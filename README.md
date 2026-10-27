@@ -18,7 +18,10 @@ an HDMI monitor shows three screens, and you change everything from your phone.
 inner micro-USB port, marked **USB** (not PWR), through an OTG adapter:
 
 - ◀ / ▶ move between days, pages or postcards.
-- ● switches screens.
+- ● switches screens. The Today screen draws these as dark arrows at the
+  ends of the week and a yellow 📞 button. Put a yellow sticker on the
+  middle key to match. When postcards are waiting, the yellow spot turns
+  into a mail tag, and pressing it opens them.
 - After two minutes without a press, it goes back to Today.
 
 You pick which button does what on the admin page.
@@ -80,6 +83,21 @@ same account, these work from anywhere:
 - `http://zelda-phone:8080/admin` (the admin page)
 
 Nothing is opened on your router.
+
+### The magnet board (touchscreen)
+A small touchscreen where Zelda drags magnets onto her day herself. It works
+on a Pi with Raspberry Pi OS **with desktop** and a working touchscreen, on
+the same Wi-Fi. A Pi 2 needs a USB Wi-Fi adapter.
+
+1. On the admin page, go to **Settings → Magnet board → Make a board link**.
+2. On the touchscreen Pi:
+   ```sh
+   git clone https://github.com/losmanzanos/tin-can.git ~/tin-can
+   sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/board#key=...'
+   ```
+It opens full screen and turns on and off with the same times as her main
+screen (08:00–20:00 unless changed). Its link can only move magnets.
+Changes show on her big screen about 10 seconds after she stops.
 
 ### Postcards by text or email
 1. Make a new Gmail just for this. Turn on 2-Step Verification and create an
