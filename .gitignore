@@ -1,0 +1,16 @@
+# Family data never goes in this public repo. It lives in ~/zelda-phone-data
+# on the Pi; these are here in case a copy ever lands in the checkout.
+zelda-phone-data/
+contacts.json
+pin.json
+session.key
+screen.json
+screen-*.raw
+photos/
+renders/
+setup.env
+*.jpg
+*.jpeg
+*.heic
+.done
+__pycache__/

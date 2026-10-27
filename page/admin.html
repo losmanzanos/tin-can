@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbf5e8">
+<title>Phone Book Admin</title>
+<style>
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+:root { --paper: #fbf5e8; --card: #fffdf7; --ink: #16181f; --mustard: #e9ad1c; --key: #262b3b; --rule: #d8cdb4; --muted: #6f6752; --bad: #a3473a; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--paper); color: var(--ink); font: 17px/1.4 "Andika", sans-serif; border-top: 10px solid var(--mustard); padding: 0 16px calc(96px + env(safe-area-inset-bottom)); }
+main { max-width: 560px; margin: 0 auto; }
+button, input, select { font: inherit; color: inherit; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 8px; }
+h1 { font-size: 24px; line-height: 1.1; }
+h2 { font-size: 19px; margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+h2 small { font-size: 14px; color: var(--muted); font-weight: 400; }
+a { color: inherit; }
+.links { display: flex; gap: 14px; font-size: 15px; white-space: nowrap; }
+.links button { background: none; border: 0; text-decoration: underline; cursor: pointer; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border: 3px solid var(--ink); border-radius: 999px; background: var(--mustard); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer; }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn.plain { background: var(--card); }
+.btn.danger { background: var(--card); color: var(--bad); border-color: var(--bad); box-shadow: 0 4px 0 var(--bad); }
+.btn:disabled { opacity: 0.45; pointer-events: none; }
+.wide { width: 100%; }
+
+/* Contact list */
+.list { list-style: none; display: grid; gap: 10px; }
+.item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 10px 10px 10px 12px; }
+.item .main { display: flex; align-items: center; gap: 12px; min-width: 0; background: none; border: 0; text-align: left; cursor: pointer; padding: 0; }
+.face { flex: none; position: relative; width: 54px; height: 54px; border: 3px solid var(--ink); border-radius: 50%; overflow: hidden; background: var(--tone, #888); display: grid; place-items: center; box-shadow: 2px 2px 0 var(--ink); }
+.face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.face span { font-weight: 700; font-size: 26px; color: #fff; line-height: 1; }
+.who { min-width: 0; }
+.who b { display: block; font-size: 19px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dial { display: flex; gap: 5px; margin-top: 4px; align-items: center; }
+.key { width: 30px; height: 24px; border-radius: 46% 54% 50% 50% / 52% 48% 52% 48%; background: var(--key); color: #fff; font-weight: 700; font-size: 15px; display: grid; place-items: center; transform: rotate(-7deg); }
+.key b { transform: rotate(7deg); }
+.pad { width: 44px; height: 26px; border-radius: 999px; background: var(--pad); border: 2px solid var(--ink); display: grid; place-items: center; flex: none; }
+.pad svg { height: 15px; width: auto; display: block; }
+.move { display: grid; gap: 6px; }
+.move button { width: 44px; height: 38px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); font-size: 18px; font-weight: 700; cursor: pointer; }
+.move button:disabled { opacity: 0.25; }
+.num { font-weight: 700; color: var(--muted); width: 18px; text-align: center; font-size: 15px; }
+.pagehead { font-weight: 700; font-size: 14px; color: var(--muted); padding: 6px 4px 0; text-transform: uppercase; letter-spacing: .06em; }
+.empty { color: var(--muted); padding: 14px; text-align: center; border: 2px dashed var(--rule); border-radius: 18px; }
+
+/* Forms */
+.panel { background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 16px; display: grid; gap: 14px; }
+label, .label { display: grid; gap: 6px; font-weight: 700; font-size: 15px; }
+.hint { font-weight: 400; color: var(--muted); font-size: 14px; }
+input[type=text], input[type=tel], input[type=time] { width: 100%; min-height: 50px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 18px; }
+input:focus-visible, button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+.check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.check input { width: 26px; height: 26px; accent-color: var(--ink); }
+.check .hint { flex-basis: 100%; padding-left: 36px; }
+.screen-state { color: var(--muted); font-size: 14px; text-align: center; margin-top: 14px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Edit sheet */
+dialog { margin: auto auto 0; width: 100%; max-width: 560px; max-height: 94vh; border: 0; border-radius: 24px 24px 0 0; background: var(--paper); color: var(--ink); padding: 0; box-shadow: 0 -8px 40px rgba(0,0,0,.25); }
+@media (min-width: 620px) { dialog { margin: auto; border-radius: 24px; } }
+dialog::backdrop { background: rgba(22,24,31,.55); }
+.sheet { display: grid; gap: 18px; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); }
+.sheet h3 { font-size: 22px; }
+.photo { display: flex; align-items: center; gap: 16px; }
+.photo .face { width: 96px; height: 96px; border-width: 4px; box-shadow: 4px 4px 0 var(--ink); }
+.photo .face span { font-size: 46px; }
+.photo .acts { display: grid; gap: 8px; }
+.photo input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.linkbtn { background: none; border: 0; text-decoration: underline; color: var(--bad); font-size: 15px; cursor: pointer; justify-self: start; }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--ink); cursor: pointer; position: relative; }
+.swatch[aria-pressed=true]::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 3px solid #fff; }
+.swatch.custom { background: conic-gradient(#e44, #ea2, #4a4, #29d, #a4d, #e44); overflow: hidden; }
+.swatch.custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; }
+.seg button { min-height: 46px; border: 0; background: var(--card); font-weight: 700; cursor: pointer; }
+.seg button[aria-pressed=true] { background: var(--ink); color: #fff; }
+.pads { display: flex; flex-wrap: wrap; gap: 12px; }
+.padopt { display: grid; justify-items: center; gap: 4px; background: none; border: 0; cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px; border-radius: 14px; }
+.padopt .pad { width: 66px; height: 38px; border-width: 3px; box-shadow: 0 3px 0 var(--ink); }
+.padopt .pad svg { height: 22px; }
+.padopt[aria-pressed=true] { outline: 3px solid var(--mustard); color: var(--ink); font-weight: 700; }
+.code { font-size: 30px !important; letter-spacing: 0.4em; text-align: center; max-width: 160px; font-weight: 700; }
+.err { color: var(--bad); font-weight: 700; }
+.err:empty { display: none; }
+.sheet .foot { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+
+/* Status toast */
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translate(-50%, 150%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 700; font-size: 15px; transition: transform .25s; max-width: calc(100% - 32px); text-align: center; z-index: 10; }
+.toast.show { transform: translate(-50%, 0); }
+.toast.bad { background: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Zelda's Phone Book</h1>
+    <div class="links"><a href="/" target="_blank">View screen</a><button id="logout">Log out</button></div>
+  </header>
+
+  <h2>Contacts <small id="count"></small></h2>
+  <ol class="list" id="list"></ol>
+  <p style="margin-top:12px"><button class="btn wide" id="add">+ Add contact</button></p>
+
+  <h2>Zelda's phone</h2>
+  <form class="panel" id="settings">
+    <label>Her number <span class="hint">Shown in the last box on the screen</span>
+      <input type="tel" id="number" maxlength="30" autocomplete="off" placeholder="(555) 555-0100">
+    </label>
+    <div class="label">Screen on and off <span class="hint">Set "on" later than "off" to keep it on overnight</span></div>
+    <div class="row2">
+      <label><span class="hint">Turns on</span><input type="time" id="on" required></label>
+      <label><span class="hint">Turns off</span><input type="time" id="off" required></label>
+    </div>
+    <label class="check"><input type="checkbox" id="flip"> Flip the picture upside down <span class="hint">For a screen mounted the other way up</span></label>
+    <button class="btn" type="submit">Save</button>
+  </form>
+  <p class="screen-state" id="screenState"></p>
+</main>
+
+<dialog id="sheet">
+  <form class="sheet" id="edit" method="dialog">
+    <h3 id="sheetTitle">Edit contact</h3>
+    <div class="photo">
+      <div class="face" id="pFace"><span id="pLetter"></span></div>
+      <div class="acts">
+        <label class="btn plain" for="file">Choose photo</label>
+        <input type="file" id="file" accept="image/*">
+        <button type="button" class="linkbtn" id="noPhoto">Remove photo</button>
+      </div>
+    </div>
+    <label>Name<input type="text" id="name" maxlength="24" required autocomplete="off"></label>
+    <label>Letter <span class="hint">Shown when there's no photo. Leave empty to use the first letter.</span>
+      <input type="text" id="letter" maxlength="2" autocomplete="off" style="max-width:110px;text-align:center;font-weight:700">
+    </label>
+    <div class="label">Color<div class="swatches" id="swatches"></div></div>
+    <div class="label">How Zelda calls them
+      <div class="seg"><button type="button" id="usePad">Top button</button><button type="button" id="useCode">2-digit code</button></div>
+    </div>
+    <div id="padBox" class="pads"></div>
+    <label id="codeBox">Code <span class="hint">Two number keys</span>
+      <input type="text" id="code" class="code" inputmode="numeric" pattern="[0-9]{2}" maxlength="2" autocomplete="off">
+    </label>
+    <div class="err" id="editErr" role="alert"></div>
+    <div class="foot">
+      <button type="button" class="btn plain" id="cancel">Cancel</button>
+      <button type="submit" class="btn" id="saveContact">Save</button>
+    </div>
+    <button type="button" class="btn danger" id="del">Delete contact</button>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="/render.js"></script>
+<script>
+const MAX_PEOPLE = PhoneBook.MAX_PEOPLE, PER_PAGE = PhoneBook.PER_PAGE;
+const PADS = {
+  bolt:  { label: "Lightning", bg: "#2c4c8c", svg: '<svg viewBox="0 0 20 30"><path d="M12 1 3 17h6l-2 12 10-17h-6z" fill="#fff"/></svg>' },
+  star:  { label: "Star", bg: "#6e9a7c", svg: '<svg viewBox="0 0 30 30"><g stroke="#fff" stroke-width="5.5" stroke-linecap="round"><path d="M15 3v24M4.6 9l20.8 12M4.6 21 25.4 9"/></g></svg>' },
+  smile: { label: "Smiley", bg: "#a3473a", svg: '<svg viewBox="0 0 30 30"><rect x="2" y="2" width="26" height="26" rx="9" fill="#f6e7cf"/><circle cx="11" cy="12" r="2.2" fill="#a3473a"/><circle cx="19" cy="12" r="2.2" fill="#a3473a"/><path d="M9.5 17.5q5.5 6 11 0" stroke="#a3473a" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg>' },
+  lips:  { label: "Lips", bg: "#a87650", svg: '<svg viewBox="0 0 40 22"><path d="M2 8q6-7 12-5 3 1 6 2 3-1 6-2 6-2 12 5-7 12-18 12T2 8z" fill="#f2b7a8"/><path d="M5 9.5q15 4 30 0" stroke="#7a3d33" stroke-width="2" fill="none" stroke-linecap="round"/></svg>' },
+};
+const TONES = ["#5c8a6c", "#2f4f8f", "#a3473a", "#6b6f7c", "#b7792f", "#9a6b4b", "#4d7a86", "#7a4f8a", "#c0577a", "#3f6b3a"];
+const $ = (id) => document.getElementById(id);
+let doc = null;
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function toast(msg, bad) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => (t.className = "toast"), bad ? 5000 : 2600);
+}
+function face(p, node) {
+  node = node || el("div", "face");
+  node.replaceChildren();
+  node.style.setProperty("--tone", p.tone || "#888");
+  node.append(el("span", null, (p.letter || "").trim() || [...(p.name || "?").trim()][0] || "?"));
+  if (p.photo) {
+    const img = el("img");
+    img.alt = "";
+    img.onerror = () => img.remove();
+    img.src = "/photos/" + encodeURIComponent(p.photo);
+    node.append(img);
+  }
+  return node;
+}
+function padChip(name) {
+  const d = el("div", "pad");
+  d.style.setProperty("--pad", PADS[name].bg);
+  d.innerHTML = PADS[name].svg; // fixed markup, never user text
+  return d;
+}
+function dial(p) {
+  const d = el("div", "dial");
+  if (p.pad && PADS[p.pad]) d.append(padChip(p.pad));
+  else if (p.code) for (const c of p.code) { const k = el("div", "key"); k.append(el("b", null, c)); d.append(k); }
+  return d;
+}
+
+async function api(method, url, body, type) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers["Content-Type"] = type || "application/json";
+    opts.body = type ? body : JSON.stringify(body);
+  }
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.reload(); throw new Error("Please log in again"); }
+  if (r.status === 409 && data.doc) { doc = data.doc; render(); }
+  if (!r.ok) throw new Error(data.error || "Something went wrong (" + r.status + ")");
+  return data;
+}
+
+async function save(next, okMsg) {
+  try {
+    doc = await api("PUT", "/api/contacts", { ...next, rev: doc.rev });
+    render();
+    toast("Saved. Updating the screen…");
+    await pushScreen();
+    toast(okMsg || "Saved. The screen is updated.");
+    return true;
+  } catch (e) {
+    toast(e.message, true);
+    return false;
+  }
+}
+
+function render() {
+  const list = $("list");
+  list.replaceChildren();
+  const people = doc.people;
+  const pages = PhoneBook.pageCount(doc);
+  $("count").textContent = people.length + " of " + MAX_PEOPLE + (pages > 1 ? " · " + pages + " pages" : "");
+  $("add").disabled = people.length >= MAX_PEOPLE;
+  $("add").textContent = people.length >= MAX_PEOPLE ? "Full (" + MAX_PEOPLE + " contacts)" : "+ Add contact";
+  if (!people.length) list.append(el("li", "empty", "No contacts yet."));
+  people.forEach((p, i) => {
+    const li = el("li", "item");
+    const main = el("button", "main");
+    main.type = "button";
+    main.setAttribute("aria-label", "Edit " + p.name);
+    const who = el("div", "who");
+    who.append(el("b", null, p.name), dial(p));
+    main.append(face(p), who);
+    main.onclick = () => openEdit(i);
+    const move = el("div", "move");
+    const up = el("button", null, "↑"), down = el("button", null, "↓");
+    up.type = down.type = "button";
+    up.setAttribute("aria-label", "Move " + p.name + " up");
+    down.setAttribute("aria-label", "Move " + p.name + " down");
+    up.disabled = i === 0;
+    down.disabled = i === people.length - 1;
+    up.onclick = () => moveTo(i, i - 1);
+    down.onclick = () => moveTo(i, i + 1);
+    move.append(up, down);
+    li.append(el("span", "num", String(i + 1)), main, move);
+    if (i % PER_PAGE === 0 && people.length > PER_PAGE) list.append(el("li", "pagehead", "Page " + (i / PER_PAGE + 1)));
+    list.append(li);
+  });
+  if (document.activeElement?.closest?.("#settings") == null) {
+    $("number").value = doc.number || "";
+    $("on").value = doc.screen?.on || "08:00";
+    $("off").value = doc.screen?.off || "20:00";
+    $("flip").checked = !!doc.screen?.flip;
+  }
+}
+
+/* ---------- the Pi's screen ----------
+   The Pi Zero has no browser, so we draw the picture here and send it the
+   pixels. Also redraws on open if the last save didn't make it to the screen. */
+let fb = null;
+async function pushScreen() {
+  if (!fb) fb = (await api("GET", "/api/screen")).fb;
+  const pages = PhoneBook.pageCount(doc);
+  for (let page = 0; page < pages; page++) {
+    const canvas = await PhoneBook.drawBook(document.createElement("canvas"), doc, fb.w, fb.h, page);
+    const r = await fetch("/api/screen", { method: "POST", body: PhoneBook.framebuffer(canvas, fb.bpp), headers: {
+      "Content-Type": "application/octet-stream", "X-Width": fb.w, "X-Height": fb.h, "X-Bpp": fb.bpp,
+      "X-Rev": doc.rev, "X-Page": page, "X-Pages": pages } });
+    if (!r.ok) throw new Error("Saved, but the screen didn't update: " + ((await r.json().catch(() => ({}))).error || r.status));
+  }
+  showScreenState({ w: fb.w, h: fb.h, bpp: fb.bpp, rev: doc.rev });
+}
+function showScreenState(drawn) {
+  $("screenState").textContent = drawn && fb
+    ? `Screen: ${fb.w}×${fb.h}${fb.real ? "" : " (no screen found, using a guess)"}. ${drawn.rev === doc.rev ? "Up to date." : "Out of date."}`
+    : "";
+}
+async function checkScreen() {
+  const s = await api("GET", "/api/screen");
+  fb = s.fb;
+  const d = s.drawn;
+  showScreenState(d);
+  if (!d || d.rev !== doc.rev || d.w !== fb.w || d.h !== fb.h || d.bpp !== fb.bpp) {
+    toast("Updating the screen…");
+    await pushScreen();
+    toast("The screen is up to date.");
+  }
+}
+
+function moveTo(from, to) {
+  const people = doc.people.slice();
+  const [p] = people.splice(from, 1);
+  people.splice(to, 0, p);
+  save({ ...doc, people }, "Moved.");
+}
+
+/* ---------- edit sheet ---------- */
+let editing = null; // { index, p }
+function openEdit(index) {
+  const isNew = index == null;
+  const base = isNew
+    ? { name: "", tone: TONES.find(t => !doc.people.some(p => p.tone === t)) || TONES[0], letter: "", photo: "" }
+    : doc.people[index];
+  const p = { ...base };
+  if (isNew) {
+    const free = freePads(null);
+    if (free.length) p.pad = free[0]; else p.code = "";
+  }
+  editing = { index, p };
+  $("sheetTitle").textContent = isNew ? "New contact" : "Edit " + p.name;
+  $("name").value = p.name;
+  $("letter").value = p.letter || "";
+  $("code").value = p.code || "";
+  $("del").hidden = isNew;
+  $("editErr").textContent = "";
+  drawSheet();
+  $("sheet").showModal();
+  if (isNew) $("name").focus();
+}
+function freePads(exceptIndex) {
+  const taken = new Set(doc.people.filter((_, i) => i !== exceptIndex).map(p => p.pad).filter(Boolean));
+  return Object.keys(PADS).filter(k => !taken.has(k));
+}
+function drawSheet() {
+  const p = editing.p;
+  face({ ...p, name: $("name").value, letter: $("letter").value }, $("pFace"));
+  $("noPhoto").hidden = !p.photo;
+
+  const sw = $("swatches");
+  sw.replaceChildren();
+  const tones = TONES.includes(p.tone) ? TONES : [...TONES, p.tone];
+  for (const t of tones) {
+    const b = el("button", "swatch");
+    b.type = "button";
+    b.style.background = t;
+    b.setAttribute("aria-label", "Color " + t);
+    b.setAttribute("aria-pressed", String(t === p.tone));
+    b.onclick = () => { p.tone = t; drawSheet(); };
+    sw.append(b);
+  }
+  const custom = el("label", "swatch custom");
+  custom.title = "Pick any color";
+  const ci = el("input");
+  ci.type = "color";
+  ci.value = p.tone;
+  ci.setAttribute("aria-label", "Pick any color");
+  ci.oninput = () => { p.tone = ci.value; drawSheet(); };
+  custom.append(ci);
+  sw.append(custom);
+
+  const usingPad = p.pad !== undefined;
+  const free = freePads(editing.index);
+  $("usePad").setAttribute("aria-pressed", String(usingPad));
+  $("useCode").setAttribute("aria-pressed", String(!usingPad));
+  $("usePad").disabled = !free.length;
+  $("usePad").textContent = free.length ? "Top button" : "Top buttons all used";
+  $("padBox").hidden = !usingPad;
+  $("codeBox").hidden = usingPad;
+  const box = $("padBox");
+  box.replaceChildren();
+  for (const k of free) {
+    const b = el("button", "padopt");
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(p.pad === k));
+    b.append(padChip(k), el("span", null, PADS[k].label));
+    b.onclick = () => { p.pad = k; drawSheet(); };
+    box.append(b);
+  }
+}
+$("name").oninput = $("letter").oninput = () => face({ ...editing.p, name: $("name").value, letter: $("letter").value }, $("pFace"));
+$("usePad").onclick = () => { const f = freePads(editing.index); if (f.length) { editing.p.pad = f.includes(editing.p.pad) ? editing.p.pad : f[0]; delete editing.p.code; drawSheet(); } };
+$("useCode").onclick = () => { delete editing.p.pad; editing.p.code = $("code").value; drawSheet(); $("code").focus(); };
+$("code").oninput = () => { $("code").value = $("code").value.replace(/\D/g, "").slice(0, 2); };
+$("cancel").onclick = () => $("sheet").close();
+$("noPhoto").onclick = () => { editing.p.photo = ""; drawSheet(); };
+
+$("edit").onsubmit = async (e) => {
+  e.preventDefault();
+  const p = editing.p;
+  p.name = $("name").value.trim();
+  p.letter = $("letter").value.trim();
+  if (p.pad === undefined) p.code = $("code").value;
+  const err = $("editErr");
+  if (!p.name) return (err.textContent = "Give them a name.");
+  if (p.pad === undefined && !/^\d\d$/.test(p.code)) return (err.textContent = "The code needs two digits.");
+  if (p.code && doc.people.some((q, i) => i !== editing.index && q.code === p.code))
+    return (err.textContent = "Someone else already has code " + p.code + ".");
+  const people = doc.people.slice();
+  if (editing.index == null) people.push(p); else people[editing.index] = p;
+  $("saveContact").disabled = true;
+  const ok = await save({ ...doc, people });
+  $("saveContact").disabled = false;
+  if (ok) $("sheet").close();
+};
+$("del").onclick = async () => {
+  const p = doc.people[editing.index];
+  if (!confirm("Delete " + p.name + " from the phone book?")) return;
+  const people = doc.people.filter((_, i) => i !== editing.index);
+  if (await save({ ...doc, people }, p.name + " deleted.")) $("sheet").close();
+};
+$("add").onclick = () => openEdit(null);
+
+/* ---------- photos: crop to a square and shrink in the browser ---------- */
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Couldn't read that photo. Try a JPEG or PNG."));
+    img.src = url;
+  });
+}
+async function squareJpeg(file, size = 400) {
+  const img = await loadImage(file); // browsers apply the EXIF rotation for us
+  const w = img.naturalWidth, h = img.naturalHeight, s = Math.min(w, h);
+  const out = Math.min(size, s);
+  const c = document.createElement("canvas");
+  c.width = c.height = out;
+  const ctx = c.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, (w - s) / 2, (h - s) / 2, s, s, 0, 0, out, out);
+  URL.revokeObjectURL(img.src);
+  return new Promise((resolve, reject) =>
+    c.toBlob(b => (b ? resolve(b) : reject(new Error("Couldn't shrink that photo."))), "image/jpeg", 0.86));
+}
+$("file").onchange = async () => {
+  const f = $("file").files[0];
+  $("file").value = "";
+  if (!f) return;
+  $("editErr").textContent = "";
+  try {
+    toast("Uploading photo…");
+    const blob = await squareJpeg(f);
+    const { photo } = await api("POST", "/api/photo", blob, "image/jpeg");
+    editing.p.photo = photo;
+    drawSheet();
+    toast("Photo ready. Tap Save to put it on the screen.");
+  } catch (e) {
+    $("editErr").textContent = e.message;
+  }
+};
+
+/* ---------- settings ---------- */
+$("settings").onsubmit = (e) => {
+  e.preventDefault();
+  document.activeElement?.blur();
+  save({ ...doc, number: $("number").value.trim(), screen: { on: $("on").value, off: $("off").value, flip: $("flip").checked } });
+};
+$("logout").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.reload(); };
+
+(async () => {
+  try { doc = await api("GET", "/api/contacts"); render(); await checkScreen(); }
+  catch (e) { toast(e.message, true); }
+})();
+</script>
+</body>
+</html>

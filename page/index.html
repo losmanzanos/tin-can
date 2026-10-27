@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zelda's Phone Book</title>
+<style>
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+* { margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #fbf5e8; }
+canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<!-- A live preview of exactly what the Pi's screen shows. -->
+<canvas id="book" aria-label="Zelda's phone book"></canvas>
+<script src="/render.js"></script>
+<script>
+const canvas = document.getElementById("book");
+let doc = null, seen = null, page = 0;
+
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+function draw() {
+  if (!doc) return;
+  const dpr = window.devicePixelRatio || 1;
+  page = page % PhoneBook.pageCount(doc);
+  PhoneBook.drawBook(canvas, doc, Math.round(innerWidth * dpr), Math.round(innerHeight * dpr), page);
+}
+// Same as the Pi: flip pages every 20 seconds; arrow keys go back and forth.
+let flipped = Date.now();
+function turn(by) {
+  if (!doc) return;
+  const n = PhoneBook.pageCount(doc);
+  page = (page + by + n) % n;
+  flipped = Date.now();
+  draw();
+}
+setInterval(() => { if (Date.now() - flipped >= 20000) turn(1); }, 1000);
+addEventListener("keydown", (e) => {
+  if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) turn(-1);
+  else if (e.key.length === 1 || ["ArrowRight", "ArrowDown", "PageDown", "Enter", " "].includes(e.key)) turn(1);
+});
+// Redraw whenever the admin page saves. If the server restarted (an update),
+// reload so new page code shows up too.
+async function refresh() {
+  try {
+    const v = await getJSON("/api/version");
+    if (seen && v.boot !== seen.boot) return location.reload();
+    if (!seen || v.rev !== seen.rev) {
+      doc = await getJSON("/api/contacts");
+      seen = v;
+      draw();
+    }
+  } catch (e) { /* server restarting: keep what's showing */ }
+}
+addEventListener("resize", draw);
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

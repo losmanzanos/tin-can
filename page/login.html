@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#fbf5e8">
+<title>Phone Book Admin</title>
+<style>
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+:root { --paper: #fbf5e8; --ink: #16181f; --mustard: #e9ad1c; --rule: #d8cdb4; --muted: #6f6752; --bad: #a3473a; }
+* { box-sizing: border-box; margin: 0; }
+body { min-height: 100vh; display: grid; place-items: center; background: var(--paper); color: var(--ink); font: 18px/1.4 "Andika", sans-serif; padding: 16px; border-top: 10px solid var(--mustard); }
+form { width: 100%; max-width: 340px; display: grid; gap: 14px; }
+h1 { font-size: 28px; line-height: 1.1; }
+p { color: var(--muted); }
+input { font: inherit; font-size: 28px; letter-spacing: 0.3em; text-align: center; padding: 12px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; width: 100%; }
+button { font: inherit; font-weight: 700; font-size: 20px; padding: 14px; border: 3px solid var(--ink); border-radius: 999px; background: var(--mustard); color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.err { color: var(--bad); font-weight: 700; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<form id="f">
+  <h1>Zelda's Phone Book</h1>
+  <p>Enter the admin PIN to change contacts.</p>
+  <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN" autofocus required>
+  <button type="submit">Unlock</button>
+  <div class="err" id="err" role="alert"></div>
+</form>
+<script>
+document.getElementById("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("err");
+  err.textContent = "";
+  try {
+    const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: document.getElementById("pin").value }) });
+    if (r.ok) return location.reload();
+    err.textContent = (await r.json()).error || "Didn't work";
+  } catch { err.textContent = "Can't reach the phone book. Is the Pi on?"; }
+  document.getElementById("pin").select();
+});
+</script>
+</body>
+</html>
