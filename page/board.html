@@ -27,19 +27,20 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
   background: #fffdf7; padding: calc(var(--u) * 1) calc(var(--u) * 2) calc(var(--u) * 1.6); min-height: 0; }
 .day h1 { text-align: center; color: var(--dayText); font-size: calc(var(--u) * 6); line-height: 1.2; border-bottom: calc(var(--u) * 0.5) solid var(--day); margin: 0 calc(var(--u) * 6) calc(var(--u) * 1); }
 .row { display: grid; grid-template-columns: calc(var(--u) * 10) 1fr; align-items: center; gap: calc(var(--u) * 1.5); border-radius: calc(var(--u) * 3); padding: 0 calc(var(--u) * 1); min-height: 0; transition: background .12s; }
-.row.now { background: color-mix(in srgb, var(--day) 18%, transparent); }
-.row.over { background: color-mix(in srgb, var(--mustard) 45%, transparent); outline: calc(var(--u) * 0.6) dashed var(--ink); }
+.row.now { background: var(--dayTint); }
+.row.over { background: rgba(233, 173, 28, 0.45); outline: calc(var(--u) * 0.6) dashed var(--ink); }
 .row canvas.icon { width: calc(var(--u) * 9); height: calc(var(--u) * 9); }
 .slots { display: flex; gap: calc(var(--u) * 2); justify-content: center; align-items: center; height: 100%; }
 .slot { width: calc(var(--u) * 17); height: calc(var(--u) * 17); border: calc(var(--u) * 0.6) dashed var(--rule); border-radius: calc(var(--u) * 3); }
 
 /* The tile tray: every magnet she can use. */
-.tray { background: #efe6d2; border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 2); display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 13), 1fr));
+.tray { background: #efe6d2; border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 2); display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 21), 1fr));
   gap: calc(var(--u) * 1.6); align-content: start; overflow-y: auto; min-height: 0; touch-action: pan-y; transition: background .12s; }
 .tray.over { background: #e4d6b6; outline: calc(var(--u) * 0.6) dashed var(--ink); }
 
 .tile { width: calc(var(--u) * 17); height: calc(var(--u) * 17); display: block; touch-action: none; }
-.tray .tile { width: calc(var(--u) * 13); height: calc(var(--u) * 13); justify-self: center; }
+/* Big enough for a small finger. Up/down scrolls the tray; sideways picks a magnet up. */
+.tray .tile { width: calc(var(--u) * 21); height: calc(var(--u) * 21); justify-self: center; touch-action: pan-y; }
 .tile.placed { animation: pop .25s ease-out; }
 @keyframes pop { 0% { transform: scale(.7); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
 .ghost { position: fixed; z-index: 10; pointer-events: none; width: calc(var(--u) * 20); height: calc(var(--u) * 20); transform: translate(-50%, -60%) rotate(-4deg);
@@ -76,7 +77,7 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 const PB = window.PhoneBook;
 const $ = (id) => document.getElementById(id);
 const IDLE_MS = 120000;       // back to today after two minutes
-const REDRAW_AFTER_MS = 8000; // wait for her to finish before redrawing the big screen
+const REDRAW_AFTER_MS = 20000; // wait for her to finish before redrawing the big screen (slow on a Pi 2)
 
 let key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
 try { if (key) localStorage.setItem("zp-board-key", key); else key = localStorage.getItem("zp-board-key") || ""; } catch (e) {}
@@ -114,6 +115,8 @@ function render() {
   const today = PB.weekdayOf(new Date());
   document.documentElement.style.setProperty("--day", PB.DAY_COLORS[day]);
   document.documentElement.style.setProperty("--dayText", PB.DAY_TEXT[day]);
+  const hex = PB.DAY_COLORS[day], rgb = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  document.documentElement.style.setProperty("--dayTint", `rgba(${rgb.join(",")},0.2)`);
   const days = $("days");
   days.replaceChildren(...PB.DAYS.map((name, d) => {
     const b = el("button", (d === 2 || d === 6 ? "light " : "") + (d < today ? "past" : ""));
@@ -147,18 +150,32 @@ function targetAt(x, y) {
   const hit = document.elementFromPoint(x, y);
   return hit?.closest(".row") || hit?.closest("#tray") || null;
 }
+// Magnets already on the day lift straight away. In the tray, wait to see
+// which way the finger goes: sideways (toward the day) picks it up, up/down scrolls.
+let pending = null;
 document.addEventListener("pointerdown", (e) => {
   const tile = e.target.closest(".tile");
   if (!tile || dragging) return;
-  e.preventDefault();
   touched = Date.now();
+  if (tile.closest("#tray") && e.pointerType !== "mouse") { pending = { tile, x: e.clientX, y: e.clientY }; return; }
+  startDrag(tile, e);
+});
+document.addEventListener("pointermove", (e) => {
+  if (!pending || dragging) return;
+  const dx = e.clientX - pending.x, dy = e.clientY - pending.y;
+  if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { const t = pending.tile; pending = null; startDrag(t, e); }
+  else if (Math.abs(dy) > 12) pending = null;   // scrolling the tray
+});
+for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, () => (pending = null));
+function startDrag(tile, e) {
+  e.preventDefault();
   const ghost = tileCanvas(doc.tiles.find(t => t.id === tile.dataset.id));
   ghost.className = "ghost";
   document.body.append(ghost);
   dragging = { id: tile.dataset.id, from: tile.dataset.from != null ? +tile.dataset.from : null, ghost, over: null, startX: e.clientX, startY: e.clientY };
   if (dragging.from != null) tile.style.opacity = ".25";
   move(e);
-});
+}
 function move(e) {
   if (!dragging) return;
   dragging.ghost.style.left = e.clientX + "px";

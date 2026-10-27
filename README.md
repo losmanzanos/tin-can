@@ -85,19 +85,46 @@ same account, these work from anywhere:
 Nothing is opened on your router.
 
 ### The magnet board (touchscreen)
-A small touchscreen where Zelda drags magnets onto her day herself. It works
-on a Pi with Raspberry Pi OS **with desktop** and a working touchscreen, on
-the same Wi-Fi. A Pi 2 needs a USB Wi-Fi adapter.
+A little touchscreen where Zelda drags magnets onto her day herself. Built
+for a **Raspberry Pi 2 Model B** with a **3.5" 480×320 SPI touchscreen**
+(ILI9486 display, XPT2046 touch) plugged onto its pins. It also works on any
+Pi with that screen.
 
-1. On the admin page, go to **Settings → Magnet board → Make a board link**.
-2. On the touchscreen Pi:
-   ```sh
-   git clone https://github.com/losmanzanos/tin-can.git ~/tin-can
-   sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/board#key=...'
-   ```
-It opens full screen and turns on and off with the same times as her main
-screen (08:00–20:00 unless changed). Its link can only move magnets.
-Changes show on her big screen about 10 seconds after she stops.
+**1. Make the SD card** in Raspberry Pi Imager:
+- Device: *Raspberry Pi 2*.
+- OS: *Raspberry Pi OS (other) → Raspberry Pi OS Lite (32-bit)*.
+- Edit settings:
+  - hostname `zelda-board`
+  - your username and password
+  - your Wi-Fi and Wireless LAN country
+  - your time zone
+  - Services: turn on SSH
+
+**2. Plug in the Wi-Fi stick.** Use the Edimax. The Pi 2 has no Wi-Fi of its
+own; Ethernet works too. Press the screen onto the pins: it covers the first
+26 pins, at the end by the SD card. Then boot it. The screen stays white
+until setup is done.
+
+**3. Make the board's link** on the admin page: **Settings → Magnet board →
+Make a board link**.
+
+**4. Set it up**, from your laptop:
+```sh
+ssh chad@zelda-board.local
+sudo apt-get update && sudo apt-get install -y git
+git clone https://github.com/losmanzanos/tin-can.git ~/tin-can
+sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/board#key=...'
+```
+It reboots into the board. It turns on and off with the same times as her
+main screen, and its link can only move magnets. Her big screen picks up her
+changes about 20 seconds after she stops.
+
+**If it isn't right the first time:**
+- **Upside down:** run setup again with `ROTATE=270 sudo -E bash ~/tin-can/board/setup.sh '...'`.
+- **Taps land in the wrong place:** tell Claude where you tapped and where it
+  landed. The fix is one line in `/etc/X11/xorg.conf.d/99-zelda-touch.conf`.
+- **Screen stays white:** the driver didn't load. Try
+  `OVERLAY=waveshare35a sudo -E bash ~/tin-can/board/setup.sh '...'`.
 
 ### Postcards by text or email
 1. Make a new Gmail just for this. Turn on 2-Step Verification and create an
