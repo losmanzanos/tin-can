@@ -12,10 +12,12 @@ DATA=$H/zelda-phone-data
 OPT=/opt/zelda-phone
 ASK=0; [ -t 0 ] && [ -z "${ZELDA_NONINTERACTIVE:-}" ] && ASK=1
 
-# Tools. Raspberry Pi OS Lite ships these; this is only a fallback.
+# Tools. Raspberry Pi OS Lite ships python3 and git; Pillow (python3-pil)
+# lets the Pi draw postcards that arrive by email.
 NEED=()
 command -v python3 >/dev/null || NEED+=(python3)
 command -v git >/dev/null || NEED+=(git)
+python3 -c 'import PIL' 2>/dev/null || NEED+=(python3-pil)
 if [ ${#NEED[@]} -gt 0 ]; then
   apt-get update
   apt-get install -y "${NEED[@]}"
@@ -69,7 +71,7 @@ UNIT
 
 cat > /etc/systemd/system/zelda-phone-web.service <<UNIT
 [Unit]
-Description=Zelda's phone book admin page (port 8080)
+Description=Zelda's screen: admin page, Zelda's view and postcards (port 8080)
 After=network.target
 
 [Service]
@@ -97,7 +99,25 @@ systemctl daemon-reload
 systemctl enable zelda-phone.service zelda-phone-web.service
 systemctl restart zelda-phone-web.service zelda-phone.service
 
+# Optional: Tailscale, to reach the admin page and Zelda's view from anywhere
+# without opening anything on the router. Asks once; ZELDA_TAILSCALE=1 says yes.
+if ! command -v tailscale >/dev/null; then
+  WANT=${ZELDA_TAILSCALE:-}
+  if [ -z "$WANT" ] && [ "$ASK" = 1 ]; then
+    read -r -p "Set up Tailscale for access away from home? [y/N] " WANT </dev/tty || true
+  fi
+  if [[ "$WANT" =~ ^(1|y|Y|yes)$ ]]; then
+    curl -fsSL https://tailscale.com/install.sh | sh
+  fi
+fi
+if command -v tailscale >/dev/null && ! tailscale status >/dev/null 2>&1; then
+  echo
+  echo "Tailscale is installed but not signed in. Run:  sudo tailscale up"
+  echo "and open the link it prints. Then use http://$(hostname):8080/ from your phone anywhere."
+fi
+
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
 echo "Done. On your phone (same Wi-Fi) open:"
 echo "  http://$(hostname).local:8080/admin${IP:+   or   http://$IP:8080/admin}"
+echo "Zelda's view (calendar, phone book, postcards):  http://$(hostname).local:8080/"

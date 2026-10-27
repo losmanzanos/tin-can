@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#fbf5e8">
-<title>Phone Book Admin</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="/icons/zelda-180.png">
+<title>Zelda's Screen · Admin</title>
 <style>
 @font-face { font-family: "Andika"; src: url("/fonts/andika-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
 @font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
@@ -14,22 +16,30 @@
 html { -webkit-text-size-adjust: 100%; }
 body { background: var(--paper); color: var(--ink); font: 17px/1.4 "Andika", sans-serif; border-top: 10px solid var(--mustard); padding: 0 16px calc(96px + env(safe-area-inset-bottom)); }
 main { max-width: 560px; margin: 0 auto; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 8px; }
 h1 { font-size: 24px; line-height: 1.1; }
-h2 { font-size: 19px; margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+h2 { font-size: 19px; margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 h2 small { font-size: 14px; color: var(--muted); font-weight: 400; }
 a { color: inherit; }
 .links { display: flex; gap: 14px; font-size: 15px; white-space: nowrap; }
 .links button { background: none; border: 0; text-decoration: underline; cursor: pointer; }
 
+/* Tabs */
+.tabs { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px 0; background: var(--paper); }
+.tabs button { min-height: 42px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); font-weight: 700; font-size: 15px; cursor: pointer; position: relative; }
+.tabs button[aria-current=true] { background: var(--ink); color: #fff; }
+.tabs .dot { position: absolute; top: -7px; right: 4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--mustard); color: var(--ink); font-size: 12px; line-height: 16px; border: 2px solid var(--ink); }
+
 /* Buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border: 3px solid var(--ink); border-radius: 999px; background: var(--mustard); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border: 3px solid var(--ink); border-radius: 999px; background: var(--mustard); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer; text-decoration: none; }
 .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 .btn.plain { background: var(--card); }
+.btn.small { min-height: 38px; padding: 0 14px; font-size: 15px; border-width: 2px; box-shadow: 0 3px 0 var(--ink); }
 .btn.danger { background: var(--card); color: var(--bad); border-color: var(--bad); box-shadow: 0 4px 0 var(--bad); }
 .btn:disabled { opacity: 0.45; pointer-events: none; }
 .wide { width: 100%; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* Contact list */
 .list { list-style: none; display: grid; gap: 10px; }
@@ -51,40 +61,83 @@ a { color: inherit; }
 .num { font-weight: 700; color: var(--muted); width: 18px; text-align: center; font-size: 15px; }
 .pagehead { font-weight: 700; font-size: 14px; color: var(--muted); padding: 6px 4px 0; text-transform: uppercase; letter-spacing: .06em; }
 .empty { color: var(--muted); padding: 14px; text-align: center; border: 2px dashed var(--rule); border-radius: 18px; }
+.mail-tag { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+/* Week */
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.days button { min-height: 52px; border-radius: 14px; border: 3px solid transparent; background: var(--c); color: #fff; font-weight: 700; font-size: 17px; cursor: pointer; position: relative; }
+.days button.light { color: var(--ink); }
+.days button[aria-pressed=true] { border-color: var(--ink); box-shadow: 0 4px 0 var(--ink); transform: translateY(-3px); }
+.days button .today { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); font-size: 10px; color: var(--ink); font-weight: 700; letter-spacing: .04em; }
+.preview { width: 100%; aspect-ratio: 1024 / 600; border-radius: 14px; border: 2px solid var(--rule); background: #fff; display: block; margin-top: 28px; }
+.period { background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 12px; display: grid; gap: 10px; }
+.period h3 { font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.period h3 canvas { width: 30px; height: 30px; }
+.slots { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.placed { display: grid; justify-items: center; gap: 4px; width: 104px; font-size: 13px; text-align: center; position: relative; }
+.placed canvas, .tilebtn canvas { width: 84px; height: 84px; }
+.placed .x { position: absolute; top: -6px; right: 4px; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); background: var(--card); font-weight: 700; cursor: pointer; line-height: 1; }
+.addtile { width: 104px; min-height: 104px; border: 3px dashed var(--rule); border-radius: 16px; background: none; color: var(--muted); font-weight: 700; cursor: pointer; }
+.tilegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.tilebtn { display: grid; justify-items: center; gap: 4px; background: none; border: 0; cursor: pointer; font-size: 13px; padding: 4px; border-radius: 14px; }
+.tilebtn:active { background: var(--rule); }
+.tilebtn.new { border: 3px dashed var(--rule); min-height: 110px; align-content: center; color: var(--muted); font-weight: 700; }
 
 /* Forms */
 .panel { background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 16px; display: grid; gap: 14px; }
 label, .label { display: grid; gap: 6px; font-weight: 700; font-size: 15px; }
 .hint { font-weight: 400; color: var(--muted); font-size: 14px; }
-input[type=text], input[type=tel], input[type=time] { width: 100%; min-height: 50px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 18px; }
-input:focus-visible, button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
-.check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.hint a { color: var(--ink); }
+input[type=text], input[type=tel], input[type=time], input[type=email], input[type=password], input[type=url], select, textarea { width: 100%; min-height: 50px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 18px; }
+textarea { min-height: 80px; resize: vertical; }
+input:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+.check { display: grid; grid-template-columns: 26px 1fr; align-items: center; gap: 4px 10px; }
 .check input { width: 26px; height: 26px; accent-color: var(--ink); }
-.check .hint { flex-basis: 100%; padding-left: 36px; }
+.check .hint { grid-column: 2; }
+/* Inputs (time pickers especially) must not push a panel wider than the phone. */
+.panel > *, .row2 > *, label { min-width: 0; }
+input, select, textarea { min-width: 0; max-width: 100%; }
 .screen-state { color: var(--muted); font-size: 14px; text-align: center; margin-top: 14px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.status { font-size: 14px; color: var(--muted); }
+.status.ok { color: #3f7a3a; }
+.status.bad { color: var(--bad); }
+code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padding: 1px 6px; font-size: 14px; word-break: break-all; }
 
-/* Edit sheet */
-/* On phones the sheet fills the *visible* screen (dvh), so the browser's
-   address bar and toolbar never cover its top or bottom. */
+/* Postcards */
+.cards { list-style: none; display: grid; gap: 10px; }
+.cardrow { display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: center; background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 10px; }
+.cardrow img, .cardrow .txt { width: 76px; height: 76px; object-fit: cover; border-radius: 12px; border: 2px solid var(--ink); background: #fff; }
+.cardrow .txt { display: grid; place-items: center; font-size: 12px; padding: 4px; text-align: center; overflow: hidden; }
+.cardrow b { display: block; }
+.cardrow .meta { font-size: 13px; color: var(--muted); }
+.pending { border-color: var(--mustard); background: #fff6dc; }
+.sendprev { width: 100%; border-radius: 14px; border: 2px solid var(--ink); display: block; }
+.keychips { display: flex; flex-wrap: wrap; gap: 8px; }
+.keychip { display: grid; gap: 4px; padding: 8px 10px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; font-size: 14px; }
+.keychip select { min-height: 38px; font-size: 15px; padding: 4px 8px; }
+
+/* Sheets (dialogs). On phones they fill the *visible* screen (dvh), so the
+   browser's address bar and toolbar never cover their top or bottom. */
 dialog { position: fixed; inset: 0; margin: 0; width: 100%; max-width: 100%; height: 100vh; height: 100dvh; max-height: none; border: 0; border-radius: 0; background: var(--paper); color: var(--ink); padding: 0; overflow-y: auto; overscroll-behavior: contain; }
 @media (min-width: 620px) { dialog { margin: auto; width: 560px; height: auto; max-height: 90vh; max-height: 90dvh; border-radius: 24px; box-shadow: 0 8px 40px rgba(0,0,0,.25); } }
 dialog::backdrop { background: rgba(22,24,31,.55); }
-.sheet { display: grid; gap: 18px; padding: calc(20px + env(safe-area-inset-top)) 18px 0; }
+.sheet { display: grid; gap: 18px; padding: calc(20px + env(safe-area-inset-top)) 18px 0; min-height: 100%; align-content: start; }
 .sheet h3 { font-size: 22px; }
 .photo { display: flex; align-items: center; gap: 16px; }
 .photo .face { width: 96px; height: 96px; border-width: 4px; box-shadow: 4px 4px 0 var(--ink); }
 .photo .face span { font-size: 46px; }
 .photo .acts { display: grid; gap: 8px; }
-.photo input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .linkbtn { background: none; border: 0; text-decoration: underline; color: var(--bad); font-size: 15px; cursor: pointer; justify-self: start; }
 .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
 .swatch { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--ink); cursor: pointer; position: relative; }
 .swatch[aria-pressed=true]::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 3px solid #fff; }
 .swatch.custom { background: conic-gradient(#e44, #ea2, #4a4, #29d, #a4d, #e44); overflow: hidden; }
 .swatch.custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; }
 .seg button { min-height: 46px; border: 0; background: var(--card); font-weight: 700; cursor: pointer; }
+.seg button + button { border-left: 2px solid var(--ink); }
 .seg button[aria-pressed=true] { background: var(--ink); color: #fff; }
 .pads { display: flex; flex-wrap: wrap; gap: 12px; }
 .padopt { display: grid; justify-items: center; gap: 4px; background: none; border: 0; cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px; border-radius: 14px; }
@@ -95,10 +148,21 @@ dialog::backdrop { background: rgba(22,24,31,.55); }
 .err { color: var(--bad); font-weight: 700; }
 .err:empty { display: none; }
 /* Cancel / Save stay pinned to the bottom while the form scrolls. */
-.sheet .foot { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin: 0 -18px; padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 2px solid var(--rule); }
+.sheet .foot { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin: auto -18px 0; padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 2px solid var(--rule); }
+.tileprev { width: 120px; height: 120px; }
+.emojis { display: flex; flex-wrap: wrap; gap: 6px; }
+.emojis button { width: 46px; height: 46px; font-size: 26px; border: 2px solid var(--rule); border-radius: 12px; background: #fff; cursor: pointer; }
+
+/* Doodle pad */
+.doodle { width: 100%; aspect-ratio: 4 / 3; border: 3px solid var(--ink); border-radius: 14px; background: #fff; touch-action: none; display: block; }
+.inks { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inks .swatch { width: 38px; height: 38px; }
+.sizes button { width: 44px; height: 44px; border: 2px solid var(--ink); border-radius: 50%; background: #fff; display: grid; place-items: center; cursor: pointer; }
+.sizes button[aria-pressed=true] { background: var(--mustard); }
+.sizes i { display: block; border-radius: 50%; background: var(--ink); }
 
 /* Status toast */
-.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translate(-50%, 150%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 700; font-size: 15px; transition: transform .25s; max-width: calc(100% - 32px); text-align: center; z-index: 10; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translate(-50%, 150%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 700; font-size: 15px; transition: transform .25s; max-width: calc(100% - 32px); text-align: center; z-index: 20; }
 .toast.show { transform: translate(-50%, 0); }
 .toast.bad { background: var(--bad); }
 </style>
@@ -106,30 +170,111 @@ dialog::backdrop { background: rgba(22,24,31,.55); }
 <body>
 <main>
   <header>
-    <h1>Zelda's Phone Book</h1>
+    <h1>Zelda's Screen</h1>
     <div class="links"><a href="/" target="_blank">View screen</a><button id="logout">Log out</button></div>
   </header>
+  <nav class="tabs" id="tabs">
+    <button data-tab="week">Week</button>
+    <button data-tab="contacts">Contacts</button>
+    <button data-tab="postcards">Postcards<span class="dot" id="pendingDot" hidden></span></button>
+    <button data-tab="settings">Settings</button>
+  </nav>
 
-  <h2>Contacts <small id="count"></small></h2>
-  <ol class="list" id="list"></ol>
-  <p style="margin-top:12px"><button class="btn wide" id="add">+ Add contact</button></p>
+  <!-- ============ WEEK ============ -->
+  <section id="tab-week" hidden>
+    <div class="days" id="days"></div>
+    <canvas class="preview" id="dayPreview" aria-label="How this day looks on the screen"></canvas>
+    <div id="periods" style="display:grid;gap:10px;margin-top:14px"></div>
+    <h2>Tiles <small>Tap one to change it</small></h2>
+    <div class="tilegrid" id="tileLib"></div>
+  </section>
 
-  <h2>Zelda's phone</h2>
-  <form class="panel" id="settings">
-    <label>Her number <span class="hint">Shown in the last box on the screen</span>
-      <input type="tel" id="number" maxlength="30" autocomplete="off" placeholder="(555) 555-0100">
-    </label>
-    <div class="label">Screen on and off <span class="hint">Set "on" later than "off" to keep it on overnight</span></div>
-    <div class="row2">
-      <label><span class="hint">Turns on</span><input type="time" id="on" required></label>
-      <label><span class="hint">Turns off</span><input type="time" id="off" required></label>
+  <!-- ============ CONTACTS ============ -->
+  <section id="tab-contacts" hidden>
+    <h2>Contacts <small id="count"></small></h2>
+    <ol class="list" id="list"></ol>
+    <p style="margin-top:12px"><button class="btn wide" id="add">+ Add contact</button></p>
+  </section>
+
+  <!-- ============ POSTCARDS ============ -->
+  <section id="tab-postcards" hidden>
+    <h2>Send Zelda a postcard</h2>
+    <form class="panel" id="sendForm">
+      <canvas class="sendprev" id="sendPreview" hidden></canvas>
+      <div class="row-btns">
+        <label class="btn plain small" for="cardFile">Choose photo</label>
+        <input type="file" id="cardFile" accept="image/*">
+        <button type="button" class="btn plain small" id="openDoodle">Draw something</button>
+        <button type="button" class="linkbtn" id="clearCard" hidden>Start over</button>
+      </div>
+      <label>Message <span class="hint">Optional. Short is best.</span>
+        <input type="text" id="cardCaption" maxlength="120" autocomplete="off" placeholder="We love you!">
+      </label>
+      <label>From<select id="cardFrom"></select></label>
+      <button class="btn" type="submit" id="sendCard">Send to her screen</button>
+    </form>
+    <h2>Postcards <small id="cardCount"></small></h2>
+    <ul class="cards" id="cardList"></ul>
+    <div id="ignoredBox" hidden>
+      <h2>Not shown <small>Sent from addresses that aren't in the phone book</small></h2>
+      <ul class="cards" id="ignoredList"></ul>
     </div>
-    <label class="check"><input type="checkbox" id="flip"> Flip the picture upside down <span class="hint">For a screen mounted the other way up</span></label>
-    <button class="btn" type="submit">Save</button>
-  </form>
-  <p class="screen-state" id="screenState"></p>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="tab-settings" hidden>
+    <h2>Zelda's phone</h2>
+    <form class="panel" id="settings">
+      <label>Her number <span class="hint">Shown in the last box of the phone book</span>
+        <input type="tel" id="number" maxlength="30" autocomplete="off" placeholder="(555) 555-0100">
+      </label>
+      <div class="label">Screen on and off <span class="hint">Set "on" later than "off" to keep it on overnight</span></div>
+      <div class="row2">
+        <label><span class="hint">Turns on</span><input type="time" id="on" required></label>
+        <label><span class="hint">Turns off</span><input type="time" id="off" required></label>
+      </div>
+      <label class="check"><input type="checkbox" id="flip"> Flip the picture upside down <span class="hint">For a screen mounted the other way up</span></label>
+      <button class="btn" type="submit">Save</button>
+    </form>
+
+    <h2>Zelda's buttons</h2>
+    <div class="panel">
+      <p class="hint">Press each button on her controller once, then tap <b>Check again</b>. Pick what each one should do.</p>
+      <div class="keychips" id="keyChips"></div>
+      <div class="row-btns"><button type="button" class="btn plain small" id="refreshKeys">Check again</button><button type="button" class="btn small" id="saveKeys">Save buttons</button></div>
+    </div>
+
+    <h2>Postcards by text or email</h2>
+    <form class="panel" id="mailForm">
+      <p class="hint">Make a new Gmail just for Zelda's postcards, turn on 2-Step Verification, then create an
+        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app password</a>.
+        Family in the phone book (with their email or mobile number filled in) can then text or email a photo to that address.</p>
+      <label>Postcard email address<input type="email" id="imapUser" autocomplete="off" placeholder="zelda.postcards@gmail.com"></label>
+      <label>App password <span class="hint" id="pwState"></span><input type="password" id="imapPass" autocomplete="new-password" placeholder="16 letters from Google"></label>
+      <details><summary class="hint">Not Gmail?</summary><label style="margin-top:8px">Mail server (IMAP)<input type="text" id="imapHost" autocomplete="off"></label></details>
+      <label class="check"><input type="checkbox" id="approve"> Ask me before a postcard goes on her screen <span class="hint">Messages that can't be verified always wait for your OK</span></label>
+      <div class="status" id="inboxStatus"></div>
+      <div class="row-btns"><button class="btn small" type="submit">Save</button><button type="button" class="btn plain small" id="testMail">Test</button><button type="button" class="btn plain small" id="vcard">Contact card for family</button></div>
+    </form>
+
+    <h2>Alerts on your phone (ntfy)</h2>
+    <form class="panel" id="ntfyForm">
+      <p class="hint">Install the <b>ntfy</b> app, add a subscription and paste the topic below. You'll get a ping when a postcard arrives. The topic works like a password, so keep it long and random.</p>
+      <label>Topic<input type="text" id="ntfyTopic" autocomplete="off" spellcheck="false"></label>
+      <button type="button" class="linkbtn" id="newTopic" style="color:var(--ink)">Make a random topic</button>
+      <details><summary class="hint">More</summary>
+        <div style="display:grid;gap:12px;margin-top:8px">
+          <label>ntfy server<input type="url" id="ntfyServer" autocomplete="off"></label>
+          <label>Address for Zelda's view <span class="hint">Where tapping an alert takes you. With Tailscale this is the Pi's name, e.g. http://zelda-phone:8080/</span><input type="url" id="viewUrl" autocomplete="off"></label>
+        </div>
+      </details>
+      <div class="row-btns"><button class="btn small" type="submit">Save</button><button type="button" class="btn plain small" id="testNtfy">Send a test</button></div>
+    </form>
+    <p class="screen-state" id="screenState"></p>
+  </section>
 </main>
 
+<!-- Contact sheet -->
 <dialog id="sheet">
   <form class="sheet" id="edit" method="dialog">
     <h3 id="sheetTitle">Edit contact</h3>
@@ -153,6 +298,9 @@ dialog::backdrop { background: rgba(22,24,31,.55); }
     <label id="codeBox">Code <span class="hint">Two number keys</span>
       <input type="text" id="code" class="code" inputmode="numeric" pattern="[0-9]{2}" maxlength="2" autocomplete="off">
     </label>
+    <div class="label">Postcards from them <span class="hint">So their texts and emails reach Zelda. Never shown on her screen.</span></div>
+    <label><span class="hint">Mobile number</span><input type="tel" id="cPhone" maxlength="30" autocomplete="off"></label>
+    <label><span class="hint">Email</span><input type="email" id="cEmail" maxlength="120" autocomplete="off"></label>
     <button type="button" class="btn danger" id="del">Delete contact</button>
     <div class="err" id="editErr" role="alert"></div>
     <div class="foot">
@@ -162,11 +310,57 @@ dialog::backdrop { background: rgba(22,24,31,.55); }
   </form>
 </dialog>
 
+<!-- Pick a tile for a period -->
+<dialog id="pickSheet">
+  <div class="sheet">
+    <h3 id="pickTitle">Add a tile</h3>
+    <div class="tilegrid" id="pickGrid"></div>
+    <div class="foot" style="grid-template-columns:1fr"><button type="button" class="btn plain" id="pickCancel">Cancel</button></div>
+  </div>
+</dialog>
+
+<!-- Edit a tile -->
+<dialog id="tileSheet">
+  <form class="sheet" id="tileForm" method="dialog">
+    <h3 id="tileTitle">Tile</h3>
+    <canvas class="tileprev" id="tilePrev"></canvas>
+    <label>Name <span class="hint">For grown-ups; shown next to it on the screen</span><input type="text" id="tLabel" maxlength="24" autocomplete="off" required></label>
+    <div class="seg" id="tKind">
+      <button type="button" data-kind="emoji">Picture</button><button type="button" data-kind="photo">Photo</button>
+      <button type="button" data-kind="face">Face</button><button type="button" data-kind="blank">Blank</button>
+    </div>
+    <div id="tEmojiBox" class="label">Any emoji
+      <input type="text" id="tEmoji" maxlength="16" autocomplete="off" style="font-size:28px;max-width:140px;text-align:center">
+      <div class="emojis" id="emojiPicks"></div>
+    </div>
+    <div id="tPhotoBox" class="label">Photo of her real magnet, or anything else
+      <div><label class="btn plain small" for="tFile">Choose photo</label><input type="file" id="tFile" accept="image/*"></div>
+    </div>
+    <div id="tFaceBox" class="label">Color<div class="swatches" id="tFaceColors"></div></div>
+    <button type="button" class="btn danger" id="tDel">Delete tile</button>
+    <div class="err" id="tileErr" role="alert"></div>
+    <div class="foot"><button type="button" class="btn plain" id="tCancel">Cancel</button><button type="submit" class="btn">Save</button></div>
+  </form>
+</dialog>
+
+<!-- Doodle pad -->
+<dialog id="doodleSheet">
+  <div class="sheet">
+    <h3>Draw for Zelda</h3>
+    <canvas class="doodle" id="doodle" width="1200" height="900"></canvas>
+    <div class="inks" id="inks"></div>
+    <div class="inks sizes" id="sizes"></div>
+    <div class="row-btns"><button type="button" class="btn plain small" id="undo">Undo</button><button type="button" class="btn plain small" id="wipe">Clear</button></div>
+    <div class="foot"><button type="button" class="btn plain" id="doodleCancel">Cancel</button><button type="button" class="btn" id="doodleDone">Use drawing</button></div>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script src="/render.js"></script>
 <script>
-const MAX_PEOPLE = PhoneBook.MAX_PEOPLE, PER_PAGE = PhoneBook.PER_PAGE;
+const PB = window.PhoneBook;
+const MAX_PEOPLE = PB.MAX_PEOPLE, PER_PAGE = PB.PER_PAGE;
 const PADS = {
   bolt:  { label: "Lightning", bg: "#2c4c8c", svg: '<svg viewBox="0 0 20 30"><path d="M12 1 3 17h6l-2 12 10-17h-6z" fill="#fff"/></svg>' },
   star:  { label: "Star", bg: "#6e9a7c", svg: '<svg viewBox="0 0 30 30"><g stroke="#fff" stroke-width="5.5" stroke-linecap="round"><path d="M15 3v24M4.6 9l20.8 12M4.6 21 25.4 9"/></g></svg>' },
@@ -174,8 +368,20 @@ const PADS = {
   lips:  { label: "Lips", bg: "#a87650", svg: '<svg viewBox="0 0 40 22"><path d="M2 8q6-7 12-5 3 1 6 2 3-1 6-2 6-2 12 5-7 12-18 12T2 8z" fill="#f2b7a8"/><path d="M5 9.5q15 4 30 0" stroke="#7a3d33" stroke-width="2" fill="none" stroke-linecap="round"/></svg>' },
 };
 const TONES = ["#5c8a6c", "#2f4f8f", "#a3473a", "#6b6f7c", "#b7792f", "#9a6b4b", "#4d7a86", "#7a4f8a", "#c0577a", "#3f6b3a"];
+const FACE_COLORS = ["#5aa64b", "#2b8fb0", "#ec7a2a", "#e2413b", "#f2c230", "#b768d6", "#c0577a"];
+const EMOJI_PICKS = ["🎒", "🎨", "🚲", "🏠", "🍦", "🍿", "💃", "🏊", "⭐", "🌳", "👫", "👵", "👴", "🛁", "🌙", "📚", "⚽", "🎵", "🐶", "🍕", "🚗", "✈️", "🎂", "🩺", "🛒", "🧸", "🎁", "🌈", "🏖️", "⛄"];
+// Linux key codes the little macro pads usually send, for nicer names.
+const KEY_NAMES = { 1: "Esc", 14: "Backspace", 15: "Tab", 28: "Enter", 57: "Space", 103: "Up", 105: "Left", 106: "Right", 108: "Down",
+  104: "Page Up", 109: "Page Down", 102: "Home", 107: "End", 113: "Mute", 114: "Volume −", 115: "Volume +", 163: "Next track",
+  164: "Play/Pause", 165: "Previous track", 29: "Ctrl", 42: "Shift", 56: "Alt", 125: "Cmd/Win" };
+"1234567890".split("").forEach((d, i) => (KEY_NAMES[i + 2] = d));
+"QWERTYUIOP".split("").forEach((c, i) => (KEY_NAMES[16 + i] = c));
+"ASDFGHJKL".split("").forEach((c, i) => (KEY_NAMES[30 + i] = c));
+"ZXCVBNM".split("").forEach((c, i) => (KEY_NAMES[44 + i] = c));
+for (let i = 0; i < 10; i++) KEY_NAMES[59 + i] = "F" + (i + 1);
+
 const $ = (id) => document.getElementById(id);
-let doc = null;
+let state = null, doc = null;
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -216,9 +422,28 @@ function dial(p) {
   else if (p.code) for (const c of p.code) { const k = el("div", "key"); k.append(el("b", null, c)); d.append(k); }
   return d;
 }
+const tileById = (id) => doc.tiles.find(t => t.id === id);
+const photoCache = {};
+function tileCanvas(t, size = 84) {
+  const c = el("canvas");
+  const dpr = window.devicePixelRatio || 1;
+  c.width = c.height = Math.round(size * dpr);
+  const draw = (photos) => { const x = c.getContext("2d"); x.clearRect(0, 0, c.width, c.height); PB.drawTile(x, t, c.width * 0.04, c.width * 0.02, c.width * 0.9, photos); };
+  if (t && t.kind === "photo" && t.photo) {
+    const cached = photoCache[t.photo];
+    if (cached) draw({ [t.photo]: cached });
+    else {
+      draw({});
+      const img = new Image();
+      img.onload = () => { photoCache[t.photo] = img; draw({ [t.photo]: img }); };
+      img.src = "/photos/" + encodeURIComponent(t.photo);
+    }
+  } else draw({});
+  return c;
+}
 
-async function api(method, url, body, type) {
-  const opts = { method, headers: {} };
+async function api(method, url, body, type, headers = {}) {
+  const opts = { method, headers: { ...headers } };
   if (body !== undefined) {
     opts.headers["Content-Type"] = type || "application/json";
     opts.body = type ? body : JSON.stringify(body);
@@ -226,7 +451,7 @@ async function api(method, url, body, type) {
   const r = await fetch(url, opts);
   const data = await r.json().catch(() => ({}));
   if (r.status === 401) { location.reload(); throw new Error("Please log in again"); }
-  if (r.status === 409 && data.doc) { doc = data.doc; render(); }
+  if (r.status === 409 && data.doc) { doc = data.doc; renderAll(); }
   if (!r.ok) throw new Error(data.error || "Something went wrong (" + r.status + ")");
   return data;
 }
@@ -234,10 +459,8 @@ async function api(method, url, body, type) {
 async function save(next, okMsg) {
   try {
     doc = await api("PUT", "/api/contacts", { ...next, rev: doc.rev });
-    render();
-    toast("Saved. Updating the screen…");
-    await pushScreen();
-    toast(okMsg || "Saved. The screen is updated.");
+    renderAll();
+    await pushScreens(okMsg || "Saved.");
     return true;
   } catch (e) {
     toast(e.message, true);
@@ -245,11 +468,273 @@ async function save(next, okMsg) {
   }
 }
 
-function render() {
+/* ---------- tabs ---------- */
+let tab = "week";
+function showTab(name, push = true) {
+  tab = name;
+  for (const b of document.querySelectorAll("#tabs button")) b.setAttribute("aria-current", String(b.dataset.tab === name));
+  for (const s of document.querySelectorAll("main > section")) s.hidden = s.id !== "tab-" + name;
+  if (push) history.replaceState(null, "", "#" + name);
+  if (name === "week") renderWeek();
+}
+for (const b of document.querySelectorAll("#tabs button")) b.onclick = () => showTab(b.dataset.tab);
+
+function renderAll() {
+  renderContacts();
+  renderWeek();
+  renderSettings();
+  renderPostcards();
+}
+
+/* ============ the Pi's screen ============
+   The Pi Zero has no browser, so this page draws the phone book and the
+   calendar at the screen's exact size and sends the pixels. Only the parts
+   that changed are redrawn. Postcards are drawn on the Pi itself. */
+function hash(s) {   // FNV-1a, enough to notice a change
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+function groupKey(group) {
+  const fb = state.fb;
+  const part = group === "book"
+    ? { people: doc.people.map(({ email, phone, ...p }) => p), number: doc.number }
+    : { tiles: doc.tiles, week: doc.week };
+  return hash(JSON.stringify([part, fb.w, fb.h, fb.bpp, 2]));
+}
+function groupFrames(group) {
+  if (group === "book") return [...Array(PB.pageCount(doc)).keys()].map(i => ({ name: "book-" + i, draw: (c, W, H) => PB.drawBook(c, doc, W, H, i) }));
+  const out = [];
+  for (let d = 0; d < 7; d++) {
+    for (let p = 0; p < 3; p++) out.push({ name: `today-${d}-${p}`, draw: (c, W, H) => PB.drawDay(c, doc, W, H, d, d, p) });
+    out.push({ name: `day-${d}`, draw: (c, W, H) => PB.drawDay(c, doc, W, H, d, null, null) });
+  }
+  return out;
+}
+let pushing = Promise.resolve();
+function pushScreens(doneMsg) {
+  pushing = pushing.then(() => doPush(doneMsg)).catch(e => toast(e.message, true));
+  return pushing;
+}
+async function doPush(doneMsg) {
+  const fb = state.fb;
+  const stale = ["book", "days"].filter(g => state.frames[g]?.key !== groupKey(g) || state.frames[g]?.w !== fb.w || state.frames[g]?.h !== fb.h || state.frames[g]?.bpp !== fb.bpp);
+  if (!stale.length) { if (doneMsg) toast(doneMsg); return; }
+  for (const group of stale) {
+    const frames = groupFrames(group);
+    let n = 0;
+    for (const f of frames) {
+      toast(`Updating the screen… ${Math.round((n++ / frames.length) * 100)}%`);
+      const canvas = await f.draw(document.createElement("canvas"), fb.w, fb.h);
+      const raw = PB.framebuffer(canvas, fb.bpp);
+      const gz = await PB.gzipBytes(raw);
+      const r = await fetch(`/api/frames/${group}/${f.name}`, { method: "POST", body: gz || raw, headers: {
+        "Content-Type": "application/octet-stream", "X-Width": fb.w, "X-Height": fb.h, "X-Bpp": fb.bpp, "X-Gzip": gz ? "1" : "0" } });
+      if (!r.ok) throw new Error("Saved, but the screen didn't update: " + ((await r.json().catch(() => ({}))).error || r.status));
+    }
+    const meta = { w: fb.w, h: fb.h, bpp: fb.bpp, key: groupKey(group), names: frames.map(f => f.name) };
+    await api("POST", `/api/frames/${group}/commit`, meta);
+    state.frames[group] = meta;
+  }
+  renderScreenState();
+  toast((doneMsg ? doneMsg + " " : "") + "The screen is updated.");
+}
+function renderScreenState() {
+  const fb = state.fb;
+  const ok = ["book", "days"].every(g => state.frames[g]?.key === groupKey(g));
+  $("screenState").textContent = `Screen: ${fb.w}×${fb.h}${fb.real ? "" : " (no screen found, using a guess)"}. ${ok ? "Up to date." : "Out of date."}`
+    + (state.pil ? "" : " Postcards need python3-pil on the Pi: run install.sh again.");
+}
+
+/* ============ WEEK ============ */
+let dayShown = PB.weekdayOf(new Date());
+function renderWeek() {
+  if (!doc) return;
+  const today = PB.weekdayOf(new Date());
+  const days = $("days");
+  days.replaceChildren();
+  PB.DAYS.forEach((name, d) => {
+    const b = el("button", d === 2 || d === 6 ? "light" : "", name.slice(0, 2));
+    b.type = "button";
+    b.style.setProperty("--c", PB.DAY_COLORS[d]);
+    b.setAttribute("aria-label", name);
+    b.setAttribute("aria-pressed", String(d === dayShown));
+    if (d === today) b.append(el("span", "today", "TODAY"));
+    b.onclick = () => { dayShown = d; history.replaceState(null, "", "#week-" + d); renderWeek(); };
+    days.append(b);
+  });
+  drawPreview();
+
+  const box = $("periods");
+  box.replaceChildren();
+  doc.week[dayShown].forEach((slot, p) => {
+    const sec = el("div", "period");
+    const h = el("h3");
+    const icon = el("canvas");
+    icon.width = icon.height = 60;
+    h.append(icon, PB.PERIODS[p]);
+    sec.append(h);
+    // A dot in the period's color (sunrise coral, sun yellow, moon teal), like the board's legend.
+    const ix = icon.getContext("2d");
+    ix.fillStyle = ["#f2675a", "#f6b92a", "#3fb6a8"][p];
+    ix.beginPath(); ix.arc(30, 30, 20, 0, 7); ix.fill();
+    const slots = el("div", "slots");
+    slot.forEach((id, i) => {
+      const t = tileById(id);
+      if (!t) return;
+      const w = el("div", "placed");
+      w.append(tileCanvas(t), el("span", null, t.label));
+      const x = el("button", "x", "×");
+      x.type = "button";
+      x.setAttribute("aria-label", "Take off " + t.label);
+      x.onclick = () => setSlot(dayShown, p, slot.filter((_, j) => j !== i));
+      w.append(x);
+      slots.append(w);
+    });
+    if (slot.length < 2) {
+      const add = el("button", "addtile", "+ Add");
+      add.type = "button";
+      add.onclick = () => openPicker(dayShown, p);
+      slots.append(add);
+    }
+    sec.append(slots);
+    box.append(sec);
+  });
+
+  const lib = $("tileLib");
+  lib.replaceChildren();
+  for (const t of doc.tiles) {
+    const b = el("button", "tilebtn");
+    b.type = "button";
+    b.append(tileCanvas(t), el("span", null, t.label));
+    b.onclick = () => openTile(t.id);
+    lib.append(b);
+  }
+  const nb = el("button", "tilebtn new", "+ New tile");
+  nb.type = "button";
+  nb.onclick = () => openTile(null);
+  lib.append(nb);
+}
+let previewJob = 0;
+async function drawPreview() {
+  const job = ++previewJob;
+  const today = PB.weekdayOf(new Date());
+  const isToday = dayShown === today;
+  const off = await PB.drawDay(document.createElement("canvas"), doc, 1024, 600, dayShown, isToday ? today : null, isToday ? PB.periodAt(new Date()) : null);
+  if (job !== previewJob) return;
+  const c = $("dayPreview");
+  c.width = 1024; c.height = 600;
+  c.getContext("2d").drawImage(off, 0, 0);
+}
+function setSlot(d, p, ids) {
+  const week = doc.week.map(day => day.map(s => s.slice()));
+  week[d][p] = ids;
+  save({ ...doc, week });
+}
+function openPicker(d, p) {
+  $("pickTitle").textContent = `${PB.DAYS[d]} · ${PB.PERIODS[p]}`;
+  const grid = $("pickGrid");
+  grid.replaceChildren();
+  for (const t of doc.tiles) {
+    const b = el("button", "tilebtn");
+    b.type = "button";
+    b.append(tileCanvas(t, 96), el("span", null, t.label));
+    b.onclick = () => { $("pickSheet").close(); setSlot(d, p, [...doc.week[d][p], t.id].slice(0, 2)); };
+    grid.append(b);
+  }
+  $("pickSheet").showModal();
+}
+$("pickCancel").onclick = () => $("pickSheet").close();
+
+/* ---------- tile editor ---------- */
+let tileEdit = null;
+function openTile(id) {
+  const t = id ? { ...tileById(id) } : { id: "", label: "", kind: "emoji", emoji: "⭐" };
+  tileEdit = t;
+  $("tileTitle").textContent = id ? "Edit tile" : "New tile";
+  $("tLabel").value = t.label;
+  $("tEmoji").value = t.emoji || "";
+  $("tDel").hidden = !id;
+  $("tileErr").textContent = "";
+  drawTileSheet();
+  $("tileSheet").showModal();
+}
+function drawTileSheet() {
+  const t = tileEdit;
+  for (const b of $("tKind").children) b.setAttribute("aria-pressed", String(b.dataset.kind === t.kind));
+  $("tEmojiBox").hidden = t.kind !== "emoji";
+  $("tPhotoBox").hidden = t.kind !== "photo";
+  $("tFaceBox").hidden = t.kind !== "face";
+  const prev = tileCanvas(t, 120);
+  prev.className = "tileprev";
+  prev.id = "tilePrev";
+  $("tilePrev").replaceWith(prev);
+  const fc = $("tFaceColors");
+  fc.replaceChildren();
+  for (const col of FACE_COLORS) {
+    const b = el("button", "swatch");
+    b.type = "button";
+    b.style.background = col;
+    b.setAttribute("aria-pressed", String(t.color === col));
+    b.onclick = () => { t.color = col; drawTileSheet(); };
+    fc.append(b);
+  }
+}
+for (const b of $("tKind").children) b.onclick = () => {
+  tileEdit.kind = b.dataset.kind;
+  if (tileEdit.kind === "face" && !tileEdit.color) tileEdit.color = FACE_COLORS[0];
+  if (tileEdit.kind === "emoji" && !tileEdit.emoji) tileEdit.emoji = "⭐";
+  drawTileSheet();
+};
+$("emojiPicks").append(...EMOJI_PICKS.map(e => {
+  const b = el("button", null, e);
+  b.type = "button";
+  b.onclick = () => { tileEdit.emoji = e; $("tEmoji").value = e; drawTileSheet(); };
+  return b;
+}));
+$("tEmoji").oninput = () => { tileEdit.emoji = $("tEmoji").value.trim(); drawTileSheet(); };
+$("tFile").onchange = async () => {
+  const f = $("tFile").files[0];
+  $("tFile").value = "";
+  if (!f) return;
+  try {
+    toast("Uploading photo…");
+    const { photo } = await api("POST", "/api/photo", await squareJpeg(f), "image/jpeg");
+    tileEdit.photo = photo;
+    tileEdit.kind = "photo";
+    drawTileSheet();
+    toast("Photo ready. Tap Save.");
+  } catch (e) { $("tileErr").textContent = e.message; }
+};
+$("tCancel").onclick = () => $("tileSheet").close();
+$("tileForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const t = tileEdit;
+  t.label = $("tLabel").value.trim();
+  if (!t.label) return ($("tileErr").textContent = "Give it a name.");
+  if (t.kind === "photo" && !t.photo) return ($("tileErr").textContent = "Choose a photo first.");
+  const clean = { id: t.id || "t" + Math.random().toString(36).slice(2, 8), label: t.label, kind: t.kind };
+  if (t.kind === "emoji") clean.emoji = t.emoji;
+  if (t.kind === "face") clean.color = t.color;
+  if (t.kind === "photo") clean.photo = t.photo;
+  const tiles = t.id ? doc.tiles.map(x => (x.id === t.id ? clean : x)) : [...doc.tiles, clean];
+  if (await save({ ...doc, tiles })) $("tileSheet").close();
+};
+$("tDel").onclick = async () => {
+  const t = tileById(tileEdit.id);
+  const used = doc.week.flat(2).filter(id => id === t.id).length;
+  if (!confirm(`Delete the ${t.label} tile?` + (used ? ` It's on the calendar ${used} time${used > 1 ? "s" : ""}.` : ""))) return;
+  const tiles = doc.tiles.filter(x => x.id !== t.id);
+  const week = doc.week.map(day => day.map(s => s.filter(id => id !== t.id)));
+  if (await save({ ...doc, tiles, week })) $("tileSheet").close();
+};
+
+/* ============ CONTACTS ============ */
+function renderContacts() {
   const list = $("list");
   list.replaceChildren();
   const people = doc.people;
-  const pages = PhoneBook.pageCount(doc);
+  const pages = PB.pageCount(doc);
   $("count").textContent = people.length + " of " + MAX_PEOPLE + (pages > 1 ? " · " + pages + " pages" : "");
   $("add").disabled = people.length >= MAX_PEOPLE;
   $("add").textContent = people.length >= MAX_PEOPLE ? "Full (" + MAX_PEOPLE + " contacts)" : "+ Add contact";
@@ -261,6 +746,7 @@ function render() {
     main.setAttribute("aria-label", "Edit " + p.name);
     const who = el("div", "who");
     who.append(el("b", null, p.name), dial(p));
+    if (p.email || p.phone) who.append(el("span", "mail-tag", "✉ can send postcards"));
     main.append(face(p), who);
     main.onclick = () => openEdit(i);
     const move = el("div", "move");
@@ -277,47 +763,7 @@ function render() {
     if (i % PER_PAGE === 0 && people.length > PER_PAGE) list.append(el("li", "pagehead", "Page " + (i / PER_PAGE + 1)));
     list.append(li);
   });
-  if (document.activeElement?.closest?.("#settings") == null) {
-    $("number").value = doc.number || "";
-    $("on").value = doc.screen?.on || "08:00";
-    $("off").value = doc.screen?.off || "20:00";
-    $("flip").checked = !!doc.screen?.flip;
-  }
 }
-
-/* ---------- the Pi's screen ----------
-   The Pi Zero has no browser, so we draw the picture here and send it the
-   pixels. Also redraws on open if the last save didn't make it to the screen. */
-let fb = null;
-async function pushScreen() {
-  if (!fb) fb = (await api("GET", "/api/screen")).fb;
-  const pages = PhoneBook.pageCount(doc);
-  for (let page = 0; page < pages; page++) {
-    const canvas = await PhoneBook.drawBook(document.createElement("canvas"), doc, fb.w, fb.h, page);
-    const r = await fetch("/api/screen", { method: "POST", body: PhoneBook.framebuffer(canvas, fb.bpp), headers: {
-      "Content-Type": "application/octet-stream", "X-Width": fb.w, "X-Height": fb.h, "X-Bpp": fb.bpp,
-      "X-Rev": doc.rev, "X-Page": page, "X-Pages": pages } });
-    if (!r.ok) throw new Error("Saved, but the screen didn't update: " + ((await r.json().catch(() => ({}))).error || r.status));
-  }
-  showScreenState({ w: fb.w, h: fb.h, bpp: fb.bpp, rev: doc.rev });
-}
-function showScreenState(drawn) {
-  $("screenState").textContent = drawn && fb
-    ? `Screen: ${fb.w}×${fb.h}${fb.real ? "" : " (no screen found, using a guess)"}. ${drawn.rev === doc.rev ? "Up to date." : "Out of date."}`
-    : "";
-}
-async function checkScreen() {
-  const s = await api("GET", "/api/screen");
-  fb = s.fb;
-  const d = s.drawn;
-  showScreenState(d);
-  if (!d || d.rev !== doc.rev || d.w !== fb.w || d.h !== fb.h || d.bpp !== fb.bpp) {
-    toast("Updating the screen…");
-    await pushScreen();
-    toast("The screen is up to date.");
-  }
-}
-
 function moveTo(from, to) {
   const people = doc.people.slice();
   const [p] = people.splice(from, 1);
@@ -325,7 +771,6 @@ function moveTo(from, to) {
   save({ ...doc, people }, "Moved.");
 }
 
-/* ---------- edit sheet ---------- */
 let editing = null; // { index, p }
 function openEdit(index) {
   const isNew = index == null;
@@ -342,6 +787,8 @@ function openEdit(index) {
   $("name").value = p.name;
   $("letter").value = p.letter || "";
   $("code").value = p.code || "";
+  $("cPhone").value = p.phone || "";
+  $("cEmail").value = p.email || "";
   $("del").hidden = isNew;
   $("editErr").textContent = "";
   drawSheet();
@@ -410,6 +857,8 @@ $("edit").onsubmit = async (e) => {
   const p = editing.p;
   p.name = $("name").value.trim();
   p.letter = $("letter").value.trim();
+  p.phone = $("cPhone").value.trim();
+  p.email = $("cEmail").value.trim();
   if (p.pad === undefined) p.code = $("code").value;
   const err = $("editErr");
   if (!p.name) return (err.textContent = "Give them a name.");
@@ -431,7 +880,7 @@ $("del").onclick = async () => {
 };
 $("add").onclick = () => openEdit(null);
 
-/* ---------- photos: crop to a square and shrink in the browser ---------- */
+/* ---------- photos: shrink in the browser so the Pi never handles big or HEIC images ---------- */
 function loadImage(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -440,6 +889,10 @@ function loadImage(file) {
     img.onerror = () => reject(new Error("Couldn't read that photo. Try a JPEG or PNG."));
     img.src = url;
   });
+}
+function toJpeg(canvas, q = 0.86) {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error("Couldn't shrink that photo."))), "image/jpeg", q));
 }
 async function squareJpeg(file, size = 400) {
   const img = await loadImage(file); // browsers apply the EXIF rotation for us
@@ -451,8 +904,7 @@ async function squareJpeg(file, size = 400) {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, (w - s) / 2, (h - s) / 2, s, s, 0, 0, out, out);
   URL.revokeObjectURL(img.src);
-  return new Promise((resolve, reject) =>
-    c.toBlob(b => (b ? resolve(b) : reject(new Error("Couldn't shrink that photo."))), "image/jpeg", 0.86));
+  return toJpeg(c);
 }
 $("file").onchange = async () => {
   const f = $("file").files[0];
@@ -471,16 +923,301 @@ $("file").onchange = async () => {
   }
 };
 
-/* ---------- settings ---------- */
+/* ============ POSTCARDS ============ */
+let outgoing = null;   // canvas with the photo and/or drawing to send
+function renderPostcards() {
+  if (!state) return;
+  const from = $("cardFrom");
+  const keep = from.value;
+  from.replaceChildren(...["Mom & Dad", "Mom", "Dad", ...doc.people.map(p => p.name)]
+    .filter((v, i, a) => a.indexOf(v) === i).map(n => { const o = el("option", null, n); o.value = n; return o; }));
+  if (keep) from.value = keep;
+
+  const list = $("cardList");
+  list.replaceChildren();
+  const cards = state.postcards;
+  const pending = cards.filter(c => c.status === "pending").length;
+  $("pendingDot").hidden = !pending;
+  $("pendingDot").textContent = pending;
+  $("cardCount").textContent = cards.length ? `${cards.length} kept` + (pending ? ` · ${pending} waiting for you` : "") : "";
+  if (!cards.length) list.append(el("li", "empty", "No postcards yet."));
+  for (const c of cards) {
+    const li = el("li", "cardrow" + (c.status === "pending" ? " pending" : ""));
+    if (c.photo) { const img = el("img"); img.alt = ""; img.src = `/postcards/${c.id}.jpg`; li.append(img); }
+    else li.append(el("div", "txt", c.caption));
+    const info = el("div");
+    info.append(el("b", null, "From " + c.from));
+    if (c.caption && c.photo) info.append(el("div", null, "“" + c.caption + "”"));
+    const when = new Date(c.ts * 1000);
+    info.append(el("div", "meta", when.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + " · " +
+      when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) + " · " + (c.via === "email" ? "by text/email" : "from here") +
+      (c.status === "pending" ? " · waiting for your OK" : "")));
+    const acts = el("div", "row-btns");
+    acts.style.marginTop = "8px";
+    if (c.status === "pending") {
+      const ok = el("button", "btn small", "Show it");
+      ok.type = "button";
+      ok.onclick = () => cardAction(c.id, "approve", "On her screen now.");
+      acts.append(ok);
+    }
+    const del = el("button", "btn plain small", "Delete");
+    del.type = "button";
+    del.onclick = () => { if (confirm("Delete this postcard?")) cardAction(c.id, "delete", "Deleted."); };
+    acts.append(del);
+    info.append(acts);
+    li.append(info);
+    list.append(li);
+  }
+  const ign = state.ignored || [];
+  $("ignoredBox").hidden = !ign.length;
+  $("ignoredList").replaceChildren(...ign.map(i => {
+    const li = el("li", "cardrow");
+    li.style.gridTemplateColumns = "1fr";
+    li.append(el("div", null, `${i.from} · ${i.why} · ${new Date(i.ts * 1000).toLocaleDateString()}`));
+    return li;
+  }));
+}
+async function cardAction(id, action, msg) {
+  try { await api("POST", `/api/postcards/${id}/${action}`, {}); await reload(); toast(msg); }
+  catch (e) { toast(e.message, true); }
+}
+function showOutgoing() {
+  const prev = $("sendPreview");
+  prev.hidden = !outgoing;
+  $("clearCard").hidden = !outgoing;
+  if (outgoing) {
+    prev.width = outgoing.width; prev.height = outgoing.height;
+    prev.getContext("2d").drawImage(outgoing, 0, 0);
+  }
+}
+$("cardFile").onchange = async () => {
+  const f = $("cardFile").files[0];
+  $("cardFile").value = "";
+  if (!f) return;
+  try {
+    const img = await loadImage(f);
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(img.src);
+    outgoing = c;
+    showOutgoing();
+  } catch (e) { toast(e.message, true); }
+};
+$("clearCard").onclick = () => { outgoing = null; showOutgoing(); };
+$("sendForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const caption = $("cardCaption").value.trim();
+  if (!outgoing && !caption) return toast("Add a photo, a drawing or a message.", true);
+  $("sendCard").disabled = true;
+  try {
+    const headers = { "X-From": encodeURIComponent($("cardFrom").value), "X-Caption": encodeURIComponent(caption) };
+    if (outgoing) await api("POST", "/api/postcards", await toJpeg(outgoing, 0.88), "image/jpeg", headers);
+    else await api("POST", "/api/postcards", "", "text/plain", headers);
+    outgoing = null; showOutgoing(); $("cardCaption").value = "";
+    await reload();
+    toast("Sent! It's on her screen in a few seconds.");
+  } catch (err) { toast(err.message, true); }
+  $("sendCard").disabled = false;
+};
+
+/* ---------- doodle pad ---------- */
+const INKS = ["#16181f", "#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2b8fb0", "#b768d6", "#c0577a", "#8a5a3c", "#ffffff"];
+const SIZES = [8, 18, 36];
+let ink = INKS[1], brush = SIZES[1], strokes = [], cur = null, doodleBg = null;
+function paintDoodle() {
+  const c = $("doodle"), x = c.getContext("2d");
+  x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+  if (doodleBg) {
+    const k = Math.min(c.width / doodleBg.width, c.height / doodleBg.height);
+    x.drawImage(doodleBg, (c.width - doodleBg.width * k) / 2, (c.height - doodleBg.height * k) / 2, doodleBg.width * k, doodleBg.height * k);
+  }
+  x.lineCap = x.lineJoin = "round";
+  for (const s of strokes) {
+    x.strokeStyle = s.ink; x.lineWidth = s.size;
+    x.beginPath();
+    s.pts.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
+    if (s.pts.length === 1) x.lineTo(s.pts[0][0] + 0.1, s.pts[0][1]);
+    x.stroke();
+  }
+}
+function drawInks() {
+  $("inks").replaceChildren(...INKS.map(col => {
+    const b = el("button", "swatch");
+    b.type = "button";
+    b.style.background = col;
+    b.setAttribute("aria-label", col === "#ffffff" ? "Eraser (white)" : "Color " + col);
+    b.setAttribute("aria-pressed", String(col === ink));
+    b.onclick = () => { ink = col; drawInks(); };
+    return b;
+  }));
+  $("sizes").replaceChildren(...SIZES.map(s => {
+    const b = el("button");
+    b.type = "button";
+    b.setAttribute("aria-label", "Brush size " + s);
+    b.setAttribute("aria-pressed", String(s === brush));
+    const dot = el("i");
+    dot.style.width = dot.style.height = Math.round(s / 1.6 + 4) + "px";
+    b.append(dot);
+    b.onclick = () => { brush = s; drawInks(); };
+    return b;
+  }));
+}
+function pt(e) {
+  const c = $("doodle"), r = c.getBoundingClientRect();
+  return [(e.clientX - r.left) * (c.width / r.width), (e.clientY - r.top) * (c.height / r.height)];
+}
+$("doodle").addEventListener("pointerdown", (e) => { e.preventDefault(); $("doodle").setPointerCapture(e.pointerId); cur = { ink, size: brush, pts: [pt(e)] }; strokes.push(cur); paintDoodle(); });
+$("doodle").addEventListener("pointermove", (e) => { if (!cur) return; cur.pts.push(pt(e)); paintDoodle(); });
+for (const ev of ["pointerup", "pointercancel"]) $("doodle").addEventListener(ev, () => (cur = null));
+$("undo").onclick = () => { strokes.pop(); paintDoodle(); };
+$("wipe").onclick = () => { if (strokes.length && confirm("Clear the drawing?")) { strokes = []; paintDoodle(); } };
+$("openDoodle").onclick = () => {
+  doodleBg = outgoing;   // draw on top of the chosen photo, if there is one
+  strokes = [];
+  drawInks(); paintDoodle();
+  $("doodleSheet").showModal();
+};
+$("doodleCancel").onclick = () => $("doodleSheet").close();
+$("doodleDone").onclick = () => {
+  const c = document.createElement("canvas");
+  c.width = $("doodle").width; c.height = $("doodle").height;
+  c.getContext("2d").drawImage($("doodle"), 0, 0);
+  outgoing = c;
+  showOutgoing();
+  $("doodleSheet").close();
+};
+
+/* ============ SETTINGS ============ */
+function renderSettings() {
+  if (!state) return;
+  if (document.activeElement?.closest?.("#settings") == null) {
+    $("number").value = doc.number || "";
+    $("on").value = doc.screen?.on || "08:00";
+    $("off").value = doc.screen?.off || "20:00";
+    $("flip").checked = !!doc.screen?.flip;
+  }
+  const s = state.settings;
+  if (document.activeElement?.closest?.("#mailForm") == null) {
+    $("imapUser").value = s.imap.user || "";
+    $("imapHost").value = s.imap.host || "imap.gmail.com";
+    $("imapPass").value = "";
+    $("approve").checked = !!doc.postcards?.approve;
+  }
+  $("pwState").textContent = s.imap.passwordSet ? "(saved; leave empty to keep it)" : "";
+  const ib = s.inbox || {};
+  const st = $("inboxStatus");
+  st.className = "status" + (ib.ok === true ? " ok" : ib.ok === false ? " bad" : "");
+  st.textContent = !s.imap.user ? "" : ib.ok === true ? "Checked the inbox " + ago(ib.at) + "." : ib.ok === false ? "Couldn't check the inbox: " + ib.error : "Not checked yet.";
+  if (document.activeElement?.closest?.("#ntfyForm") == null) {
+    $("ntfyTopic").value = s.ntfy.topic || "";
+    $("ntfyServer").value = s.ntfy.server || "https://ntfy.sh";
+    $("viewUrl").value = s.viewUrl || "";
+  }
+  renderKeys();
+  renderScreenState();
+}
+function ago(ts) {
+  const m = Math.round((Date.now() / 1000 - ts) / 60);
+  return m < 1 ? "just now" : m === 1 ? "a minute ago" : m < 60 ? m + " minutes ago" : "a while ago";
+}
+let keyPlan = {};
+function renderKeys() {
+  const seen = (state.keysSeen.recent || []).map(k => k.code);
+  const assigned = doc.keys || { back: [], next: [], switch: [] };
+  const codes = [...new Set([...seen, ...assigned.back, ...assigned.next, ...assigned.switch])];
+  keyPlan = {};
+  for (const c of codes) keyPlan[c] = assigned.back.includes(c) ? "back" : assigned.switch.includes(c) ? "switch" : assigned.next.includes(c) ? "next" : "";
+  const box = $("keyChips");
+  box.replaceChildren();
+  if (!codes.length) { box.append(el("p", "hint", "No button presses seen yet. Plug the controller into the Pi and press each button.")); return; }
+  for (const c of codes) {
+    const chip = el("div", "keychip");
+    chip.append(el("b", null, (KEY_NAMES[c] || "Key") + " (" + c + ")"));
+    const sel = el("select");
+    for (const [v, label] of [["", "Default"], ["back", "◀ Back"], ["switch", "● Switch screen"], ["next", "▶ Next"]]) {
+      const o = el("option", null, label); o.value = v; sel.append(o);
+    }
+    sel.value = keyPlan[c];
+    sel.onchange = () => (keyPlan[c] = sel.value);
+    chip.append(sel);
+    box.append(chip);
+  }
+}
+$("refreshKeys").onclick = async () => { await reload(); toast("Checked."); };
+$("saveKeys").onclick = () => {
+  const keys = { back: [], next: [], switch: [] };
+  for (const [c, v] of Object.entries(keyPlan)) if (v) keys[v].push(+c);
+  save({ ...doc, keys }, "Buttons saved.");
+};
 $("settings").onsubmit = (e) => {
   e.preventDefault();
   document.activeElement?.blur();
   save({ ...doc, number: $("number").value.trim(), screen: { on: $("on").value, off: $("off").value, flip: $("flip").checked } });
 };
+function settingsBody() {
+  return {
+    imap: { user: $("imapUser").value.trim(), password: $("imapPass").value, host: $("imapHost").value.trim() },
+    ntfy: { topic: $("ntfyTopic").value.trim(), server: $("ntfyServer").value.trim() },
+    viewUrl: $("viewUrl").value.trim(),
+  };
+}
+async function saveSettings(msg) {
+  state.settings = await api("PUT", "/api/settings", settingsBody());
+  document.activeElement?.blur();
+  renderSettings();
+  toast(msg);
+}
+$("mailForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await saveSettings("Saved.");
+    if ($("approve").checked !== !!doc.postcards?.approve) await save({ ...doc, postcards: { approve: $("approve").checked } }, "Saved.");
+  } catch (err) { toast(err.message, true); }
+};
+$("testMail").onclick = async () => {
+  try { await api("POST", "/api/test/email", {}); toast("Logged in to the inbox. Checking for postcards now."); setTimeout(reload, 4000); }
+  catch (e) { toast(e.message, true); }
+};
+$("ntfyForm").onsubmit = async (e) => { e.preventDefault(); try { await saveSettings("Saved."); } catch (err) { toast(err.message, true); } };
+$("newTopic").onclick = () => {
+  const a = new Uint8Array(12); crypto.getRandomValues(a);
+  $("ntfyTopic").value = "zelda-" + [...a].map(b => b.toString(36).padStart(2, "0")).join("").slice(0, 18);
+};
+$("testNtfy").onclick = async () => {
+  try { await saveSettings("Saved."); await api("POST", "/api/test/ntfy", {}); toast("Sent. Check your phone."); }
+  catch (e) { toast(e.message, true); }
+};
+// A contact card for family: they pick "Zelda's Postcards" and send a photo.
+$("vcard").onclick = () => {
+  const addr = state.settings.imap.user;
+  if (!addr) return toast("Save the postcard email address first.", true);
+  const card = ["BEGIN:VCARD", "VERSION:3.0", "N:Postcards;Zelda's;;;", "FN:Zelda's Postcards", "EMAIL;TYPE=INTERNET:" + addr,
+    "NOTE:Text or email a photo here and it shows up on Zelda's screen.", "END:VCARD", ""].join("\r\n");
+  const file = new File([card], "Zeldas-Postcards.vcf", { type: "text/vcard" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: "Zelda's Postcards" }).catch(() => {});
+  } else {
+    const a = el("a");
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
+    a.click();
+  }
+};
 $("logout").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.reload(); };
 
+/* ============ start ============ */
+async function reload() {
+  state = await api("GET", "/api/admin");
+  doc = state.doc;
+  renderAll();
+}
 (async () => {
-  try { doc = await api("GET", "/api/contacts"); render(); await checkScreen(); }
+  const h = location.hash.slice(1);
+  if (/^week-[0-6]$/.test(h)) { dayShown = +h.slice(5); showTab("week", false); }
+  else showTab(["week", "contacts", "postcards", "settings"].includes(h) ? h : "week", false);
+  try { await reload(); await pushScreens(); }
   catch (e) { toast(e.message, true); }
 })();
 </script>

@@ -2,64 +2,143 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zelda's Phone Book</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbf5e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zelda">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/zelda-180.png">
+<title>Zelda's Screen</title>
 <style>
 @font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
-* { margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; background: #fbf5e8; }
-canvas { display: block; width: 100vw; height: 100vh; }
+:root { --paper: #fbf5e8; --ink: #16181f; --mustard: #e9ad1c; --rule: #d8cdb4; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; background: var(--paper); font-family: "Andika", sans-serif; -webkit-user-select: none; user-select: none; }
+body { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+.stage { flex: 1; min-height: 0; position: relative; touch-action: pan-y; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+nav { display: flex; gap: 6px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); border-top: 2px solid var(--rule); background: var(--paper); }
+nav button { flex: 1; min-height: 46px; border: 2px solid var(--ink); border-radius: 999px; background: #fffdf7; font: 700 16px "Andika", sans-serif; color: var(--ink); position: relative; }
+nav button[aria-current=true] { background: var(--ink); color: #fff; }
+nav .dot { position: absolute; top: -6px; right: 10px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--mustard); color: var(--ink); font-size: 13px; line-height: 22px; border: 2px solid var(--ink); }
+/* Touch screens swipe; arrows are for mouse and keyboard. */
+@media (hover: none) { .arrows { display: none !important; } }
+.arrows { position: absolute; inset: auto 0 10px; display: flex; justify-content: space-between; padding: 0 10px; pointer-events: none; }
+.arrows button { pointer-events: auto; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--ink); background: rgba(255,253,247,.9); font: 700 22px "Andika", sans-serif; color: var(--ink); }
+nav .edit { flex: 0 0 auto; display: grid; place-items: center; padding: 0 14px; min-height: 46px; border-radius: 999px; border: 2px dashed var(--ink); font: 700 15px "Andika", sans-serif; color: var(--ink); text-decoration: none; }
+/* Full screen on a TV or laptop: hide the controls, use arrow keys. */
+@media (hover: hover) and (min-width: 900px) { nav, .arrows, .edit { opacity: 0; transition: opacity .3s; } body:hover nav, body:hover .arrows, body:hover .edit { opacity: 1; } }
 </style>
 </head>
 <body>
-<!-- A live preview of exactly what the Pi's screen shows. -->
-<canvas id="book" aria-label="Zelda's phone book"></canvas>
+<!-- Zelda's view: the same three screens as the Pi in her room, for any phone or browser. -->
+<div class="stage" id="stage">
+  <canvas id="screen" aria-live="polite"></canvas>
+  <div class="arrows"><button id="prev" aria-label="Back">◀</button><button id="next" aria-label="Next">▶</button></div>
+</div>
+<nav>
+  <button data-screen="today">Today</button>
+  <button data-screen="book">Phone book</button>
+  <button data-screen="postcards">Postcards <span class="dot" id="newDot" hidden></span></button>
+  <a class="edit" id="edit" href="/admin" aria-label="Edit">Edit</a>
+</nav>
 <script src="/render.js"></script>
 <script>
-const canvas = document.getElementById("book");
-let doc = null, seen = null, page = 0;
+const canvas = document.getElementById("screen");
+const PB = window.PhoneBook;
+let doc = null, cards = [], seen = null;
+let screen = ["today", "book", "postcards"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
+let offset = 0, page = 0, cardIndex = 0, drawing = 0;
+let lastCardSeen = +(localStorage.getItem("zp-last-card") || 0);
 
 async function getJSON(url) {
   const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }
-function draw() {
+
+async function draw() {
   if (!doc) return;
-  const dpr = window.devicePixelRatio || 1;
-  page = page % PhoneBook.pageCount(doc);
-  PhoneBook.drawBook(canvas, doc, Math.round(innerWidth * dpr), Math.round(innerHeight * dpr), page);
+  const job = ++drawing;
+  const rect = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+  const off = document.createElement("canvas");
+  if (screen === "today") {
+    const now = new Date(), today = PB.weekdayOf(now), day = (today + offset + 70) % 7;
+    await PB.drawDay(off, doc, W, H, day, offset === 0 ? today : null, offset === 0 ? PB.periodAt(now) : null);
+    document.getElementById("edit").href = "/admin#week-" + day;
+  } else if (screen === "book") {
+    page = (page + PB.pageCount(doc)) % PB.pageCount(doc);
+    await PB.drawBook(off, doc, W, H, page);
+    document.getElementById("edit").href = "/admin#contacts";
+  } else {
+    cardIndex = cards.length ? (cardIndex + cards.length) % cards.length : 0;
+    await PB.drawPostcard(off, cards[cardIndex] || null, W, H);
+    document.getElementById("edit").href = "/admin#postcards";
+    if (cards[0]) { lastCardSeen = Math.max(lastCardSeen, cards[0].ts); try { localStorage.setItem("zp-last-card", lastCardSeen); } catch (e) {} }
+  }
+  if (job !== drawing) return;   // a newer draw started meanwhile
+  canvas.width = W; canvas.height = H;
+  canvas.getContext("2d").drawImage(off, 0, 0);
+  for (const b of document.querySelectorAll("nav button")) b.setAttribute("aria-current", String(b.dataset.screen === screen));
+  const fresh = cards.filter(c => c.ts > lastCardSeen).length;
+  document.getElementById("newDot").hidden = !fresh;
+  document.getElementById("newDot").textContent = fresh;
 }
-// Same as the Pi: flip pages every 20 seconds; arrow keys go back and forth.
-let flipped = Date.now();
-function turn(by) {
-  if (!doc) return;
-  const n = PhoneBook.pageCount(doc);
-  page = (page + by + n) % n;
-  flipped = Date.now();
+
+// ◀ ▶ work like the buttons on her controller.
+function step(by) {
+  if (screen === "today") offset = Math.max(-6, Math.min(6, offset + by));
+  else if (screen === "book") page += by;
+  else cardIndex += by;
   draw();
 }
-setInterval(() => { if (Date.now() - flipped >= 20000) turn(1); }, 1000);
+function show(name) {
+  screen = name; offset = 0; cardIndex = 0;
+  history.replaceState(null, "", "#" + name);
+  draw();
+}
+document.getElementById("prev").onclick = () => step(-1);
+document.getElementById("next").onclick = () => step(1);
+for (const b of document.querySelectorAll("nav button")) b.onclick = () => show(b.dataset.screen);
 addEventListener("keydown", (e) => {
-  if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) turn(-1);
-  else if (e.key.length === 1 || ["ArrowRight", "ArrowDown", "PageDown", "Enter", " "].includes(e.key)) turn(1);
+  if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) step(-1);
+  else if (["ArrowRight", "ArrowDown", "PageDown"].includes(e.key)) step(1);
+  else if (e.key === "Enter" || e.key === " ") {
+    const order = ["today", "book", "postcards"];
+    show(order[(order.indexOf(screen) + 1) % 3]);
+  }
 });
-// Redraw whenever the admin page saves. If the server restarted (an update),
-// reload so new page code shows up too.
+// Swipe left / right.
+let touch = null;
+const stage = document.getElementById("stage");
+stage.addEventListener("touchstart", (e) => { touch = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+stage.addEventListener("touchend", (e) => {
+  if (!touch) return;
+  const dx = e.changedTouches[0].clientX - touch[0], dy = e.changedTouches[0].clientY - touch[1];
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+  touch = null;
+});
+addEventListener("resize", draw);
+addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h !== screen && ["today", "book", "postcards"].includes(h)) show(h); });
+
+// Pick up saves from the admin page and new postcards. A server restart
+// (an update) reloads the page so new code shows up too.
 async function refresh() {
   try {
     const v = await getJSON("/api/version");
     if (seen && v.boot !== seen.boot) return location.reload();
-    if (!seen || v.rev !== seen.rev) {
-      doc = await getJSON("/api/contacts");
+    if (!seen || v.version !== seen.version) {
+      [doc, cards] = await Promise.all([getJSON("/api/contacts"), getJSON("/api/postcards")]);
       seen = v;
       draw();
     }
-  } catch (e) { /* server restarting: keep what's showing */ }
+  } catch (e) { /* server restarting or offline: keep what's showing */ }
 }
-addEventListener("resize", draw);
 refresh();
 setInterval(refresh, 10000);
+// Keep "now" right as the day goes on.
+setInterval(() => { if (screen === "today" && offset === 0) draw(); }, 60000);
 </script>
 </body>
 </html>

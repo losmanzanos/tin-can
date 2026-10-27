@@ -85,8 +85,9 @@
   async function ready(doc) {
     try { await document.fonts.load(font(40), "Zelda's 0123456789"); } catch (e) { /* falls back to sans-serif */ }
     const photos = {};
-    await Promise.all((doc.people || []).filter(p => p.photo).map(async (p) => {
-      photos[p.photo] = await loadImage("/photos/" + encodeURIComponent(p.photo));
+    const wanted = [...(doc.people || []), ...(doc.tiles || [])].filter(p => p.photo).map(p => p.photo);
+    await Promise.all([...new Set(wanted)].map(async (name) => {
+      photos[name] = await loadImage("/photos/" + encodeURIComponent(name));
     }));
     return photos;
   }
@@ -222,6 +223,281 @@
     return canvas;
   }
 
+  // ------------------------------------------------------------ calendar
+  // After her wooden Lovevery board: a colored column per day, three periods
+  // (sunrise, sun, moon), white tiles, and past days folded away.
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const DAY_COLORS = ["#b768d6", "#e2413b", "#f2c230", "#ef7f2c", "#6cbf4a", "#46bfc0", "#d9d6cf"];
+  const DAY_TEXT = ["#9a4cbc", "#d6332d", "#c99a0e", "#e06d17", "#4f9f30", "#2ea2a3", "#8a8169"];
+  const PERIODS = ["Morning", "Midday", "Evening"];
+  const EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+
+  function periodIcon(c, i, x, y, s) {
+    // x, y: center; s: size
+    c.save();
+    c.translate(x, y);
+    c.lineCap = "round";
+    if (i === 0) {          // sunrise over a horizon
+      c.fillStyle = c.strokeStyle = "#f2675a";
+      c.lineWidth = s * 0.07;
+      c.beginPath(); c.arc(0, s * 0.12, s * 0.24, Math.PI, 0); c.fill();
+      for (let k = 0; k < 7; k++) {
+        const a = Math.PI + (k * Math.PI) / 6;
+        c.beginPath();
+        c.moveTo(Math.cos(a) * s * 0.33, s * 0.12 + Math.sin(a) * s * 0.33);
+        c.lineTo(Math.cos(a) * s * 0.46, s * 0.12 + Math.sin(a) * s * 0.46);
+        c.stroke();
+      }
+      c.beginPath(); c.moveTo(-s * 0.48, s * 0.2); c.lineTo(s * 0.48, s * 0.2); c.stroke();
+    } else if (i === 1) {   // sun
+      c.fillStyle = c.strokeStyle = "#f6b92a";
+      c.lineWidth = s * 0.07;
+      c.beginPath(); c.arc(0, 0, s * 0.22, 0, 7); c.fill();
+      for (let k = 0; k < 12; k++) {
+        const a = (k * Math.PI) / 6;
+        c.beginPath();
+        c.moveTo(Math.cos(a) * s * 0.31, Math.sin(a) * s * 0.31);
+        c.lineTo(Math.cos(a) * s * 0.45, Math.sin(a) * s * 0.45);
+        c.stroke();
+      }
+    } else {                // moon and two stars
+      // Crescent: the moon's circle minus a second circle. Done with a clip and
+      // even-odd fill so it never punches a see-through hole in what's behind.
+      c.save();
+      c.beginPath(); c.arc(-s * 0.05, 0, s * 0.3, 0, 7); c.clip();
+      c.fillStyle = "#3fb6a8";
+      c.beginPath(); c.rect(-s, -s, 2 * s, 2 * s); c.arc(s * 0.1, -s * 0.1, s * 0.26, 0, 7); c.fill("evenodd");
+      c.restore();
+      c.strokeStyle = "#3fb6a8"; c.lineWidth = s * 0.045;
+      for (const [sx, sy, r] of [[0.32, -0.22, 0.07], [0.3, 0.16, 0.05]]) {
+        c.beginPath();
+        c.moveTo(s * (sx - r), s * sy); c.lineTo(s * (sx + r), s * sy);
+        c.moveTo(s * sx, s * (sy - r)); c.lineTo(s * sx, s * (sy + r));
+        c.stroke();
+      }
+    }
+    c.restore();
+  }
+
+  // One magnet tile: white rounded square with an emoji, a smiley, a photo or nothing.
+  function drawTile(c, t, x, y, s, photos) {
+    const r = s * 0.14;
+    c.fillStyle = "rgba(22,24,31,0.16)";
+    roundRect(c, x + s * 0.03, y + s * 0.05, s, s, r); c.fill();
+    c.fillStyle = "#ffffff";
+    roundRect(c, x, y, s, s, r); c.fill();
+    c.strokeStyle = "#e3dccb"; c.lineWidth = Math.max(1, s * 0.02);
+    roundRect(c, x, y, s, s, r); c.stroke();
+    if (!t) return;
+    const cx = x + s / 2, cy = y + s / 2;
+    if (t.kind === "photo" && photos[t.photo]) {
+      const img = photos[t.photo], m = Math.min(img.naturalWidth, img.naturalHeight);
+      c.save();
+      roundRect(c, x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, r * 0.8); c.clip();
+      c.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9);
+      c.restore();
+    } else if (t.kind === "emoji") {
+      c.font = `${s * 0.6}px ${EMOJI}`;
+      c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = INK;
+      c.fillText(t.emoji, cx, cy + s * 0.04);
+    } else if (t.kind === "face") {
+      c.fillStyle = t.color;
+      c.beginPath(); c.arc(cx, cy, s * 0.33, 0, 7); c.fill();
+      c.strokeStyle = "rgba(22,24,31,0.6)"; c.lineWidth = s * 0.03; c.lineCap = "round";
+      for (const dx of [-0.1, 0.1]) {   // happy closed eyes
+        c.beginPath(); c.arc(cx + s * dx, cy - s * 0.04, s * 0.04, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+      }
+      c.beginPath(); c.arc(cx, cy + s * 0.03, s * 0.1, Math.PI * 0.2, Math.PI * 0.8); c.stroke();
+    }
+    c.textBaseline = "alphabetic";
+  }
+
+  // The week along the bottom: past days folded, today lifted, the shown day outlined.
+  function drawWeek(c, x, y, w, h, today, shown) {
+    const gap = w * 0.02, bw = (w - gap * 6) / 7;
+    for (let d = 0; d < 7; d++) {
+      const bx = x + d * (bw + gap);
+      const folded = today != null && d < today;
+      const lifted = d === shown;
+      const bh = folded ? h * 0.5 : lifted ? h : h * 0.8;
+      const by = y + h - bh - (lifted ? h * 0.08 : 0);
+      c.globalAlpha = folded ? 0.38 : 1;
+      if (lifted) { c.fillStyle = INK; roundRect(c, bx + h * 0.05, by + h * 0.07, bw, bh, bw * 0.22); c.fill(); }
+      c.fillStyle = DAY_COLORS[d];
+      roundRect(c, bx, by, bw, bh, bw * 0.22); c.fill();
+      if (lifted) { c.strokeStyle = INK; c.lineWidth = h * 0.05; roundRect(c, bx, by, bw, bh, bw * 0.22); c.stroke(); }
+      c.globalAlpha = 1;
+      c.font = font(Math.min(bw, bh) * 0.42);
+      c.fillStyle = d === 2 || d === 6 ? INK : "#fff";
+      c.textAlign = "center"; c.textBaseline = "middle";
+      if (!folded) c.fillText(DAYS[d][0], bx + bw / 2, by + bh / 2 + h * 0.02);
+      c.textBaseline = "alphabetic";
+    }
+  }
+
+  // day: 0 = Monday. today: which day is today (null when just browsing).
+  // period: 0-2 to light up the current part of the day, or null.
+  async function drawDay(canvas, doc, W, H, day, today = null, period = null) {
+    const photos = await ready(doc);
+    canvas.width = W; canvas.height = H;
+    const c = canvas.getContext("2d", { willReadFrequently: true });
+    const u = Math.min(W, H) / 100, portrait = H > W;
+    const tiles = Object.fromEntries((doc.tiles || []).map(t => [t.id, t]));
+    const plan = (doc.week || [])[day] || [[], [], []];
+    c.fillStyle = PAPER; c.fillRect(0, 0, W, H);
+
+    // Where things go.
+    let col, legendX, text, week;
+    if (portrait) {
+      // Room for "Today is / Tuesday, / a weekday. / Evening: ..." above the column.
+      const lines = (today === day ? u * 7 : 0) + u * 15.75 + u * 9 + (today === day && period != null ? u * 9 : 0);
+      text = { x: W * 0.07, y: u * 6, w: W * 0.86, h: lines + u * 6 };
+      week = { x: W * 0.07, y: H - u * 15, w: W * 0.86, h: u * 10 };
+      legendX = W * 0.07 + u * 7;
+      col = { x: W * 0.07 + u * 15, y: text.y + text.h + u * 2, w: W * 0.86 - u * 15, h: week.y - u * 4 - (text.y + text.h + u * 2) };
+    } else {
+      c.fillStyle = MUSTARD; c.fillRect(0, 0, 0.014 * W, H);
+      legendX = 0.014 * W + u * 9;
+      col = { x: legendX + u * 9, y: u * 5, w: Math.min(W * 0.4, H * 0.8), h: H - u * 10 };
+      const rx = col.x + col.w + u * 8;
+      text = { x: rx, y: u * 12, w: W - rx - u * 6, h: H * 0.5 };
+      week = { x: rx, y: H - u * 22, w: W - rx - u * 6, h: u * 13 };
+    }
+
+    // The day's column, like the colored frames on her board.
+    const bw = u * 2.2, hr = u * 3.5;
+    c.fillStyle = DAY_COLORS[day];
+    roundRect(c, col.x, col.y, col.w, col.h, u * 4); c.fill();
+    c.fillStyle = "#fffdf7";
+    roundRect(c, col.x + bw, col.y + bw, col.w - 2 * bw, col.h - 2 * bw, u * 2.6); c.fill();
+    const headH = u * 9;
+    c.font = font(u * 5.2); c.fillStyle = DAY_TEXT[day]; c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(DAYS[day], col.x + col.w / 2, col.y + bw + headH / 2 + u * 0.4);
+    c.fillStyle = DAY_COLORS[day];
+    c.fillRect(col.x + col.w * 0.18, col.y + bw + headH - u * 0.6, col.w * 0.64, u * 0.5);
+    c.textBaseline = "alphabetic";
+
+    const top = col.y + bw + headH + u, rowH = (col.y + col.h - bw - u - top) / 3;
+    for (let p = 0; p < 3; p++) {
+      const ry = top + p * rowH, cy = ry + rowH / 2;
+      if (p === period) {
+        c.fillStyle = DAY_COLORS[day]; c.globalAlpha = 0.22;
+        roundRect(c, col.x + bw + u, ry + u * 0.6, col.w - 2 * bw - 2 * u, rowH - u * 1.2, u * 2.4); c.fill();
+        c.globalAlpha = 1;
+        // "now" ring around the period icon
+        c.fillStyle = "#fff"; c.strokeStyle = INK; c.lineWidth = u * 0.6;
+        c.beginPath(); c.arc(legendX, cy, u * 6.4, 0, 7); c.fill(); c.stroke();
+      }
+      periodIcon(c, p, legendX, cy, u * (p === period ? 10 : 8.5));
+      const ids = (plan[p] || []).filter(id => tiles[id]);
+      const s = Math.min(rowH * 0.8, (col.w - 2 * bw - u * 6) / 2);
+      const n = ids.length, total = n * s + Math.max(0, n - 1) * u * 3;
+      let tx = col.x + col.w / 2 - total / 2;
+      for (const id of ids) {
+        drawTile(c, tiles[id], tx, cy - s / 2, s, photos);
+        tx += s + u * 3;
+      }
+    }
+
+    // "Today is Tuesday, a weekday."
+    const weekend = day >= 5;
+    c.textAlign = "left"; c.textBaseline = "alphabetic";
+    let ty = text.y;
+    if (today === day) {
+      c.font = font(u * 7); c.fillStyle = INK;
+      ty += u * 7; c.fillText("Today is", text.x, ty);
+    }
+    const big = fitText(c, DAYS[day] + (today === day ? "," : ""), u * 15, text.w);
+    c.font = font(big.size); c.fillStyle = DAY_TEXT[day];
+    ty += big.size * 1.05; c.fillText(big.text, text.x, ty);
+    c.font = font(u * 7); c.fillStyle = INK;
+    ty += u * 9; c.fillText(weekend ? "a weekend day." : "a weekday.", text.x, ty);
+
+    // What's happening now, in words, for grown-ups reading along.
+    if (period != null && today === day) {
+      const now = (plan[period] || []).map(id => tiles[id]?.label).filter(Boolean);
+      if (now.length) {
+        const t = fitText(c, PERIODS[period] + ": " + now.join(" & "), u * 5, text.w);
+        c.font = font(t.size); c.fillStyle = "#6f6752";
+        ty += u * 9; c.fillText(t.text, text.x, ty);
+      }
+    }
+    drawWeek(c, week.x, week.y, week.w, week.h, today, day);
+    return canvas;
+  }
+
+  // ------------------------------------------------------------ postcards (Zelda's view)
+  // The Pi draws these itself (postcards.py); this is the same look for the browser.
+  async function drawPostcard(canvas, card, W, H) {
+    try { await document.fonts.load(font(40), "From"); } catch (e) { /* sans-serif */ }
+    const img = card && card.photo ? await loadImage("/postcards/" + card.id + ".jpg") : null;
+    canvas.width = W; canvas.height = H;
+    const c = canvas.getContext("2d");
+    const u = Math.min(W, H) / 100;
+    c.fillStyle = PAPER; c.fillRect(0, 0, W, H);
+    if (W > H) { c.fillStyle = MUSTARD; c.fillRect(0, 0, W * 0.014, H); }
+    const x0 = W * 0.06, y0 = u * 5, x1 = W * 0.94, y1 = H - u * 16, sh = u * 1.2;
+    c.fillStyle = INK; roundRect(c, x0 + sh, y0 + sh, x1 - x0, y1 - y0, u * 4); c.fill();
+    c.fillStyle = "#fffdf7"; roundRect(c, x0, y0, x1 - x0, y1 - y0, u * 4); c.fill();
+    c.strokeStyle = INK; c.lineWidth = u * 0.6; roundRect(c, x0, y0, x1 - x0, y1 - y0, u * 4); c.stroke();
+    const pad = u * 3, caption = (card && card.caption || "").trim();
+    let ix0 = x0 + pad, iy0 = y0 + pad, ix1 = x1 - pad, iy1 = y1 - pad;
+    c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = INK;
+    if (img) {
+      if (caption) iy1 -= u * 11;
+      const k = Math.min((ix1 - ix0) / img.naturalWidth, (iy1 - iy0) / img.naturalHeight);
+      const w = img.naturalWidth * k, h = img.naturalHeight * k;
+      c.drawImage(img, (ix0 + ix1 - w) / 2, (iy0 + iy1 - h) / 2, w, h);
+      if (caption) {
+        const t = fitText(c, caption, u * 7, ix1 - ix0);
+        c.font = font(t.size); c.fillText(t.text, (ix0 + ix1) / 2, iy1 + u * 5.5);
+      }
+    } else {
+      const msg = caption || "No postcards yet. Ask Nana to send one!";
+      let size = u * 12, lines;
+      for (;;) {
+        c.font = font(size);
+        lines = [];
+        let line = "";
+        for (const word of msg.split(/\s+/)) {
+          const test = line ? line + " " + word : word;
+          if (c.measureText(test).width <= ix1 - ix0 || !line) line = test; else { lines.push(line); line = word; }
+        }
+        lines.push(line);
+        if (lines.length * size * 1.25 <= iy1 - iy0 || size < u * 5) break;
+        size *= 0.9;
+      }
+      const top = (iy0 + iy1) / 2 - (lines.length - 1) * size * 1.25 / 2;
+      lines.forEach((ln, i) => c.fillText(ln, (ix0 + ix1) / 2, top + i * size * 1.25));
+    }
+    if (card) {
+      const who = fitText(c, "From " + (card.from || "someone"), u * 8, W * 0.5);
+      c.font = font(who.size);
+      const tw = c.measureText(who.text).width, bx = x0, by = y1 + u * 3.2, bwid = tw + u * 6, bh = u * 9.5;
+      c.fillStyle = INK; roundRect(c, bx + sh, by + sh, bwid, bh, bh / 2); c.fill();
+      c.fillStyle = MUSTARD; roundRect(c, bx, by, bwid, bh, bh / 2); c.fill();
+      c.fillStyle = INK; c.fillText(who.text, bx + bwid / 2, by + bh / 2);
+      c.font = font(u * 5.5); c.fillStyle = "#8a8169"; c.textAlign = "right";
+      const wd = (new Date(card.ts * 1000).getDay() + 6) % 7;
+      c.fillText(DAYS[wd], x1, by + bh / 2);
+    }
+    c.textAlign = "left"; c.textBaseline = "alphabetic";
+    return canvas;
+  }
+
+  // Which part of the day it is: morning until 11, midday until 4, then evening.
+  function periodAt(date) {
+    const m = date.getHours() * 60 + date.getMinutes();
+    return m < 11 * 60 ? 0 : m < 16 * 60 ? 1 : 2;
+  }
+  function weekdayOf(date) { return (date.getDay() + 6) % 7; }  // Monday = 0
+
+  async function gzipBytes(bytes) {
+    if (typeof CompressionStream === "undefined") return null;
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
   // Pixels in the layout /dev/fb0 wants: 32 bpp is B,G,R,X; 16 bpp is RGB565, little-endian.
   function framebuffer(canvas, bpp) {
     const { width: w, height: h } = canvas;
@@ -241,5 +517,8 @@
     return out;
   }
 
-  window.PhoneBook = { drawBook, framebuffer, pageCount, PADS, PER_PAGE, MAX_PEOPLE };
+  window.PhoneBook = {
+    drawBook, drawDay, drawPostcard, drawTile, framebuffer, gzipBytes, pageCount, periodAt, weekdayOf,
+    PADS, PER_PAGE, MAX_PEOPLE, DAYS, DAY_COLORS, PERIODS,
+  };
 })();

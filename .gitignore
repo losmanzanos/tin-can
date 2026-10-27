@@ -14,3 +14,11 @@ setup.env
 *.heic
 .done
 __pycache__/
+secrets.json
+postcards.json
+postcards-seen.json
+keys-seen.json
+frames/
+postcards/
+*.raw
+*.raw.gz

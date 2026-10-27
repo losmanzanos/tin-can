@@ -1,0 +1,12 @@
+{
+  "name": "Zelda's Screen",
+  "short_name": "Zelda",
+  "start_url": "/#today",
+  "display": "standalone",
+  "background_color": "#fbf5e8",
+  "theme_color": "#fbf5e8",
+  "icons": [
+    { "src": "/icons/zelda-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icons/zelda-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
