@@ -282,8 +282,9 @@ def clean_doc(doc):
         vals = keys.get(k) or []
         clean_keys[k] = sorted({int(v) for v in vals if str(v).isdigit() and 0 < int(v) < 768})[:8]
 
+    home = screen.get("home") if screen.get("home") in ("today", "book") else "today"
     return {"people": out, "number": number,
-            "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False))},
+            "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home},
             "tiles": tiles, "week": clean_week, "keys": clean_keys,
             "postcards": {"approve": bool((doc.get("postcards") or {}).get("approve", False))}}
 
@@ -798,6 +799,13 @@ def make_handler(store, mailroom):
                 if saved is None:
                     return self.send(HTTPStatus.CONFLICT, {"error": "changed elsewhere", "doc": public_doc(store.load())})
                 return self.send(HTTPStatus.OK, public_doc(saved))
+
+            if path == "/api/remote" and self.command == "POST":
+                action = str((self.json_body() or {}).get("action", ""))
+                if action not in ("back", "next", "switch", "goto:today", "goto:book", "goto:postcards"):
+                    raise BadRequest("unknown button")
+                write_atomic(store.dir / "remote.json", json.dumps({"seq": time.time_ns(), "action": action}).encode())
+                return self.send(HTTPStatus.OK, {"ok": True})
 
             if path == "/api/board/key" and self.command == "POST":
                 s = store.secrets()

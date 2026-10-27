@@ -5,7 +5,9 @@ Three screens, like rooms: Today (her picture calendar, the home screen), the
 phone book, and postcards. Her little USB controller moves around:
   back / next  - days on Today, pages in the phone book, postcards in Postcards
   switch       - Today -> Phone book -> Postcards -> Today
-After IDLE_SECONDS without a press it drifts back to Today.
+After IDLE_SECONDS without a press it drifts back to the home screen (Today,
+unless the admin page says the phone book). The admin page also has a remote:
+it writes <data>/remote.json, which is read here every couple of seconds.
 
 Runs as root at boot (zelda-phone.service) and only copies pictures to the
 framebuffer. The admin page draws the phone book and calendar; server.py draws
@@ -30,7 +32,7 @@ import time
 ON_AT, OFF_AT = "08:00", "20:00"   # used when contacts.json has no times
 PAGE_SECONDS = 20                  # phone book pages flip on their own this often
 HOLD_SECONDS = 60                  # ...but not for this long after a button press
-IDLE_SECONDS = 120                 # then go back to Today
+IDLE_SECONDS = 120                 # then go back to the home screen
 TAKEOVER_SECONDS = 60              # a new postcard shows full screen this long
 REFRESH_SECONDS = 30               # repaint anyway, in case the console drew over it
 MORNING_ENDS, MIDDAY_ENDS = "11:00", "16:00"
@@ -104,7 +106,7 @@ class Settings:
     """contacts.json, re-read only when it changes."""
 
     def __init__(self):
-        self.key, self.on, self.off, self.flip = None, ON_AT, OFF_AT, False
+        self.key, self.on, self.off, self.flip, self.home = None, ON_AT, OFF_AT, False, "today"
         self.back, self.next, self.switch = set(), set(), set()
 
     def refresh(self):
@@ -117,6 +119,7 @@ class Settings:
         self.on = s.get("on") if TIME_RE.match(str(s.get("on"))) else ON_AT
         self.off = s.get("off") if TIME_RE.match(str(s.get("off"))) else OFF_AT
         self.flip = bool(s.get("flip"))
+        self.home = s.get("home") if s.get("home") in ("today", "book") else "today"
         k = doc.get("keys") or {}
         self.back, self.next, self.switch = (set(int(c) for c in k.get(n) or [] if str(c).isdigit())
                                              for n in ("back", "next", "switch"))
@@ -273,7 +276,9 @@ class Screen:
         now = time.time()
         self.pressed = now
         self.takeover = False
-        if action == "switch":
+        if action.startswith("goto:") and action[5:] in SCREENS:   # from the admin page's remote
+            self.screen, self.offset, self.card = action[5:], 0, 0
+        elif action == "switch":
             cards = self.cards()
             if self.screen == "today" and any(c["ts"] > self.seen_ts for c in cards):
                 self.screen = "postcards"     # the mail tag is on the yellow button: go read it
@@ -313,6 +318,7 @@ class Screen:
 
     def tick(self, settings, daytime, now_hm):
         now = time.time()
+        home = settings.home
         cards = self.cards()
         if cards and cards[0]["ts"] > self.newest:     # a postcard just arrived
             self.newest = cards[0]["ts"]
@@ -325,8 +331,8 @@ class Screen:
             self.takeover = False
             self.screen, self.card = "postcards", 0
             self.pressed = now - IDLE_SECONDS + TAKEOVER_SECONDS
-        if self.screen != "today" and now - self.pressed >= IDLE_SECONDS:
-            self.screen, self.offset = "today", 0
+        if self.screen != home and now - self.pressed >= IDLE_SECONDS:
+            self.screen, self.offset = home, 0
         if self.screen == "today" and self.offset and now - self.pressed >= IDLE_SECONDS:
             self.offset = 0
         if (self.screen == "book" and self.pages > 1 and now - self.turned >= PAGE_SECONDS
@@ -428,10 +434,29 @@ class Keys:
         return codes
 
 
+class Remote:
+    """Button presses sent from the admin page (remote.json, newest wins)."""
+
+    def __init__(self):
+        self.seq = (read_json(f"{DATA}/remote.json") or {}).get("seq", 0)   # ignore old ones
+
+    def poll(self):
+        r = read_json(f"{DATA}/remote.json") or {}
+        if r.get("seq", 0) > self.seq and r.get("action") in ("back", "next", "switch", *(f"goto:{s}" for s in SCREENS)):
+            self.seq = r["seq"]
+            log("remote", r["action"])
+            return r["action"]
+        return None
+
+
 def main():
-    screen, keys, settings = Screen(), Keys(), Settings()
+    screen, keys, settings, remote = Screen(), Keys(), Settings(), Remote()
+    screen.screen = settings.refresh().home
     while True:
         try:
+            action = remote.poll()
+            if action:
+                screen.press(action)
             settings.refresh()
             now_hm = time.strftime("%H:%M")
             screen.tick(settings, is_daytime(settings.on, settings.off, now_hm), now_hm)

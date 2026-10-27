@@ -20,6 +20,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 8px; }
 h1 { font-size: 24px; line-height: 1.1; }
 h2 { font-size: 19px; margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+h2 { scroll-margin-top: 76px; }
 h2 small { font-size: 14px; color: var(--muted); font-weight: 400; }
 a { color: inherit; }
 .links { display: flex; gap: 14px; font-size: 15px; white-space: nowrap; }
@@ -113,6 +114,10 @@ code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padd
 .cardrow .meta { font-size: 13px; color: var(--muted); }
 .pending { border-color: var(--mustard); background: #fff6dc; }
 .sendprev { width: 100%; border-radius: 14px; border: 2px solid var(--ink); display: block; }
+.remote { display: flex; justify-content: center; gap: 22px; }
+.rbtn { width: 70px; height: 70px; border-radius: 50%; border: 0; background: var(--ink); color: #fff; font-size: 28px; box-shadow: 0 6px 0 #000; cursor: pointer; }
+.rbtn.mid { background: var(--mustard); color: var(--ink); box-shadow: 0 6px 0 var(--ink); border: 3px solid var(--ink); }
+.rbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #000; }
 .keychips { display: flex; flex-wrap: wrap; gap: 8px; }
 .keychip { display: grid; gap: 4px; padding: 8px 10px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; font-size: 14px; }
 .keychip select { min-height: 38px; font-size: 15px; padding: 4px 8px; }
@@ -171,7 +176,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 <main>
   <header>
     <h1>Zelda's Screen</h1>
-    <div class="links"><a href="/" target="_blank">View screen</a><button id="logout">Log out</button></div>
+    <div class="links"><button id="goRemote">Remote</button><a href="/" target="_blank">View screen</a><button id="logout">Log out</button></div>
   </header>
   <nav class="tabs" id="tabs">
     <button data-tab="week">Week</button>
@@ -223,6 +228,22 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
   <!-- ============ SETTINGS ============ -->
   <section id="tab-settings" hidden>
+    <h2 id="remote">Her screen right now</h2>
+    <div class="panel">
+      <p class="hint">Works like her controller. The screen changes within a couple of seconds.</p>
+      <div class="remote">
+        <button type="button" class="rbtn" data-act="back" aria-label="Back">◀</button>
+        <button type="button" class="rbtn mid" data-act="switch" aria-label="Next screen">●</button>
+        <button type="button" class="rbtn" data-act="next" aria-label="Next">▶</button>
+      </div>
+      <div class="seg">
+        <button type="button" data-act="goto:today">Today</button><button type="button" data-act="goto:book">Phone book</button><button type="button" data-act="goto:postcards">Postcards</button>
+      </div>
+      <label>Home screen <span class="hint">Where it goes back to after 2 minutes without a press</span>
+        <select id="home"><option value="today">Today (her calendar)</option><option value="book">Phone book</option></select>
+      </label>
+    </div>
+
     <h2>Zelda's phone</h2>
     <form class="panel" id="settings">
       <label>Her number <span class="hint">Shown in the last box of the phone book</span>
@@ -1066,6 +1087,7 @@ function renderSettings() {
     $("off").value = doc.screen?.off || "20:00";
     $("flip").checked = !!doc.screen?.flip;
   }
+  $("home").value = doc.screen?.home || "today";
   const s = state.settings;
   if (document.activeElement?.closest?.("#mailForm") == null) {
     $("imapUser").value = s.imap.user || "";
@@ -1143,7 +1165,7 @@ $("saveKeys").onclick = () => {
 $("settings").onsubmit = (e) => {
   e.preventDefault();
   document.activeElement?.blur();
-  save({ ...doc, number: $("number").value.trim(), screen: { on: $("on").value, off: $("off").value, flip: $("flip").checked } });
+  save({ ...doc, number: $("number").value.trim(), screen: { ...doc.screen, on: $("on").value, off: $("off").value, flip: $("flip").checked } });
 };
 function settingsBody() {
   return {
@@ -1194,6 +1216,14 @@ $("vcard").onclick = () => {
     a.click();
   }
 };
+/* ---------- remote ---------- */
+for (const b of document.querySelectorAll("[data-act]")) b.onclick = async () => {
+  try { await api("POST", "/api/remote", { action: b.dataset.act }); toast("Sent to her screen."); }
+  catch (e) { toast(e.message, true); }
+};
+$("home").onchange = () => save({ ...doc, screen: { ...doc.screen, home: $("home").value } }, "Home screen saved.");
+$("goRemote").onclick = () => { showTab("settings"); $("remote").scrollIntoView({ behavior: "smooth" }); };
+
 $("newBoard").onclick = async () => {
   if (state.settings.board && !confirm("Make a new link? The touchscreen will need the new one.")) return;
   try { const { board } = await api("POST", "/api/board/key", {}); state.settings.board = board; renderBoard(); toast("Board link ready."); }
@@ -1210,6 +1240,7 @@ async function reload() {
 (async () => {
   const h = location.hash.slice(1);
   if (/^week-[0-6]$/.test(h)) { dayShown = +h.slice(5); showTab("week", false); }
+  else if (h === "remote") { showTab("settings", false); setTimeout(() => $("remote").scrollIntoView(), 300); }
   else showTab(["week", "contacts", "postcards", "settings"].includes(h) ? h : "week", false);
   try { await reload(); await pushScreens(); }
   catch (e) { toast(e.message, true); }
