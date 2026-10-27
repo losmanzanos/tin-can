@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Zelda's Magnet Board</title>
+<style>
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+:root { --paper: #fbf5e8; --ink: #16181f; --mustard: #e9ad1c; --rule: #d8cdb4; --day: #e2413b; --dayText: #d6332d; --u: 1vmin; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+html, body { height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); font-family: "Andika", sans-serif; touch-action: none; cursor: default; }
+body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); padding: calc(var(--u) * 2.5) calc(var(--u) * 3); }
+
+/* The week across the top, in her board's colors. Past days are folded. */
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: calc(var(--u) * 1.6); }
+.days button { height: calc(var(--u) * 13); border: calc(var(--u) * 0.8) solid transparent; border-radius: calc(var(--u) * 3); background: var(--c);
+  color: #fff; font: 700 calc(var(--u) * 6.5) "Andika", sans-serif; position: relative; transition: transform .15s; }
+.days button.light { color: var(--ink); }
+.days button.past { opacity: .4; height: calc(var(--u) * 9); align-self: end; }
+.days button[aria-pressed=true] { border-color: var(--ink); transform: translateY(calc(var(--u) * -1)); box-shadow: 0 calc(var(--u) * 1) 0 var(--ink); }
+.days button .star { position: absolute; top: calc(var(--u) * -2.2); right: calc(var(--u) * -1.2); font-size: calc(var(--u) * 5); }
+
+.main { display: grid; grid-template-columns: 1fr 1.05fr; gap: calc(var(--u) * 3); min-height: 0; }
+
+/* The day: a colored frame with three rows, like one column of her board. */
+.day { display: grid; grid-template-rows: auto 1fr 1fr 1fr; border: calc(var(--u) * 1.6) solid var(--day); border-radius: calc(var(--u) * 4);
+  background: #fffdf7; padding: calc(var(--u) * 1) calc(var(--u) * 2) calc(var(--u) * 1.6); min-height: 0; }
+.day h1 { text-align: center; color: var(--dayText); font-size: calc(var(--u) * 6); line-height: 1.2; border-bottom: calc(var(--u) * 0.5) solid var(--day); margin: 0 calc(var(--u) * 6) calc(var(--u) * 1); }
+.row { display: grid; grid-template-columns: calc(var(--u) * 10) 1fr; align-items: center; gap: calc(var(--u) * 1.5); border-radius: calc(var(--u) * 3); padding: 0 calc(var(--u) * 1); min-height: 0; transition: background .12s; }
+.row.now { background: color-mix(in srgb, var(--day) 18%, transparent); }
+.row.over { background: color-mix(in srgb, var(--mustard) 45%, transparent); outline: calc(var(--u) * 0.6) dashed var(--ink); }
+.row canvas.icon { width: calc(var(--u) * 9); height: calc(var(--u) * 9); }
+.slots { display: flex; gap: calc(var(--u) * 2); justify-content: center; align-items: center; height: 100%; }
+.slot { width: calc(var(--u) * 17); height: calc(var(--u) * 17); border: calc(var(--u) * 0.6) dashed var(--rule); border-radius: calc(var(--u) * 3); }
+
+/* The tile tray: every magnet she can use. */
+.tray { background: #efe6d2; border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 2); display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 13), 1fr));
+  gap: calc(var(--u) * 1.6); align-content: start; overflow-y: auto; min-height: 0; touch-action: pan-y; transition: background .12s; }
+.tray.over { background: #e4d6b6; outline: calc(var(--u) * 0.6) dashed var(--ink); }
+
+.tile { width: calc(var(--u) * 17); height: calc(var(--u) * 17); display: block; touch-action: none; }
+.tray .tile { width: calc(var(--u) * 13); height: calc(var(--u) * 13); justify-self: center; }
+.tile.placed { animation: pop .25s ease-out; }
+@keyframes pop { 0% { transform: scale(.7); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.ghost { position: fixed; z-index: 10; pointer-events: none; width: calc(var(--u) * 20); height: calc(var(--u) * 20); transform: translate(-50%, -60%) rotate(-4deg);
+  filter: drop-shadow(0 calc(var(--u) * 1.5) calc(var(--u) * 1) rgba(0,0,0,.3)); }
+
+/* Night: the screen goes dark between the off and on times. */
+.night { position: fixed; inset: 0; background: #000; z-index: 50; display: none; }
+.night.on { display: block; }
+.msg { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 8vmin; background: var(--paper); z-index: 40; font-size: calc(var(--u) * 5); line-height: 1.4; }
+.msg.on { display: grid; }
+.saving { position: fixed; right: calc(var(--u) * 2); bottom: calc(var(--u) * 1.5); font-size: calc(var(--u) * 2.6); color: #8a8169; }
+</style>
+</head>
+<body>
+<nav class="days" id="days"></nav>
+<div class="main">
+  <section class="day" id="day">
+    <h1 id="dayName"></h1>
+    <div class="row" data-period="0"><canvas class="icon" width="120" height="120"></canvas><div class="slots"></div></div>
+    <div class="row" data-period="1"><canvas class="icon" width="120" height="120"></canvas><div class="slots"></div></div>
+    <div class="row" data-period="2"><canvas class="icon" width="120" height="120"></canvas><div class="slots"></div></div>
+  </section>
+  <section class="tray" id="tray" aria-label="Magnets"></section>
+</div>
+<div class="night" id="night"></div>
+<div class="msg" id="msg"></div>
+<div class="saving" id="saving"></div>
+
+<script src="/render.js"></script>
+<script>
+// Zelda's touch magnet board: drag a magnet from the tray onto a part of the
+// day, drag it back to the tray to take it off. Changes show up on her big
+// screen too: this page redraws the calendar for it after a short pause.
+const PB = window.PhoneBook;
+const $ = (id) => document.getElementById(id);
+const IDLE_MS = 120000;       // back to today after two minutes
+const REDRAW_AFTER_MS = 8000; // wait for her to finish before redrawing the big screen
+
+let key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
+try { if (key) localStorage.setItem("zp-board-key", key); else key = localStorage.getItem("zp-board-key") || ""; } catch (e) {}
+let doc = null, fb = null, frames = {}, seen = null, day = PB.weekdayOf(new Date()), touched = Date.now(), dragging = null;
+const photos = {};
+
+function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function message(text) { $("msg").textContent = text || ""; $("msg").classList.toggle("on", !!text); }
+
+async function api(method, url, body) {
+  const r = await fetch(url, { method, cache: "no-store", headers: { "X-Board-Key": key, ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) { message("This board needs a new link.\nOn the admin page: Settings → Magnet board."); throw new Error("no key"); }
+  if (!r.ok && r.status !== 409) throw new Error(data.error || r.status);
+  return { status: r.status, data };
+}
+
+function tileCanvas(t) {
+  const c = el("canvas", "tile");
+  c.width = c.height = 220;
+  c.dataset.id = t.id;
+  const draw = () => PB.drawTile(c.getContext("2d"), t, 8, 4, 204, photos);
+  if (t.kind === "photo" && t.photo && !photos[t.photo]) {
+    const img = new Image();
+    img.onload = () => { photos[t.photo] = img; c.getContext("2d").clearRect(0, 0, 220, 220); draw(); };
+    img.src = "/photos/" + encodeURIComponent(t.photo);
+  }
+  draw();
+  return c;
+}
+
+function render() {
+  if (!doc) return;
+  const today = PB.weekdayOf(new Date());
+  document.documentElement.style.setProperty("--day", PB.DAY_COLORS[day]);
+  document.documentElement.style.setProperty("--dayText", PB.DAY_TEXT[day]);
+  const days = $("days");
+  days.replaceChildren(...PB.DAYS.map((name, d) => {
+    const b = el("button", (d === 2 || d === 6 ? "light " : "") + (d < today ? "past" : ""));
+    b.style.setProperty("--c", PB.DAY_COLORS[d]);
+    b.textContent = name[0];
+    b.setAttribute("aria-label", name);
+    b.setAttribute("aria-pressed", String(d === day));
+    if (d === today) { const s = el("span", "star"); s.textContent = "⭐"; b.append(s); }
+    b.onclick = () => { day = d; touched = Date.now(); render(); };
+    return b;
+  }));
+  $("dayName").textContent = (day === today ? "Today · " : "") + PB.DAYS[day];
+  const tiles = Object.fromEntries(doc.tiles.map(t => [t.id, t]));
+  const period = day === today ? PB.periodAt(new Date()) : -1;
+  for (const row of document.querySelectorAll(".row")) {
+    const p = +row.dataset.period;
+    row.classList.toggle("now", p === period);
+    const icon = row.querySelector("canvas.icon").getContext("2d");
+    icon.clearRect(0, 0, 120, 120);
+    PB.periodIcon(icon, p, 60, 60, 100);
+    const slots = row.querySelector(".slots");
+    const ids = (doc.week[day][p] || []).filter(id => tiles[id]);
+    slots.replaceChildren(...ids.map(id => { const c = tileCanvas(tiles[id]); c.dataset.from = p; return c; }));
+    for (let i = ids.length; i < 2; i++) slots.append(el("div", "slot"));
+  }
+  $("tray").replaceChildren(...doc.tiles.map(tileCanvas));
+}
+
+/* ---------- dragging ---------- */
+function targetAt(x, y) {
+  const hit = document.elementFromPoint(x, y);
+  return hit?.closest(".row") || hit?.closest("#tray") || null;
+}
+document.addEventListener("pointerdown", (e) => {
+  const tile = e.target.closest(".tile");
+  if (!tile || dragging) return;
+  e.preventDefault();
+  touched = Date.now();
+  const ghost = tileCanvas(doc.tiles.find(t => t.id === tile.dataset.id));
+  ghost.className = "ghost";
+  document.body.append(ghost);
+  dragging = { id: tile.dataset.id, from: tile.dataset.from != null ? +tile.dataset.from : null, ghost, over: null, startX: e.clientX, startY: e.clientY };
+  if (dragging.from != null) tile.style.opacity = ".25";
+  move(e);
+});
+function move(e) {
+  if (!dragging) return;
+  dragging.ghost.style.left = e.clientX + "px";
+  dragging.ghost.style.top = e.clientY + "px";
+  const t = targetAt(e.clientX, e.clientY);
+  if (t !== dragging.over) {
+    dragging.over?.classList.remove("over");
+    dragging.over = t;
+    t?.classList.add("over");
+  }
+}
+document.addEventListener("pointermove", move);
+document.addEventListener("pointerup", (e) => drop(e));
+document.addEventListener("pointercancel", () => drop(null));
+function drop(e) {
+  if (!dragging) return;
+  const d = dragging;
+  dragging = null;
+  d.ghost.remove();
+  d.over?.classList.remove("over");
+  const target = e ? targetAt(e.clientX, e.clientY) : null;
+  const week = doc.week.map(x => x.map(s => s.slice()));
+  const slots = week[day];
+  let changed = false;
+  if (target?.classList.contains("row")) {
+    const p = +target.dataset.period;
+    if (d.from !== p) {
+      if (d.from != null) slots[d.from].splice(slots[d.from].indexOf(d.id), 1);
+      if (slots[p].length >= 2) slots[p].shift();   // full: the new magnet pushes the oldest off
+      slots[p].push(d.id);
+      changed = true;
+    }
+  } else if (target?.id === "tray" && d.from != null) {
+    slots[d.from].splice(slots[d.from].indexOf(d.id), 1);   // dragged back to the tray: take it off
+    changed = true;
+  }
+  if (changed) { doc.week = week; render(); markPlaced(target); save(); }
+  else render();
+}
+function markPlaced(target) {
+  const last = target?.classList.contains("row") ? target.querySelector(".slots .tile:last-of-type") : null;
+  if (last) last.classList.add("placed");
+}
+
+/* ---------- saving ---------- */
+let saveChain = Promise.resolve(), redrawTimer = null;
+function save() {
+  const week = doc.week;
+  saveChain = saveChain.then(async () => {
+    const { status, data } = await api("POST", "/api/board/week", { week, rev: doc.rev });
+    if (status === 409) { doc = data.doc; render(); return; }   // changed on a phone meanwhile: show that
+    doc = data;
+    seen = null;
+    scheduleRedraw();
+  }).catch(() => {});
+}
+function scheduleRedraw() {
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(redraw, REDRAW_AFTER_MS);
+}
+async function redraw() {
+  if (dragging) return scheduleRedraw();
+  try {
+    if (!fb) ({ fb, days: frames.days } = (await api("GET", "/api/board")).data);
+    if (!PB.staleGroups(doc, fb, frames, ["days"]).length) return;
+    frames = await PB.syncScreens(doc, fb, frames, ["days"], { headers: { "X-Board-Key": key }, progress: (pct) => ($("saving").textContent = `Updating the big screen ${pct}%`) });
+  } catch (e) { scheduleRedraw(); }
+  $("saving").textContent = "";
+}
+
+/* ---------- keeping up: other phones, the clock, bedtime ---------- */
+function isNight() {
+  if (!doc) return false;
+  const now = new Date(), hm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+  const { on = "08:00", off = "20:00" } = doc.screen || {};
+  if (on === off) return false;
+  return on < off ? !(hm >= on && hm < off) : !(hm >= on || hm < off);
+}
+async function refresh() {
+  try {
+    const v = await (await fetch("/api/version", { cache: "no-store" })).json();
+    if (seen && v.boot !== seen.boot) return location.reload();
+    if (!seen || v.rev !== seen.rev) {
+      if (dragging) return;
+      doc = await (await fetch("/api/contacts", { cache: "no-store" })).json();
+      seen = v;
+      render();
+    }
+  } catch (e) { /* the Pi is restarting: try again soon */ }
+}
+setInterval(() => {
+  $("night").classList.toggle("on", isNight());
+  if (!dragging && Date.now() - touched > IDLE_MS && day !== PB.weekdayOf(new Date())) { day = PB.weekdayOf(new Date()); render(); }
+}, 5000);
+setInterval(refresh, 10000);
+setInterval(() => { if (!dragging) render(); }, 60000);   // "now" moves through the day
+
+(async () => {
+  if (!key) return message("This board needs its link.\nOn the admin page: Settings → Magnet board.");
+  try {
+    ({ fb, days: frames.days } = (await api("GET", "/api/board")).data);
+    await refresh();
+    $("night").classList.toggle("on", isNight());
+    redraw();
+  } catch (e) { /* message already shown */ }
+})();
+</script>
+</body>
+</html>

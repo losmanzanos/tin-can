@@ -42,6 +42,7 @@ DEFAULT_DATA = Path(os.environ.get("ZELDA_DATA", Path.home() / "zelda-phone-data
 MAX_PEOPLE = 21  # 7 per page; the screen flips through up to 3 pages
 MAX_TILES = 60
 MAX_CARDS = 30   # postcards kept; older ones are let go
+CARDS_LOOK = 2   # bump when postcards.py draws differently, so the Pi redraws them
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
 MAX_POSTCARD_BYTES = 6 * 1024 * 1024
 MAX_FRAME_BYTES = 4096 * 4096 * 4
@@ -460,7 +461,7 @@ class Store:
             fb = fb_geometry()
             geo = [fb["w"], fb["h"], fb["bpp"]]
             meta = read_json(self.frames / "cards.json", {}) or {}
-            fresh = meta.get("geometry") != geo
+            fresh = meta.get("geometry") != geo or meta.get("v") != CARDS_LOOK  # new look: redraw all
             with self.cards_lock:
                 shown = [c for c in self.cards()["cards"] if c["status"] == "shown"]
             for c in shown:
@@ -477,13 +478,14 @@ class Store:
                 write_atomic(self.frames / "card-empty.raw.gz", pc.gz(pc.render_empty(*geo)))
                 badges = {}
                 for n in range(1, 11):
-                    bw, bh, data = pc.render_badge(n, fb["h"], fb["bpp"])
+                    bw, bh, data = pc.render_badge(n, min(fb["w"], fb["h"]), fb["bpp"])
                     write_atomic(self.frames / f"badge-{n}.raw.gz", pc.gz(data))
                     badges[str(n)] = [bw, bh]
             cards = [{"id": c["id"], "ts": c["ts"], "from": c["from"]} for c in shown
                      if (self.frames / f"card-{c['id']}.raw.gz").exists()]
             write_atomic(self.frames / "cards.json", json.dumps(
-                {"w": fb["w"], "h": fb["h"], "bpp": fb["bpp"], "geometry": geo, "cards": cards, "badges": badges}).encode())
+                {"w": fb["w"], "h": fb["h"], "bpp": fb["bpp"], "geometry": geo, "v": CARDS_LOOK,
+                 "cards": cards, "badges": badges}).encode())
 
     def render_cards_soon(self):
         threading.Thread(target=self.render_cards, daemon=True).start()
@@ -653,6 +655,13 @@ def make_handler(store, mailroom):
             c = SimpleCookie(self.headers.get("Cookie") or "")
             return COOKIE in c and store.check_session(c[COOKIE].value)
 
+        def board_ok(self):
+            """The touchscreen magnet board: a key that can only move tiles
+            around the week (and redraw the calendar for the screen)."""
+            key = self.headers.get("X-Board-Key") or ""
+            good = store.secrets().get("board") or ""
+            return bool(key and good and hmac.compare_digest(key, good))
+
         def same_origin(self):
             # Belt and braces next to the SameSite cookie: refuse writes that a
             # page on some other site sent.
@@ -678,6 +687,7 @@ def make_handler(store, mailroom):
                     "ntfy": {"server": s["ntfy"].get("server", "https://ntfy.sh"), "topic": s["ntfy"].get("topic", "")},
                     "viewUrl": s["viewUrl"],
                     "inbox": mailroom.poller.status,
+                    "board": s.get("board", ""),
                 },
             }
 
@@ -691,6 +701,12 @@ def make_handler(store, mailroom):
                 return self.file(PAGE / "index.html")
             if path in ("/admin", "/admin/"):
                 return self.file(PAGE / ("admin.html" if self.authed() else "login.html"))
+            if path in ("/board", "/board/"):
+                return self.file(PAGE / "board.html")
+            if path == "/api/board":
+                if not (self.board_ok() or self.authed()):
+                    return self.error(HTTPStatus.UNAUTHORIZED, "This board's link is out of date. Make a new one on the admin page.")
+                return self.send(HTTPStatus.OK, {"fb": fb_geometry(), "days": store.frames_info()["days"]})
             if path == "/manifest.json":
                 return self.file(PAGE / "manifest.json")
             if path == "/api/version":
@@ -770,8 +786,24 @@ def make_handler(store, mailroom):
                 return self.send(HTTPStatus.OK, {"ok": True},
                                  headers={"Set-Cookie": f"{COOKIE}=; Path=/; Max-Age=0; SameSite=Strict"})
 
-            if not self.authed():
+            board_paths = path == "/api/board/week" or path.startswith("/api/frames/days/")
+            if not (self.authed() or (board_paths and self.board_ok())):
                 return self.error(HTTPStatus.UNAUTHORIZED, "Please log in")
+
+            if path == "/api/board/week" and self.command == "POST":
+                body = self.json_body() or {}
+                cur = store.load()
+                doc = clean_doc(dict(cur, week=body.get("week")))
+                saved = store.save(doc, expect_rev=body.get("rev"))
+                if saved is None:
+                    return self.send(HTTPStatus.CONFLICT, {"error": "changed elsewhere", "doc": public_doc(store.load())})
+                return self.send(HTTPStatus.OK, public_doc(saved))
+
+            if path == "/api/board/key" and self.command == "POST":
+                s = store.secrets()
+                s["board"] = secrets.token_urlsafe(18)
+                store.save_secrets(s)
+                return self.send(HTTPStatus.OK, {"board": s["board"]})
 
             if path == "/api/contacts" and self.command == "PUT":
                 incoming = self.json_body()

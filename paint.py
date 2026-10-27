@@ -198,14 +198,14 @@ def fill_pixel(bpp):
     return bytes([b, g, r, 0])
 
 
-def overlay(img, rw, bpp, badge, bw, bh):
-    """Put the "new postcards" tag in the top right corner of a picture."""
+def overlay(img, rw, rh, bpp, badge, bw, bh):
+    """Put the "new postcards" tag over the yellow-button hint, top right."""
     Bpp = bpp // 8
     out = bytearray(img)
-    margin = max(4, bh // 3)
-    x = rw - bw - margin
+    u = min(rw, rh) / 100
+    x, y = max(0, rw - bw - int(u * 4)), max(0, int(u * 9 - bh / 2))
     for row in range(bh):
-        o = ((margin + row) * rw + x) * Bpp
+        o = ((y + row) * rw + x) * Bpp
         out[o:o + bw * Bpp] = badge[row * bw * Bpp:(row + 1) * bw * Bpp]
     return bytes(out)
 
@@ -274,7 +274,11 @@ class Screen:
         self.pressed = now
         self.takeover = False
         if action == "switch":
-            self.screen = SCREENS[(SCREENS.index(self.screen) + 1) % len(SCREENS)]
+            cards = self.cards()
+            if self.screen == "today" and any(c["ts"] > self.seen_ts for c in cards):
+                self.screen = "postcards"     # the mail tag is on the yellow button: go read it
+            else:
+                self.screen = SCREENS[(SCREENS.index(self.screen) + 1) % len(SCREENS)]
             self.offset, self.card = 0, 0
         else:
             by = -1 if action == "back" else 1
@@ -350,7 +354,7 @@ class Screen:
                 meta = read_json(f"{FRAMES}/cards.json") or {}
                 bw, bh = (meta.get("badges") or {}).get(str(min(unseen, 10)), (0, 0))
                 if bw and bw < rw and bh < rh // 3:
-                    img = overlay(img, rw, bpp, read_picture(badge[3]), bw, bh)
+                    img = overlay(img, rw, rh, bpp, read_picture(badge[3]), bw, bh)
             self.cache = (key, compose(img, rw, rh, w, h, bpp, stride, settings.flip))
             log(f"showing {os.path.basename(path)} on {w}x{h} {bpp}bpp" + (f", {unseen} new postcards" if unseen else ""))
         if key != self.painted or now - self.painted_at >= REFRESH_SECONDS:

@@ -337,7 +337,33 @@
 
   // day: 0 = Monday. today: which day is today (null when just browsing).
   // period: 0-2 to light up the current part of the day, or null.
-  async function drawDay(canvas, doc, W, H, day, today = null, period = null) {
+  // Hints for her 3-button controller, drawn the way the buttons look:
+  // dark round arrows for back / next, a yellow button for "the next screen".
+  function arrowButton(c, x, y, r, dir) {
+    c.fillStyle = "rgba(22,24,31,0.25)";
+    c.beginPath(); c.arc(x, y + r * 0.12, r, 0, 7); c.fill();
+    c.fillStyle = INK;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.fillStyle = "#fff";
+    c.beginPath();
+    c.moveTo(x + dir * r * 0.45, y);
+    c.lineTo(x - dir * r * 0.3, y - r * 0.45);
+    c.lineTo(x - dir * r * 0.3, y + r * 0.45);
+    c.closePath(); c.fill();
+  }
+  function screenButton(c, x, y, r, emoji) {
+    c.fillStyle = INK;
+    c.beginPath(); c.arc(x + r * 0.08, y + r * 0.12, r, 0, 7); c.fill();
+    c.fillStyle = MUSTARD;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.strokeStyle = INK; c.lineWidth = r * 0.1; c.stroke();
+    c.font = `${r * 1.05}px ${EMOJI}`;
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(emoji, x, y + r * 0.06);
+    c.textBaseline = "alphabetic";
+  }
+
+  async function drawDay(canvas, doc, W, H, day, today = null, period = null, opts = {}) {
     const photos = await ready(doc);
     canvas.width = W; canvas.height = H;
     const c = canvas.getContext("2d", { willReadFrequently: true });
@@ -358,10 +384,10 @@
     } else {
       c.fillStyle = MUSTARD; c.fillRect(0, 0, 0.014 * W, H);
       legendX = 0.014 * W + u * 9;
-      col = { x: legendX + u * 9, y: u * 5, w: Math.min(W * 0.4, H * 0.8), h: H - u * 10 };
-      const rx = col.x + col.w + u * 8;
-      text = { x: rx, y: u * 12, w: W - rx - u * 6, h: H * 0.5 };
-      week = { x: rx, y: H - u * 22, w: W - rx - u * 6, h: u * 13 };
+      col = { x: legendX + u * 9, y: u * 5, w: Math.min(W * 0.36, H * 0.8), h: H - u * 10 };
+      const rx = col.x + col.w + u * 7;
+      text = { x: rx, y: u * 15, w: W - rx - u * 5, h: H * 0.5 };
+      week = { x: rx, y: H - u * 22, w: W - rx - u * 5, h: u * 13 };
     }
 
     // The day's column, like the colored frames on her board.
@@ -421,6 +447,16 @@
         c.font = font(t.size); c.fillStyle = "#6f6752";
         ty += u * 9; c.fillText(t.text, text.x, ty);
       }
+    }
+    if (opts.hints) {
+      // ◀ ▶ sit at the ends of the week, because that's what they move along.
+      const r = week.h * 0.36, cy = week.y + week.h * 0.55;
+      arrowButton(c, week.x + r, cy, r, -1);
+      arrowButton(c, week.x + week.w - r, cy, r, 1);
+      week = { x: week.x + r * 2.35, y: week.y, w: week.w - r * 4.7, h: week.h };
+      // The yellow button goes to the phone book next. paint.py covers this
+      // spot with a mail tag when postcards are waiting.
+      screenButton(c, W - u * 10, u * 9, u * 5, "📞");
     }
     drawWeek(c, week.x, week.y, week.w, week.h, today, day);
     return canvas;
@@ -517,7 +553,61 @@
     return out;
   }
 
+  // ------------------------------------------------------------ the Pi's screen
+  // The Pi Zero has no browser, so a browser (the admin page, or the magnet
+  // board) draws the phone book and calendar at the screen's exact size and
+  // uploads the pixels. A key per group says whether it needs redrawing.
+  function hash(s) {   // FNV-1a, enough to notice a change
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16);
+  }
+  function screenKey(doc, fb, group) {
+    const part = group === "book"
+      ? { people: doc.people.map(({ email, phone, ...p }) => p), number: doc.number }
+      : { tiles: doc.tiles, week: doc.week };
+    return hash(JSON.stringify([part, fb.w, fb.h, fb.bpp, 4]));
+  }
+  function screenFrames(doc, group) {
+    if (group === "book") return [...Array(pageCount(doc)).keys()].map(i => ({ name: "book-" + i, draw: (c, W, H) => drawBook(c, doc, W, H, i) }));
+    const out = [];
+    for (let d = 0; d < 7; d++) {
+      for (let p = 0; p < 3; p++) out.push({ name: `today-${d}-${p}`, draw: (c, W, H) => drawDay(c, doc, W, H, d, d, p, { hints: true }) });
+      out.push({ name: `day-${d}`, draw: (c, W, H) => drawDay(c, doc, W, H, d, null, null, { hints: true }) });
+    }
+    return out;
+  }
+  function staleGroups(doc, fb, framesInfo, groups) {
+    return groups.filter(g => {
+      const m = framesInfo[g];
+      return !m || m.key !== screenKey(doc, fb, g) || m.w !== fb.w || m.h !== fb.h || m.bpp !== fb.bpp;
+    });
+  }
+  // Redraw and upload what's out of date. Returns the new framesInfo.
+  async function syncScreens(doc, fb, framesInfo, groups, { headers = {}, progress = () => {} } = {}) {
+    framesInfo = { ...framesInfo };
+    for (const group of staleGroups(doc, fb, framesInfo, groups)) {
+      const frames = screenFrames(doc, group);
+      let n = 0;
+      for (const f of frames) {
+        progress(Math.round((n++ / frames.length) * 100));
+        const canvas = await f.draw(document.createElement("canvas"), fb.w, fb.h);
+        const raw = framebuffer(canvas, fb.bpp);
+        const gz = await gzipBytes(raw);
+        const r = await fetch(`/api/frames/${group}/${f.name}`, { method: "POST", body: gz || raw, headers: { ...headers,
+          "Content-Type": "application/octet-stream", "X-Width": fb.w, "X-Height": fb.h, "X-Bpp": fb.bpp, "X-Gzip": gz ? "1" : "0" } });
+        if (!r.ok) throw new Error("The screen didn't update: " + ((await r.json().catch(() => ({}))).error || r.status));
+      }
+      const meta = { w: fb.w, h: fb.h, bpp: fb.bpp, key: screenKey(doc, fb, group), names: frames.map(f => f.name) };
+      const r = await fetch(`/api/frames/${group}/commit`, { method: "POST", body: JSON.stringify(meta), headers: { ...headers, "Content-Type": "application/json" } });
+      if (!r.ok) throw new Error("The screen didn't update: " + ((await r.json().catch(() => ({}))).error || r.status));
+      framesInfo[group] = meta;
+    }
+    return framesInfo;
+  }
+
   window.PhoneBook = {
+    syncScreens, staleGroups, screenKey, periodIcon, DAY_TEXT,
     drawBook, drawDay, drawPostcard, drawTile, framebuffer, gzipBytes, pageCount, periodAt, weekdayOf,
     PADS, PER_PAGE, MAX_PEOPLE, DAYS, DAY_COLORS, PERIODS,
   };

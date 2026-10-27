@@ -166,13 +166,14 @@ def render_empty(w, h, bpp):
     return render_card({"caption": "No postcards yet. Ask Nana to send one!", "from": "the mailbox"}, None, w, h, bpp)
 
 
-def render_badge(count, h, bpp):
-    """The little "2 new postcards" tag paint.py puts on the other screens."""
-    S, u = 2, h / 100
+def render_badge(count, size, bpp):
+    """The "2 new postcards" tag paint.py puts over the yellow-button hint on
+    Today. size: the screen's shorter side."""
+    S, u = 2, size / 100
     text = f"{count if count < 10 else '9+'} new postcard{'s' if count != 1 else ''}"
-    f = _font(u * 4.6 * S)
+    f = _font(u * 5.2 * S)
     tw = ImageDraw.Draw(Image.new("RGB", (1, 1))).textlength(text, font=f)
-    W, H = int(tw + u * 15 * S), int(u * 9 * S)
+    W, H = int(tw + u * 15 * S), int(u * 12 * S)
     im = Image.new("RGB", (W, H), PAPER)
     d = ImageDraw.Draw(im)
     d.rounded_rectangle((0, 0, W - 1, H - 1), H // 2, fill=INK)

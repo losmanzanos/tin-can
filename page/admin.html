@@ -270,6 +270,12 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       </details>
       <div class="row-btns"><button class="btn small" type="submit">Save</button><button type="button" class="btn plain small" id="testNtfy">Send a test</button></div>
     </form>
+    <h2>Magnet board (touchscreen)</h2>
+    <div class="panel">
+      <p class="hint">A small touchscreen where Zelda drags magnets onto her week herself. It can only move magnets, nothing else. Make its link here, then set up the touchscreen Pi with the command below.</p>
+      <div id="boardBox"></div>
+      <div class="row-btns"><button type="button" class="btn small" id="newBoard">Make a board link</button></div>
+    </div>
     <p class="screen-state" id="screenState"></p>
   </section>
 </main>
@@ -490,58 +496,20 @@ function renderAll() {
    The Pi Zero has no browser, so this page draws the phone book and the
    calendar at the screen's exact size and sends the pixels. Only the parts
    that changed are redrawn. Postcards are drawn on the Pi itself. */
-function hash(s) {   // FNV-1a, enough to notice a change
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return (h >>> 0).toString(16);
-}
-function groupKey(group) {
-  const fb = state.fb;
-  const part = group === "book"
-    ? { people: doc.people.map(({ email, phone, ...p }) => p), number: doc.number }
-    : { tiles: doc.tiles, week: doc.week };
-  return hash(JSON.stringify([part, fb.w, fb.h, fb.bpp, 2]));
-}
-function groupFrames(group) {
-  if (group === "book") return [...Array(PB.pageCount(doc)).keys()].map(i => ({ name: "book-" + i, draw: (c, W, H) => PB.drawBook(c, doc, W, H, i) }));
-  const out = [];
-  for (let d = 0; d < 7; d++) {
-    for (let p = 0; p < 3; p++) out.push({ name: `today-${d}-${p}`, draw: (c, W, H) => PB.drawDay(c, doc, W, H, d, d, p) });
-    out.push({ name: `day-${d}`, draw: (c, W, H) => PB.drawDay(c, doc, W, H, d, null, null) });
-  }
-  return out;
-}
 let pushing = Promise.resolve();
 function pushScreens(doneMsg) {
   pushing = pushing.then(() => doPush(doneMsg)).catch(e => toast(e.message, true));
   return pushing;
 }
 async function doPush(doneMsg) {
-  const fb = state.fb;
-  const stale = ["book", "days"].filter(g => state.frames[g]?.key !== groupKey(g) || state.frames[g]?.w !== fb.w || state.frames[g]?.h !== fb.h || state.frames[g]?.bpp !== fb.bpp);
-  if (!stale.length) { if (doneMsg) toast(doneMsg); return; }
-  for (const group of stale) {
-    const frames = groupFrames(group);
-    let n = 0;
-    for (const f of frames) {
-      toast(`Updating the screen… ${Math.round((n++ / frames.length) * 100)}%`);
-      const canvas = await f.draw(document.createElement("canvas"), fb.w, fb.h);
-      const raw = PB.framebuffer(canvas, fb.bpp);
-      const gz = await PB.gzipBytes(raw);
-      const r = await fetch(`/api/frames/${group}/${f.name}`, { method: "POST", body: gz || raw, headers: {
-        "Content-Type": "application/octet-stream", "X-Width": fb.w, "X-Height": fb.h, "X-Bpp": fb.bpp, "X-Gzip": gz ? "1" : "0" } });
-      if (!r.ok) throw new Error("Saved, but the screen didn't update: " + ((await r.json().catch(() => ({}))).error || r.status));
-    }
-    const meta = { w: fb.w, h: fb.h, bpp: fb.bpp, key: groupKey(group), names: frames.map(f => f.name) };
-    await api("POST", `/api/frames/${group}/commit`, meta);
-    state.frames[group] = meta;
-  }
+  if (!PB.staleGroups(doc, state.fb, state.frames, ["book", "days"]).length) { if (doneMsg) toast(doneMsg); return; }
+  state.frames = await PB.syncScreens(doc, state.fb, state.frames, ["book", "days"], { progress: (pct) => toast(`Updating the screen… ${pct}%`) });
   renderScreenState();
   toast((doneMsg ? doneMsg + " " : "") + "The screen is updated.");
 }
 function renderScreenState() {
   const fb = state.fb;
-  const ok = ["book", "days"].every(g => state.frames[g]?.key === groupKey(g));
+  const ok = !PB.staleGroups(doc, fb, state.frames, ["book", "days"]).length;
   $("screenState").textContent = `Screen: ${fb.w}×${fb.h}${fb.real ? "" : " (no screen found, using a guess)"}. ${ok ? "Up to date." : "Out of date."}`
     + (state.pil ? "" : " Postcards need python3-pil on the Pi: run install.sh again.");
 }
@@ -620,7 +588,7 @@ async function drawPreview() {
   const job = ++previewJob;
   const today = PB.weekdayOf(new Date());
   const isToday = dayShown === today;
-  const off = await PB.drawDay(document.createElement("canvas"), doc, 1024, 600, dayShown, isToday ? today : null, isToday ? PB.periodAt(new Date()) : null);
+  const off = await PB.drawDay(document.createElement("canvas"), doc, 1024, 600, dayShown, isToday ? today : null, isToday ? PB.periodAt(new Date()) : null, { hints: true });
   if (job !== previewJob) return;
   const c = $("dayPreview");
   c.width = 1024; c.height = 600;
@@ -1116,7 +1084,28 @@ function renderSettings() {
     $("viewUrl").value = s.viewUrl || "";
   }
   renderKeys();
+  renderBoard();
   renderScreenState();
+}
+function renderBoard() {
+  const box = $("boardBox");
+  box.replaceChildren();
+  const token = state.settings.board;
+  $("newBoard").textContent = token ? "Make a new link (the old one stops working)" : "Make a board link";
+  if (!token) return;
+  const host = location.hostname.endsWith(".local") || /^\d/.test(location.hostname) ? location.host : location.hostname.split(".")[0] + ".local:" + (location.port || 80);
+  const link = `http://${host}/board#key=${token}`;
+  const cmd = `sudo bash ~/tin-can/board/setup.sh '${link}'`;
+  for (const [label, text] of [["Board link", link], ["On the touchscreen Pi, after cloning the repo", cmd]]) {
+    const l = el("div", "label");
+    l.append(el("span", "hint", label), el("code", null, text));
+    const copy = el("button", "linkbtn", "Copy");
+    copy.type = "button";
+    copy.style.color = "var(--ink)";
+    copy.onclick = () => navigator.clipboard?.writeText(text).then(() => toast("Copied."), () => toast("Couldn't copy; press and hold to select it.", true));
+    l.append(copy);
+    box.append(l);
+  }
 }
 function ago(ts) {
   const m = Math.round((Date.now() / 1000 - ts) / 60);
@@ -1204,6 +1193,11 @@ $("vcard").onclick = () => {
     a.download = file.name;
     a.click();
   }
+};
+$("newBoard").onclick = async () => {
+  if (state.settings.board && !confirm("Make a new link? The touchscreen will need the new one.")) return;
+  try { const { board } = await api("POST", "/api/board/key", {}); state.settings.board = board; renderBoard(); toast("Board link ready."); }
+  catch (e) { toast(e.message, true); }
 };
 $("logout").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.reload(); };
 
