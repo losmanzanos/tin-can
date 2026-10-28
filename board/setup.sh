@@ -30,11 +30,16 @@ BOOT=/boot/firmware; [ -d "$BOOT/overlays" ] || BOOT=/boot
 CONFIG=$BOOT/config.txt
 
 echo "== Packages: a bare X server, Chromium and emoji fonts"
+# Shaky Wi-Fi: skip IPv6 (often unreachable at home) and retry dropped downloads.
+printf 'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\n' > /etc/apt/apt.conf.d/99tincan
 apt-get update
 BROWSER_PKG=chromium; apt-cache show chromium >/dev/null 2>&1 || BROWSER_PKG=chromium-browser
-apt-get install -y --no-install-recommends \
+for try in 1 2 3; do apt-get install -y --no-install-recommends \
   xserver-xorg-core xserver-xorg-video-fbdev xserver-xorg-input-evdev xserver-xorg-input-libinput \
-  x11-xserver-utils xinit xinput unclutter "$BROWSER_PKG" fonts-noto-color-emoji curl
+  x11-xserver-utils xinit xinput unclutter "$BROWSER_PKG" fonts-noto-color-emoji curl && break
+  [ "$try" = 3 ] && { echo "Couldn't download packages. Check the board's Wi-Fi and run this again."; exit 1; }
+  echo "Download failed; trying again in 10 seconds (downloaded parts are kept)"; sleep 10
+done
 BROWSER=$(command -v chromium || command -v chromium-browser)
 
 echo "== The 3.5\" screen and its touch panel"
