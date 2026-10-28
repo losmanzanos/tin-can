@@ -283,8 +283,9 @@ def clean_doc(doc):
         clean_keys[k] = sorted({int(v) for v in vals if str(v).isdigit() and 0 < int(v) < 768})[:8]
 
     home = screen.get("home") if screen.get("home") in ("today", "book") else "today"
+    board = screen.get("board") if screen.get("board") in ("same", "on", "off") else "same"
     return {"people": out, "number": number,
-            "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home},
+            "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home, "board": board},
             "tiles": tiles, "week": clean_week, "keys": clean_keys,
             "postcards": {"approve": bool((doc.get("postcards") or {}).get("approve", False))}}
 

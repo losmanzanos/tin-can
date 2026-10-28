@@ -250,7 +250,8 @@ async function redraw() {
 function isNight() {
   if (!doc) return false;
   const now = new Date(), hm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
-  const { on = "08:00", off = "20:00" } = doc.screen || {};
+  const { on = "08:00", off = "20:00", board = "same" } = doc.screen || {};
+  if (board !== "same") return board === "off";
   if (on === off) return false;
   return on < off ? !(hm >= on && hm < off) : !(hm >= on || hm < off);
 }

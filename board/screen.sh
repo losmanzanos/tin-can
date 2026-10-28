@@ -1,6 +1,7 @@
 #!/bin/bash
 # Turns the magnet board's screen on and off with the times from the admin page
-# (08:00 / 20:00 if Zelda's screen can't be reached). Runs as root from cron.
+# (08:00 / 20:00 if Zelda's screen can't be reached), or keeps it always on or
+# off if the admin page says so. Runs as root from cron.
 # An "on" time later than the "off" time keeps it on overnight.
 OPT=/opt/zelda-board
 SERVER=$(cat "$OPT/server" 2>/dev/null)
@@ -10,15 +11,17 @@ TIMES=$(curl -fsS --max-time 10 "$SERVER/api/contacts" 2>/dev/null | python3 -c 
 import json, re, sys
 s = json.load(sys.stdin).get("screen", {})
 ok = lambda t: isinstance(t, str) and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t)
-print(s["on"] if ok(s.get("on")) else "", s["off"] if ok(s.get("off")) else "")' 2>/dev/null)
-read -r ON OFF <<<"$TIMES"
+print(s["on"] if ok(s.get("on")) else "", s["off"] if ok(s.get("off")) else "",
+      s.get("board") if s.get("board") in ("same", "on", "off") else "")' 2>/dev/null)
+read -r ON OFF MODE <<<"$TIMES"
 [ -n "$ON" ] && ON_AT=$ON
 [ -n "$OFF" ] && OFF_AT=$OFF
 # Remember the last good times in case the network is down later.
-if [ -n "$ON" ]; then echo "$ON_AT $OFF_AT" > "$OPT/times"; elif [ -r "$OPT/times" ]; then read -r ON_AT OFF_AT < "$OPT/times"; fi
+if [ -n "$ON" ]; then echo "$ON_AT $OFF_AT $MODE" > "$OPT/times"; elif [ -r "$OPT/times" ]; then read -r ON_AT OFF_AT MODE < "$OPT/times"; fi
 
 NOW=$(date +%H:%M)
-if [[ "$ON_AT" == "$OFF_AT" ]]; then WANT=on
+if [[ "$MODE" == on || "$MODE" == off ]]; then WANT=$MODE   # "Always on" / "Off" on the admin page
+elif [[ "$ON_AT" == "$OFF_AT" ]]; then WANT=on
 elif [[ "$ON_AT" < "$OFF_AT" ]]; then
   if [[ ! "$NOW" < "$ON_AT" && "$NOW" < "$OFF_AT" ]]; then WANT=on; else WANT=off; fi
 else

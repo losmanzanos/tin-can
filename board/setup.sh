@@ -133,7 +133,7 @@ fi
 
 echo "== On at 08:00, off at 20:00 (or whatever the admin page says)"
 cat > /etc/cron.d/zelda-board <<CRON
-*/5 * * * * root $OPT/screen.sh
+* * * * * root $OPT/screen.sh
 @reboot root sleep 90 && $OPT/screen.sh
 CRON
 

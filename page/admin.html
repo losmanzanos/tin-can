@@ -294,6 +294,9 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
     <h2>Magnet board (touchscreen)</h2>
     <div class="panel">
       <p class="hint">A small touchscreen where Zelda drags magnets onto her week herself. It can only move magnets, nothing else. Make its link here, then set up the touchscreen Pi with the command below.</p>
+      <label>Board screen <span class="hint">"Always on" lets you move magnets at night without waking her big screen</span>
+        <select id="boardPower"><option value="same">Same times as her big screen</option><option value="on">Always on</option><option value="off">Off</option></select>
+      </label>
       <div id="boardBox"></div>
       <div class="row-btns"><button type="button" class="btn small" id="newBoard">Make a board link</button></div>
     </div>
@@ -1088,6 +1091,7 @@ function renderSettings() {
     $("flip").checked = !!doc.screen?.flip;
   }
   $("home").value = doc.screen?.home || "today";
+  $("boardPower").value = doc.screen?.board || "same";
   const s = state.settings;
   if (document.activeElement?.closest?.("#mailForm") == null) {
     $("imapUser").value = s.imap.user || "";
@@ -1222,6 +1226,7 @@ for (const b of document.querySelectorAll("[data-act]")) b.onclick = async () =>
   catch (e) { toast(e.message, true); }
 };
 $("home").onchange = () => save({ ...doc, screen: { ...doc.screen, home: $("home").value } }, "Home screen saved.");
+$("boardPower").onchange = () => save({ ...doc, screen: { ...doc.screen, board: $("boardPower").value } }, "Board screen saved.");
 $("goRemote").onclick = () => { showTab("settings"); $("remote").scrollIntoView({ behavior: "smooth" }); };
 
 $("newBoard").onclick = async () => {

@@ -116,7 +116,8 @@ git clone https://github.com/losmanzanos/tin-can.git ~/tin-can
 sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/board#key=...'
 ```
 It reboots into the board. It turns on and off with the same times as her
-main screen, and its link can only move magnets. Her big screen picks up her
+main screen, or pick **Always on** or **Off** under Settings → Magnet board
+(it switches within a minute). Its link can only move magnets. Her big screen picks up her
 changes about 20 seconds after she stops.
 
 **If it isn't right the first time:**
