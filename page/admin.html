@@ -17,8 +17,8 @@ html { -webkit-text-size-adjust: 100%; }
 body { background: var(--paper); color: var(--ink); font: 17px/1.4 "Andika", sans-serif; border-top: 10px solid var(--mustard); padding: 0 16px calc(96px + env(safe-area-inset-bottom)); }
 main { max-width: 560px; margin: 0 auto; }
 button, input, select, textarea { font: inherit; color: inherit; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 8px; }
-h1 { font-size: 24px; line-height: 1.1; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; padding: 16px 0 6px; }
+h1 { font-size: 24px; line-height: 1.1; white-space: nowrap; }
 h2 { font-size: 19px; margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 h2 { scroll-margin-top: 76px; }
 h2 small { font-size: 14px; color: var(--muted); font-weight: 400; }
@@ -65,12 +65,12 @@ a { color: inherit; }
 .mail-tag { font-size: 13px; color: var(--muted); font-weight: 400; }
 
 /* Week */
-.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding-top: 8px; }
 .days button { min-height: 52px; border-radius: 14px; border: 3px solid transparent; background: var(--c); color: #fff; font-weight: 700; font-size: 17px; cursor: pointer; position: relative; }
 .days button.light { color: var(--ink); }
 .days button[aria-pressed=true] { border-color: var(--ink); box-shadow: 0 4px 0 var(--ink); transform: translateY(-3px); }
-.days button .today { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); font-size: 10px; color: var(--ink); font-weight: 700; letter-spacing: .04em; }
-.preview { width: 100%; aspect-ratio: 1024 / 600; border-radius: 14px; border: 2px solid var(--rule); background: #fff; display: block; margin-top: 28px; }
+.days button .today { position: absolute; top: -10px; right: -6px; font-size: 18px; line-height: 1; }
+.preview { width: 100%; aspect-ratio: 1024 / 600; border-radius: 14px; border: 2px solid var(--rule); background: #fff; display: block; margin-top: 16px; }
 .period { background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 12px; display: grid; gap: 10px; }
 .period h3 { font-size: 17px; display: flex; align-items: center; gap: 8px; }
 .period h3 canvas { width: 30px; height: 30px; }
@@ -176,7 +176,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 <main>
   <header>
     <h1>Zelda's Screen</h1>
-    <div class="links"><button id="goRemote">Remote</button><a href="/" target="_blank">View screen</a><button id="logout">Log out</button></div>
+    <div class="links"><button id="goRemote">Remote</button><a href="/?live" target="_blank">View screen</a><button id="logout">Log out</button></div>
   </header>
   <nav class="tabs" id="tabs">
     <button data-tab="week">Week</button>
@@ -548,7 +548,7 @@ function renderWeek() {
     b.style.setProperty("--c", PB.DAY_COLORS[d]);
     b.setAttribute("aria-label", name);
     b.setAttribute("aria-pressed", String(d === dayShown));
-    if (d === today) b.append(el("span", "today", "TODAY"));
+    if (d === today) { const t = el("span", "today", "⭐"); t.title = "Today"; b.append(t); }
     b.onclick = () => { dayShown = d; history.replaceState(null, "", "#week-" + d); renderWeek(); };
     days.append(b);
   });

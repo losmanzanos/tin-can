@@ -598,7 +598,7 @@ def make_handler(store, mailroom):
 
         def log_message(self, fmt, *args):
             # Keep the journal quiet: the views poll every 10 seconds.
-            if self.path.startswith("/api/version"):
+            if self.path.startswith(("/api/version", "/api/showing")):
                 return
             sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
 
@@ -710,6 +710,8 @@ def make_handler(store, mailroom):
                 return self.send(HTTPStatus.OK, {"fb": fb_geometry(), "days": store.frames_info()["days"]})
             if path == "/manifest.json":
                 return self.file(PAGE / "manifest.json")
+            if path == "/api/showing":
+                return self.send(HTTPStatus.OK, read_json(store.dir / "showing.json", {}) or {})
             if path == "/api/version":
                 rev = store.load().get("rev", 0)
                 return self.send(HTTPStatus.OK, {"version": f"{BOOT}-{rev}-{store.cards_rev}", "boot": BOOT,

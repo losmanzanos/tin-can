@@ -326,6 +326,7 @@ class Screen:
         if not daytime:
             set_blank(4)
             self.painted = None
+            self.report({"off": True})
             return
         if self.takeover:                               # show it now (or first thing in the morning)
             self.takeover = False
@@ -368,6 +369,20 @@ class Screen:
             with open(FBDEV, "wb") as fb:
                 fb.write(self.cache[1])
             self.painted, self.painted_at = key, now
+        card = None
+        if self.screen == "postcards" and cards:
+            card = cards[self.card % len(cards)]["id"]
+        self.report({"screen": self.screen, "offset": self.offset, "page": self.page, "card": card})
+
+    def report(self, state):
+        """Tell the admin page what's on her screen, for its live view. Only
+        written when it changes, to spare the SD card."""
+        if state != getattr(self, "reported", None):
+            self.reported = state
+            try:
+                write_json(f"{DATA}/showing.json", dict(state, at=int(time.time())))
+            except OSError:
+                pass
 
 
 # ------------------------------------------------------------- keyboard
