@@ -77,6 +77,20 @@ SEED_TILES = [
     ("face-green", "Green face", "face", "#5aa64b"), ("face-blue", "Blue face", "face", "#2b8fb0"),
     ("face-orange", "Orange face", "face", "#ec7a2a"), ("blank", "Free time", "blank", ""),
 ]
+# More of her real week, added once to boards that already exist (TILE_SET 2).
+# Swap the grandparents' for photos of them: a picture tells them apart best.
+MORE_TILES = [
+    ("zoo", "Zoo", "emoji", "🦁"), ("dino-museum", "Dinosaur museum", "emoji", "🦕"),
+    ("art-museum", "Art museum", "emoji", "🖼️"), ("kids-museum", "Children's museum", "emoji", "🧩"),
+    ("ballet", "Ballet", "emoji", "🩰"), ("acting", "Acting class", "emoji", "🎭"),
+    ("grammy", "Grammy & Grandpa's", "emoji", "👵👴"), ("nana-papa", "Nana & Papa T's", "emoji", "👵🌻"),
+    ("library", "Library", "emoji", "📚"), ("playground", "Playground", "emoji", "🛝"),
+    ("music", "Music", "emoji", "🎵"), ("story", "Story time", "emoji", "📖"),
+    ("baking", "Baking", "emoji", "🧁"), ("pizza", "Pizza night", "emoji", "🍕"),
+    ("party", "Party", "emoji", "🎉"), ("store", "Store", "emoji", "🛒"),
+    ("doctor", "Doctor", "emoji", "🩺"), ("trip", "Car trip", "emoji", "🚗"),
+]
+TILE_SET = 2
 # Monday first; morning, midday, evening. Copied from the photo of her board.
 SEED_WEEK = [
     [["school"], [], []],
@@ -141,9 +155,9 @@ def new_id():
     return secrets.token_hex(4)
 
 
-def seed_tiles():
+def seed_tiles(rows=None):
     out = []
-    for tid, label, kind, art in SEED_TILES:
+    for tid, label, kind, art in (SEED_TILES + MORE_TILES if rows is None else rows):
         t = {"id": tid, "label": label, "kind": kind}
         if kind == "emoji":
             t["emoji"] = art
@@ -164,6 +178,15 @@ def with_defaults(doc):
     if "tiles" not in doc:
         doc["tiles"] = seed_tiles()
         doc["week"] = json.loads(json.dumps(SEED_WEEK))
+        doc["tileSet"] = TILE_SET
+    if int(doc.get("tileSet") or 1) < 2:
+        # One time: add the new tiles, and the palette becomes "Crafts" as asked.
+        have = {t.get("id") for t in doc["tiles"]}
+        doc["tiles"] += [t for t in seed_tiles(MORE_TILES) if t["id"] not in have][:max(0, MAX_TILES - len(doc["tiles"]))]
+        for t in doc["tiles"]:
+            if t.get("id") == "art" and t.get("label") == "Art" and t.get("emoji") == "🎨":
+                t["label"] = "Crafts"
+        doc["tileSet"] = TILE_SET
     doc.setdefault("week", [[[], [], []] for _ in range(7)])
     doc.setdefault("keys", {"back": [], "next": [], "switch": []})
     doc.setdefault("postcards", {"approve": False})
@@ -284,7 +307,7 @@ def clean_doc(doc):
 
     home = screen.get("home") if screen.get("home") in ("today", "book") else "today"
     board = screen.get("board") if screen.get("board") in ("same", "on", "off") else "same"
-    return {"people": out, "number": number, "tinny": clean_tinny(doc.get("tinny")),
+    return {"people": out, "number": number, "tinny": clean_tinny(doc.get("tinny")), "tileSet": TILE_SET,
             "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home, "board": board,
                        "littleFlip": bool(screen.get("littleFlip", False))},
             "tiles": tiles, "week": clean_week, "keys": clean_keys,

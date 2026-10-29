@@ -298,6 +298,8 @@
       c.restore();
     } else if (t.kind === "emoji") {
       c.font = `${s * 0.6}px ${EMOJI}`;
+      const ew = c.measureText(t.emoji).width;   // a pair like 👵👴 gets smaller to fit
+      if (ew > s * 0.84) c.font = `${s * 0.6 * s * 0.84 / ew}px ${EMOJI}`;
       c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = INK;
       c.fillText(t.emoji, cx, cy + s * 0.04);
     } else if (t.kind === "face") {

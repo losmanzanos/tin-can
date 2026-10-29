@@ -25,7 +25,6 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 @media (orientation: portrait) {
   .main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
   .day { grid-template-rows: auto repeat(3, calc(var(--u) * 24)); row-gap: calc(var(--u) * 1.2); }
-  .tray { grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 23), 1fr)); }
 }
 
 /* The day: a colored frame with three rows, like one column of her board. */
@@ -40,13 +39,22 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .slot { width: calc(var(--u) * 17); height: calc(var(--u) * 17); border: calc(var(--u) * 0.6) dashed var(--rule); border-radius: calc(var(--u) * 3); }
 
 /* The tile tray: every magnet she can use. */
-.tray { background: #efe6d2; border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 2); display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 21), 1fr));
-  gap: calc(var(--u) * 1.6); align-content: start; overflow-y: auto; min-height: 0; touch-action: pan-y; transition: background .12s; }
+/* Pages of magnets: swipe sideways on the tray, or tap the arrows. */
+.tray { background: #efe6d2; border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 2); display: grid; grid-template-rows: minmax(0, 1fr) auto;
+  gap: calc(var(--u) * 1.6); overflow: hidden; min-height: 0; touch-action: none; transition: background .12s; }
+.trayPage { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: calc(var(--u) * 1.6); align-content: start; min-height: 0; }
+.trayNav { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 2); }
+.trayNav button { width: calc(var(--u) * 11); height: calc(var(--u) * 11); border: 0; border-radius: 50%; background: var(--ink); color: #fff;
+  font-size: calc(var(--u) * 4.6); line-height: 1; cursor: pointer; box-shadow: 0 calc(var(--u) * 0.8) 0 #0006; }
+.trayNav button:disabled { opacity: .2; box-shadow: none; }
+.dots { display: flex; gap: calc(var(--u) * 1.8); }
+.dots i { width: calc(var(--u) * 2.6); height: calc(var(--u) * 2.6); border-radius: 50%; background: #cbbd99; }
+.dots i.on { background: var(--ink); transform: scale(1.25); }
 .tray.over { background: #e4d6b6; outline: calc(var(--u) * 0.6) dashed var(--ink); }
 
 .tile { width: calc(var(--u) * 17); height: calc(var(--u) * 17); display: block; touch-action: none; }
-/* Big enough for a small finger. Up/down scrolls the tray; sideways picks a magnet up. */
-.tray .tile { width: calc(var(--u) * 21); height: calc(var(--u) * 21); justify-self: center; touch-action: pan-y; }
+/* Big enough for a small finger. */
+.tray .tile { width: calc(var(--u) * var(--tt, 17)); height: calc(var(--u) * var(--tt, 17)); justify-self: center; }
 .tile.placed { animation: pop .25s ease-out; }
 @keyframes pop { 0% { transform: scale(.7); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
 .ghost { position: fixed; z-index: 10; pointer-events: none; width: calc(var(--u) * 20); height: calc(var(--u) * 20); transform: translate(-50%, -60%) rotate(-4deg);
@@ -69,7 +77,10 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
     <div class="row" data-period="1"><canvas class="icon" width="120" height="120"></canvas><div class="slots"></div></div>
     <div class="row" data-period="2"><canvas class="icon" width="120" height="120"></canvas><div class="slots"></div></div>
   </section>
-  <section class="tray" id="tray" aria-label="Magnets"></section>
+  <section class="tray" id="tray" aria-label="Magnets">
+    <div class="trayPage" id="trayPage"></div>
+    <div class="trayNav"><button type="button" id="prevPage" aria-label="Back">◀</button><span class="dots" id="dots"></span><button type="button" id="nextPage" aria-label="More magnets">▶</button></div>
+  </section>
 </div>
 <div class="night" id="night"></div>
 <div class="msg" id="msg"></div>
@@ -150,31 +161,55 @@ function render() {
     slots.replaceChildren(...ids.map(id => { const c = tileCanvas(tiles[id]); c.dataset.from = p; return c; }));
     for (let i = ids.length; i < 2; i++) slots.append(el("div", "slot"));
   }
-  $("tray").replaceChildren(...doc.tiles.map(tileCanvas));
+  renderTray();
 }
+
+/* ---------- the tray, a page at a time ---------- */
+let trayPage = 0, perPage = 9;
+function renderTray() {
+  const page = $("trayPage");
+  // Upright phones get the biggest magnets; wide screens fit more per page.
+  const tt = innerHeight > innerWidth ? 21 : 17;
+  page.style.setProperty("--tt", tt);
+  const u = Math.min(innerWidth, innerHeight) / 100, cell = tt * u, gap = 1.6 * u;
+  const cols = Math.max(1, Math.floor((page.clientWidth + gap) / (cell + gap)));
+  const rows = Math.max(1, Math.floor((page.clientHeight + gap) / (cell + gap)));
+  perPage = cols * rows;
+  const pages = Math.max(1, Math.ceil(doc.tiles.length / perPage));
+  trayPage = Math.max(0, Math.min(trayPage, pages - 1));
+  page.style.setProperty("--cols", cols);
+  page.replaceChildren(...doc.tiles.slice(trayPage * perPage, (trayPage + 1) * perPage).map(tileCanvas));
+  $("prevPage").disabled = trayPage === 0;
+  $("nextPage").disabled = trayPage === pages - 1;
+  $("dots").replaceChildren(...Array.from({ length: pages }, (_, i) => { const d = el("i", i === trayPage ? "on" : ""); return d; }));
+  document.querySelector(".trayNav").style.visibility = pages > 1 ? "" : "hidden";
+}
+function turnPage(by) { trayPage += by; touched = Date.now(); renderTray(); }
+$("prevPage").onclick = () => turnPage(-1);
+$("nextPage").onclick = () => turnPage(1);
+addEventListener("resize", () => doc && renderTray());
+// A swipe on the tray (not on a magnet) turns the page.
+let swipe = null;
+$("tray").addEventListener("pointerdown", (e) => { if (!e.target.closest(".tile, button")) swipe = { x: e.clientX, y: e.clientY }; });
+document.addEventListener("pointerup", (e) => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) turnPage(dx < 0 ? 1 : -1);
+});
 
 /* ---------- dragging ---------- */
 function targetAt(x, y) {
   const hit = document.elementFromPoint(x, y);
   return hit?.closest(".row") || hit?.closest("#tray") || null;
 }
-// Magnets already on the day lift straight away. In the tray, wait to see
-// which way the finger goes: sideways (toward the day) picks it up, up/down scrolls.
-let pending = null;
+// Any magnet lifts straight away.
 document.addEventListener("pointerdown", (e) => {
   const tile = e.target.closest(".tile");
   if (!tile || dragging) return;
   touched = Date.now();
-  if (tile.closest("#tray") && e.pointerType !== "mouse") { pending = { tile, x: e.clientX, y: e.clientY }; return; }
   startDrag(tile, e);
 });
-document.addEventListener("pointermove", (e) => {
-  if (!pending || dragging) return;
-  const dx = e.clientX - pending.x, dy = e.clientY - pending.y;
-  if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { const t = pending.tile; pending = null; startDrag(t, e); }
-  else if (Math.abs(dy) > 12) pending = null;   // scrolling the tray
-});
-for (const ev of ["pointerup", "pointercancel"]) document.addEventListener(ev, () => (pending = null));
 function startDrag(tile, e) {
   e.preventDefault();
   const ghost = tileCanvas(doc.tiles.find(t => t.id === tile.dataset.id));
@@ -221,6 +256,9 @@ function drop(e) {
   } else if (target?.id === "tray" && d.from != null) {
     slots[d.from].splice(slots[d.from].indexOf(d.id), 1);   // dragged back to the tray: take it off
     changed = true;
+  } else if (target?.id === "tray" && e && Math.abs(e.clientX - d.startX) > 50) {
+    turnPage(e.clientX < d.startX ? 1 : -1);   // a swipe that started on a magnet: turn the page too
+    return;
   }
   if (changed) { doc.week = week; render(); markPlaced(target); save(); }
   else render();
