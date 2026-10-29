@@ -607,7 +607,7 @@
   }
 
   window.PhoneBook = {
-    syncScreens, staleGroups, screenKey, periodIcon, DAY_TEXT,
+    syncScreens, staleGroups, screenKey, periodIcon, DAY_TEXT, drawPerson,
     drawBook, drawDay, drawPostcard, drawTile, framebuffer, gzipBytes, pageCount, periodAt, weekdayOf,
     PADS, PER_PAGE, MAX_PEOPLE, DAYS, DAY_COLORS, PERIODS,
   };

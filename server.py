@@ -284,10 +284,25 @@ def clean_doc(doc):
 
     home = screen.get("home") if screen.get("home") in ("today", "book") else "today"
     board = screen.get("board") if screen.get("board") in ("same", "on", "off") else "same"
-    return {"people": out, "number": number,
+    return {"people": out, "number": number, "tinny": clean_tinny(doc.get("tinny")),
             "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home, "board": board},
             "tiles": tiles, "week": clean_week, "keys": clean_keys,
             "postcards": {"approve": bool((doc.get("postcards") or {}).get("approve", False))}}
+
+
+def clean_tinny(t):
+    """Tinny, the pet on the little screen: the town for its weather and the
+    day it was born (it grows week by week)."""
+    t = t if isinstance(t, dict) else {}
+    out = {"born": int(t.get("born") or time.time())}
+    try:
+        lat, lon = float(t.get("lat")), float(t.get("lon"))
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            out.update(lat=round(lat, 3), lon=round(lon, 3), place=str(t.get("place", ""))[:60])
+    except (TypeError, ValueError):
+        pass
+    out["units"] = "C" if t.get("units") == "C" else "F"
+    return out
 
 
 def public_doc(doc):
@@ -705,6 +720,13 @@ def make_handler(store, mailroom):
                 return self.file(PAGE / ("admin.html" if self.authed() else "login.html"))
             if path in ("/board", "/board/"):
                 return self.file(PAGE / "board.html")
+            if path in ("/tinny", "/tinny/"):
+                return self.file(PAGE / "tinny.html")
+            if path == "/api/tinny":
+                # What Tinny reacts to besides the calendar: has Zelda looked at
+                # her newest postcard yet, and the last hug sent from the admin page.
+                return self.send(HTTPStatus.OK, {"seen": (read_json(store.dir / "postcards-seen.json", {}) or {}).get("ts", 0),
+                                                 "hug": read_json(store.dir / "hug.json", {}) or {}})
             if path == "/api/board":
                 if not (self.board_ok() or self.authed()):
                     return self.error(HTTPStatus.UNAUTHORIZED, "This board's link is out of date. Make a new one on the admin page.")
@@ -808,6 +830,11 @@ def make_handler(store, mailroom):
                 if action not in ("back", "next", "switch", "goto:today", "goto:book", "goto:postcards"):
                     raise BadRequest("unknown button")
                 write_atomic(store.dir / "remote.json", json.dumps({"seq": time.time_ns(), "action": action}).encode())
+                return self.send(HTTPStatus.OK, {"ok": True})
+
+            if path == "/api/tinny/hug" and self.command == "POST":
+                sender = str((self.json_body() or {}).get("from", "")).strip()[:40] or "someone"
+                write_atomic(store.dir / "hug.json", json.dumps({"ts": int(time.time()), "from": sender}).encode())
                 return self.send(HTTPStatus.OK, {"ok": True})
 
             if path == "/api/board/key" and self.command == "POST":

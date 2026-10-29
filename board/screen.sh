@@ -19,6 +19,13 @@ read -r ON OFF MODE <<<"$TIMES"
 # Remember the last good times in case the network is down later.
 if [ -n "$ON" ]; then echo "$ON_AT $OFF_AT $MODE" > "$OPT/times"; elif [ -r "$OPT/times" ]; then read -r ON_AT OFF_AT MODE < "$OPT/times"; fi
 
+# Tinny says goodnight on screen for half an hour before its screen goes dark.
+if grep -qs '/tinny' "$OPT/link" && [[ "$ON_AT" != "$OFF_AT" ]]; then
+  m=$(( (10#${OFF_AT%:*} * 60 + 10#${OFF_AT#*:} + 30) % 1440 ))
+  LATER=$(printf '%02d:%02d' $((m / 60)) $((m % 60)))
+  # Only push "off" later if that doesn't run past the morning "on" time.
+  if [[ "$ON_AT" > "$OFF_AT" ]] || [[ "$LATER" < "$ON_AT" ]] || [[ "$LATER" > "$OFF_AT" ]]; then OFF_AT=$LATER; fi
+fi
 NOW=$(date +%H:%M)
 if [[ "$MODE" == on || "$MODE" == off ]]; then WANT=$MODE   # "Always on" / "Off" on the admin page
 elif [[ "$ON_AT" == "$OFF_AT" ]]; then WANT=on

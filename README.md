@@ -117,7 +117,9 @@ sudo apt-get update && sudo apt-get install -y git
 git clone https://github.com/losmanzanos/tin-can.git ~/tin-can
 sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/board#key=...'
 ```
-It reboots into the board. It turns on and off with the same times as her
+On a Chromebook or phone, just open the board link: it works at any hour, so
+you can set up tomorrow at night. On the touchscreen Pi, it reboots into the
+board. It turns on and off with the same times as her
 main screen, or pick **Always on** or **Off** under Settings → Magnet board
 (it switches within a minute). Its link can only move magnets. Her big screen picks up her
 changes about 20 seconds after she stops.
@@ -128,6 +130,22 @@ changes about 20 seconds after she stops.
   landed. The fix is one line in `/etc/X11/xorg.conf.d/99-zelda-touch.conf`.
 - **Screen stays white:** the driver didn't load. Try
   `OVERLAY=waveshare35a sudo -E bash ~/tin-can/board/setup.sh '...'`.
+
+### Tinny, the pet on the little screen
+A pixel tin-can pet for the 3.5" touchscreen Pi, at `/tinny`. It holds up new
+postcards until she looks, dresses for what's on her calendar right now
+(backpack for school, goggles for swimming, a helmet for bike rides) and for the
+weather (umbrella, scarf, sunglasses, snow), says good morning, suggests calling
+someone she hasn't heard from now and then, gives hugs you send from the admin
+page, and says goodnight for half an hour after her big screen turns off. Any
+tap pets it. It grows a little over its first weeks.
+
+Set it up under **Settings → Tinny**: pick a town for the weather, then on the
+little Pi run
+```sh
+sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/tinny'
+```
+The weather comes from Open-Meteo (free, no account).
 
 ### Postcards by text or email
 1. Make a new Gmail just for this. Turn on 2-Step Verification and create an

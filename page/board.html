@@ -253,8 +253,12 @@ async function redraw() {
 }
 
 /* ---------- keeping up: other phones, the clock, bedtime ---------- */
+// Only the touchscreen Pi goes dark at night (its link carries kiosk=1). On a
+// Chromebook or phone the board stays usable, so the week can be set up at
+// night and be on her big screen in the morning.
+const KIOSK = new URLSearchParams(location.hash.slice(1)).get("kiosk") === "1";
 function isNight() {
-  if (!doc) return false;
+  if (!doc || !KIOSK) return false;
   const now = new Date(), hm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
   const { on = "08:00", off = "20:00", board = "same" } = doc.screen || {};
   if (board !== "same") return board === "off";

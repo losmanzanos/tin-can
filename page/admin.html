@@ -308,6 +308,33 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       <div id="boardBox"></div>
       <div class="row-btns"><button type="button" class="btn small" id="newBoard">Make a board link</button></div>
     </div>
+
+    <h2>Tinny, the little screen pet</h2>
+    <div class="panel">
+      <p class="hint">A tin-can pet for the 3.5" touchscreen. It holds up new postcards, dresses for her calendar and the weather, suggests calling someone now and then, and falls asleep when her big screen turns off. Any tap pets it.</p>
+      <div class="row2">
+        <label>Weather for <span class="hint" id="tinnyPlaceNow">Not set</span>
+          <input type="text" id="tinnyPlace" autocomplete="off" placeholder="Town, e.g. Denver">
+        </label>
+        <label>Units <span class="hint">&nbsp;</span>
+          <select id="tinnyUnits"><option value="F">°F</option><option value="C">°C</option></select>
+        </label>
+      </div>
+      <div class="row-btns"><button type="button" class="btn plain small" id="tinnyFind">Find town</button></div>
+      <div class="row-btns" id="tinnyPlaces"></div>
+      <div class="label">Send Zelda a hug <span class="hint">Tinny gives her a big squeeze, with your name</span></div>
+      <div class="row2">
+        <select id="hugFrom" aria-label="Hug from"></select>
+        <button type="button" class="btn small" id="sendHug">Send a hug 💛</button>
+      </div>
+      <div class="label"><span class="hint">Tinny link</span><code id="tinnyLink"></code>
+        <div class="row-btns"><a class="btn small" id="tinnyOpen" target="_blank" rel="noopener">Open Tinny</a><button type="button" class="btn plain small" id="tinnyCopy">Copy</button></div>
+      </div>
+      <details><summary class="hint">Put Tinny on the little touchscreen Pi</summary>
+        <div class="label" style="margin-top:8px"><span class="hint">On the Pi, after cloning the repo. It reboots into Tinny.</span><code id="tinnyCmd"></code>
+          <div class="row-btns"><button type="button" class="btn plain small" id="tinnyCmdCopy">Copy</button></div></div>
+      </details>
+    </div>
     <p class="screen-state" id="screenState"></p>
   </section>
 </main>
@@ -1119,6 +1146,7 @@ function renderSettings() {
   }
   renderKeys();
   renderBoard();
+  renderTinny();
   renderScreenState();
 }
 function renderBoard() {
@@ -1151,6 +1179,54 @@ function renderBoard() {
   pi.append(l2);
   box.append(l, pi);
 }
+/* ---------- Tinny ---------- */
+function tinnyHost() {
+  return location.hostname.endsWith(".local") || /^\d/.test(location.hostname) ? location.host : location.hostname.split(".")[0] + ".local:" + (location.port || 80);
+}
+function renderTinny() {
+  const t = doc.tinny || {};
+  $("tinnyPlaceNow").textContent = t.place ? "Now: " + t.place : "Not set";
+  if (document.activeElement !== $("tinnyUnits")) $("tinnyUnits").value = t.units || "F";
+  const keep = $("hugFrom").value;
+  const names = [...new Set(["Mom & Dad", ...(doc.people || []).map(p => p.name).filter(Boolean)])];
+  $("hugFrom").replaceChildren(...names.map(n => { const o = el("option", null, n); o.value = n; return o; }));
+  if (keep) $("hugFrom").value = keep;
+  const link = `http://${tinnyHost()}/tinny`;
+  $("tinnyLink").textContent = link;
+  $("tinnyOpen").href = "/tinny";
+  $("tinnyCmd").textContent = `sudo bash ~/tin-can/board/setup.sh '${link}'`;
+}
+const copyText = (text) => navigator.clipboard?.writeText(text).then(() => toast("Copied."), () => toast("Couldn't copy; press and hold to select it.", true));
+$("tinnyCopy").onclick = () => copyText($("tinnyLink").textContent);
+$("tinnyCmdCopy").onclick = () => copyText($("tinnyCmd").textContent);
+$("tinnyUnits").onchange = () => save({ ...doc, tinny: { ...doc.tinny, units: $("tinnyUnits").value } }, "Saved.");
+$("tinnyFind").onclick = async () => {
+  const q = $("tinnyPlace").value.trim();
+  const box = $("tinnyPlaces");
+  box.replaceChildren();
+  if (!q) return toast("Type a town first.", true);
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=en&format=json`);
+    const found = (await r.json()).results || [];
+    if (!found.length) return toast("Couldn't find that town. Try the nearest city.", true);
+    for (const f of found) {
+      const name = [f.name, f.admin1, f.country_code].filter(Boolean).join(", ");
+      const b = el("button", "btn plain small", name);
+      b.type = "button";
+      b.onclick = async () => {
+        if (await save({ ...doc, tinny: { ...doc.tinny, lat: f.latitude, lon: f.longitude, place: name } }, "Tinny's weather: " + f.name)) {
+          box.replaceChildren(); $("tinnyPlace").value = "";
+        }
+      };
+      box.append(b);
+    }
+  } catch (e) { toast("Couldn't look up towns right now.", true); }
+};
+$("sendHug").onclick = async () => {
+  try { await api("POST", "/api/tinny/hug", { from: $("hugFrom").value }); toast("Hug sent! 💛"); }
+  catch (e) { toast(e.message, true); }
+};
+
 function ago(ts) {
   const m = Math.round((Date.now() / 1000 - ts) / 60);
   return m < 1 ? "just now" : m === 1 ? "a minute ago" : m < 60 ? m + " minutes ago" : "a while ago";

@@ -7,6 +7,7 @@
 # full screen on the little display. Safe to run again.
 #
 #   sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/board#key=...'
+#   sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/tinny'   (Tinny, the pet)
 #
 # Get the link from Zelda's admin page: Settings -> Magnet board.
 # Options, set in front of the command (e.g. ROTATE=270 sudo -E bash ...):
@@ -15,8 +16,9 @@
 set -euo pipefail
 [ "$(id -u)" = 0 ] || exec sudo -E bash "$0" "$@"
 LINK=${1:-}
-if [[ ! "$LINK" =~ ^https?://.+/board#key=.+ ]]; then
+if [[ ! "$LINK" =~ ^https?://[^/]+/(board#key=.+|tinny/?)$ ]]; then
   echo "Usage: sudo bash $0 'http://zelda-phone.local:8080/board#key=...'"
+  echo "   or: sudo bash $0 'http://zelda-phone.local:8080/tinny'"
   echo "(Admin page -> Settings -> Magnet board -> Make a board link)"
   exit 1
 fi
@@ -24,7 +26,7 @@ APP=$(cd "$(dirname "$0")" && pwd)
 U=$(getent passwd 1000 | cut -d: -f1)
 H=$(getent passwd 1000 | cut -d: -f6)
 OPT=/opt/zelda-board
-SERVER=${LINK%%/board*}
+SERVER=$(sed -E 's#^(https?://[^/]+).*#\1#' <<<"$LINK")
 ROTATE=${ROTATE:-90}
 BOOT=/boot/firmware; [ -d "$BOOT/overlays" ] || BOOT=/boot
 CONFIG=$BOOT/config.txt
@@ -104,6 +106,8 @@ echo "== Kiosk: log in on the screen and open the board"
 install -d "$OPT"
 install -m 755 "$APP/screen.sh" "$OPT/screen.sh"
 echo "$SERVER" > "$OPT/server"
+echo "$LINK" > "$OPT/link"
+OPEN=$LINK; [[ "$LINK" == *"#key="* ]] && OPEN="$LINK&kiosk=1"   # the board page only goes dark at night here
 cat > "$OPT/kiosk.sh" <<KIOSK
 #!/bin/bash
 # Started by X (see ~/.xinitrc). Waits for Zelda's screen, then shows the board.
@@ -115,7 +119,7 @@ while true; do
     --disable-features=Translate,TouchpadOverscrollHistoryNavigation --check-for-update-interval=31536000 \\
     --disable-pinch --overscroll-history-navigation=0 --disable-session-crashed-bubble --touch-events=enabled \\
     --window-position=0,0 --window-size=480,320 --force-device-scale-factor=1 \\
-    --disable-gpu --disk-cache-size=10000000 '$LINK'
+    --disable-gpu --disk-cache-size=10000000 '$OPEN'
   sleep 5   # if Chromium ever closes, open it again
 done
 KIOSK
