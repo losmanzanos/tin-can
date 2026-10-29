@@ -24,7 +24,9 @@ inner micro-USB port, marked **USB** (not PWR), through an OTG adapter:
   into a mail tag, and pressing it opens them.
 - After two minutes without a press, it goes back to Today.
 
-You pick which button does what on the admin page.
+You pick which button does what on the admin page. A button can also open
+one screen directly, like a 📬 postcards button; pressed again, it shows the
+next postcard.
 
 ## The pages
 

@@ -108,6 +108,7 @@ class Settings:
     def __init__(self):
         self.key, self.on, self.off, self.flip, self.home = None, ON_AT, OFF_AT, False, "today"
         self.back, self.next, self.switch = set(), set(), set()
+        self.goto = {}    # key code -> "goto:postcards" etc: buttons that open one screen
 
     def refresh(self):
         path = f"{DATA}/contacts.json"
@@ -123,9 +124,12 @@ class Settings:
         k = doc.get("keys") or {}
         self.back, self.next, self.switch = (set(int(c) for c in k.get(n) or [] if str(c).isdigit())
                                              for n in ("back", "next", "switch"))
+        self.goto = {int(c): "goto:" + n for n in SCREENS for c in k.get(n) or [] if str(c).isdigit()}
         return self
 
     def action(self, code):
+        if code in self.goto:
+            return self.goto[code]
         if code in self.back:
             return "back"
         if code in self.switch:
@@ -276,7 +280,9 @@ class Screen:
         now = time.time()
         self.pressed = now
         self.takeover = False
-        if action.startswith("goto:") and action[5:] in SCREENS:   # from the admin page's remote
+        if action.startswith("goto:") and action[5:] in SCREENS and self.screen == action[5:] != "today":
+            action = "next"     # pressed again on its own screen: the next postcard or page
+        if action.startswith("goto:") and action[5:] in SCREENS:   # a button for one screen, or the admin page's remote
             self.screen, self.offset, self.card = action[5:], 0, 0
         elif action == "switch":
             cards = self.cards()

@@ -30,11 +30,11 @@ a { color: inherit; }
 .tabs { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px 0; background: var(--paper); }
 .tabs button { min-height: 42px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); font-weight: 700; font-size: 15px; cursor: pointer; position: relative; }
 .tabs button[aria-current=true] { background: var(--ink); color: #fff; }
-@media (max-width: 360px) { .tabs { gap: 4px; } .tabs button { font-size: 13px; padding: 0 2px; } }
+@media (max-width: 360px) { .tabs { gap: 4px; } .tabs button { font-size: 13px; padding: 0 2px; } .seg button { font-size: 14px; padding: 0 4px; } }
 .tabs .dot { position: absolute; top: -7px; right: 4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--mustard); color: var(--ink); font-size: 12px; line-height: 16px; border: 2px solid var(--ink); }
 
 /* Buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border: 3px solid var(--ink); border-radius: 999px; background: var(--mustard); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer; text-decoration: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border: 3px solid var(--ink); border-radius: 999px; background: var(--mustard); color: var(--ink); font-weight: 700; box-shadow: 0 4px 0 var(--ink); cursor: pointer; text-decoration: none; }
 .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 .btn.plain { background: var(--card); }
 .btn.small { min-height: 38px; padding: 0 14px; font-size: 15px; border-width: 2px; box-shadow: 0 3px 0 var(--ink); }
@@ -100,7 +100,11 @@ input:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-
 .panel > *, .row2 > *, label { min-width: 0; }
 input, select, textarea { min-width: 0; max-width: 100%; }
 .screen-state { color: var(--muted); font-size: 14px; text-align: center; margin-top: 14px; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.row2 > label { min-width: 0; }
+/* iPhone Safari gives time fields a fixed native width that ignores width: 100%, so they spill out of the box. */
+input[type=time] { -webkit-appearance: none; appearance: none; display: block; }
+input[type=time]::-webkit-date-and-time-value { text-align: left; }
 .status { font-size: 14px; color: var(--muted); }
 .status.ok { color: #3f7a3a; }
 .status.bad { color: var(--bad); }
@@ -142,7 +146,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .swatch.custom { background: conic-gradient(#e44, #ea2, #4a4, #29d, #a4d, #e44); overflow: hidden; }
 .swatch.custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; }
-.seg button { min-height: 46px; border: 0; background: var(--card); font-weight: 700; cursor: pointer; }
+.seg button { min-height: 46px; padding: 0 6px; white-space: nowrap; border: 0; background: var(--card); font-weight: 700; cursor: pointer; }
 .seg button + button { border-left: 2px solid var(--ink); }
 .seg button[aria-pressed=true] { background: var(--ink); color: #fff; }
 .pads { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -293,11 +297,11 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       </details>
       <div class="row-btns"><button class="btn small" type="submit">Save</button><button type="button" class="btn plain small" id="testNtfy">Send a test</button></div>
     </form>
-    <h2>Magnet board (touchscreen)</h2>
+    <h2>Magnet board</h2>
     <div class="panel">
-      <p class="hint">A small touchscreen where Zelda drags magnets onto her week herself. It can only move magnets, nothing else. Make its link here, then set up the touchscreen Pi with the command below.</p>
+      <p class="hint">Zelda drags magnets onto her week herself, on a Chromebook, tablet or phone. Open the board link there and add it to the home screen. The link can only move magnets, nothing else.</p>
       <label>Board screen <span class="hint">"Always on" lets you move magnets at night without waking her big screen</span>
-        <select id="boardPower"><option value="same">Same times as her big screen</option><option value="on">Always on</option><option value="off">Off</option></select>
+        <select id="boardPower"><option value="same">Same as her big screen</option><option value="on">Always on</option><option value="off">Off</option></select>
       </label>
       <div id="boardBox"></div>
       <div class="row-btns"><button type="button" class="btn small" id="newBoard">Make a board link</button></div>
@@ -1120,32 +1124,43 @@ function renderBoard() {
   box.replaceChildren();
   const token = state.settings.board;
   $("newBoard").textContent = token ? "Make a new link (the old one stops working)" : "Make a board link";
+  $("newBoard").classList.toggle("plain", !!token);   // once there's a link, "Open the board" is the main button
   if (!token) return;
   const host = location.hostname.endsWith(".local") || /^\d/.test(location.hostname) ? location.host : location.hostname.split(".")[0] + ".local:" + (location.port || 80);
   const link = `http://${host}/board#key=${token}`;
   const cmd = `sudo bash ~/tin-can/board/setup.sh '${link}'`;
-  for (const [label, text] of [["Board link", link], ["On the touchscreen Pi, after cloning the repo", cmd]]) {
-    const l = el("div", "label");
-    l.append(el("span", "hint", label), el("code", null, text));
-    const copy = el("button", "linkbtn", "Copy");
+  const copyBtn = (text) => {
+    const copy = el("button", "btn plain small", "Copy");
     copy.type = "button";
-    copy.style.color = "var(--ink)";
     copy.onclick = () => navigator.clipboard?.writeText(text).then(() => toast("Copied."), () => toast("Couldn't copy; press and hold to select it.", true));
-    l.append(copy);
-    box.append(l);
-  }
+    return copy;
+  };
+  const open = el("a", "btn small", "Open the board");
+  open.href = link; open.target = "_blank"; open.rel = "noopener";
+  const btns = el("div", "row-btns");
+  btns.append(open, copyBtn(link));
+  const l = el("div", "label");
+  l.append(el("span", "hint", "Board link"), el("code", null, link), btns);
+  const pi = el("details");
+  pi.append(el("summary", "hint", "Using a Raspberry Pi touchscreen?"));
+  const l2 = el("div", "label");
+  l2.style.marginTop = "8px";
+  l2.append(el("span", "hint", "On the Pi, after cloning the repo"), el("code", null, cmd), copyBtn(cmd));
+  pi.append(l2);
+  box.append(l, pi);
 }
 function ago(ts) {
   const m = Math.round((Date.now() / 1000 - ts) / 60);
   return m < 1 ? "just now" : m === 1 ? "a minute ago" : m < 60 ? m + " minutes ago" : "a while ago";
 }
 let keyPlan = {};
+const KEY_ACTIONS = ["back", "next", "switch", "postcards", "book", "today"];
 function renderKeys() {
   const seen = (state.keysSeen.recent || []).map(k => k.code);
-  const assigned = doc.keys || { back: [], next: [], switch: [] };
-  const codes = [...new Set([...seen, ...assigned.back, ...assigned.next, ...assigned.switch])];
+  const assigned = doc.keys || {};
+  const codes = [...new Set([...seen, ...KEY_ACTIONS.flatMap(a => assigned[a] || [])])];
   keyPlan = {};
-  for (const c of codes) keyPlan[c] = assigned.back.includes(c) ? "back" : assigned.switch.includes(c) ? "switch" : assigned.next.includes(c) ? "next" : "";
+  for (const c of codes) keyPlan[c] = KEY_ACTIONS.find(a => (assigned[a] || []).includes(c)) || "";
   const box = $("keyChips");
   box.replaceChildren();
   if (!codes.length) { box.append(el("p", "hint", "No button presses seen yet. Plug the controller into the Pi and press each button.")); return; }
@@ -1153,7 +1168,8 @@ function renderKeys() {
     const chip = el("div", "keychip");
     chip.append(el("b", null, (KEY_NAMES[c] || "Key") + " (" + c + ")"));
     const sel = el("select");
-    for (const [v, label] of [["", "Default"], ["back", "◀ Back"], ["switch", "● Switch screen"], ["next", "▶ Next"]]) {
+    for (const [v, label] of [["", "Default"], ["back", "◀ Back"], ["switch", "● Switch screen"], ["next", "▶ Next"],
+                              ["postcards", "📬 Open postcards"], ["book", "📞 Open phone book"], ["today", "🗓️ Open today"]]) {
       const o = el("option", null, label); o.value = v; sel.append(o);
     }
     sel.value = keyPlan[c];
@@ -1164,7 +1180,7 @@ function renderKeys() {
 }
 $("refreshKeys").onclick = async () => { await reload(); toast("Checked."); };
 $("saveKeys").onclick = () => {
-  const keys = { back: [], next: [], switch: [] };
+  const keys = Object.fromEntries(KEY_ACTIONS.map(a => [a, []]));
   for (const [c, v] of Object.entries(keyPlan)) if (v) keys[v].push(+c);
   save({ ...doc, keys }, "Buttons saved.");
 };

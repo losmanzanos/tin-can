@@ -278,7 +278,7 @@ def clean_doc(doc):
 
     keys = doc.get("keys") or {}
     clean_keys = {}
-    for k in ("back", "next", "switch"):
+    for k in ("back", "next", "switch", "postcards", "book", "today"):
         vals = keys.get(k) or []
         clean_keys[k] = sorted({int(v) for v in vals if str(v).isdigit() and 0 < int(v) < 768})[:8]
 

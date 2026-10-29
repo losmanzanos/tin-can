@@ -21,6 +21,12 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .days button .star { position: absolute; top: calc(var(--u) * -2.2); right: calc(var(--u) * -1.2); font-size: calc(var(--u) * 5); }
 
 .main { display: grid; grid-template-columns: 1fr 1.05fr; gap: calc(var(--u) * 3); min-height: 0; }
+/* A phone held upright: the day on top, the magnets underneath. */
+@media (orientation: portrait) {
+  .main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .day { grid-template-rows: auto repeat(3, calc(var(--u) * 24)); row-gap: calc(var(--u) * 1.2); }
+  .tray { grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 23), 1fr)); }
+}
 
 /* The day: a colored frame with three rows, like one column of her board. */
 .day { display: grid; grid-template-rows: auto 1fr 1fr 1fr; border: calc(var(--u) * 1.6) solid var(--day); border-radius: calc(var(--u) * 4);
