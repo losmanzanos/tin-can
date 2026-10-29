@@ -92,6 +92,8 @@ label, .label { display: grid; gap: 6px; font-weight: 700; font-size: 15px; }
 .hint a { color: var(--ink); }
 input[type=text], input[type=tel], input[type=time], input[type=email], input[type=password], input[type=url], select, textarea { width: 100%; min-height: 50px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 18px; }
 textarea { min-height: 80px; resize: vertical; }
+/* Our own drop-down arrow: browsers draw a thin one jammed against the edge. Same weight as the borders. */
+select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Cpath d='M2 2l6 6 6-6' fill='none' stroke='%2316181f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 18px center; background-size: 16px 10px; padding-right: 50px; cursor: pointer; }
 input:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
 .check { display: grid; grid-template-columns: 26px 1fr; align-items: center; gap: 4px 10px; }
 .check input { width: 26px; height: 26px; accent-color: var(--ink); }
@@ -125,7 +127,7 @@ code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padd
 .rbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #000; }
 .keychips { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .keychip { display: grid; gap: 6px; padding: 10px 12px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; font-size: 14px; }
-.keychip select { min-height: 38px; font-size: 15px; padding: 4px 8px; }
+.keychip select { min-height: 38px; font-size: 15px; padding: 4px 34px 4px 10px; background-position: right 12px center; background-size: 13px 8px; }
 
 /* Sheets (dialogs). On phones they fill the *visible* screen (dvh), so the
    browser's address bar and toolbar never cover their top or bottom. */
