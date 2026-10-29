@@ -30,6 +30,7 @@ a { color: inherit; }
 .tabs { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px 0; background: var(--paper); }
 .tabs button { min-height: 42px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); font-weight: 700; font-size: 15px; cursor: pointer; position: relative; }
 .tabs button[aria-current=true] { background: var(--ink); color: #fff; }
+@media (max-width: 360px) { .tabs { gap: 4px; } .tabs button { font-size: 13px; padding: 0 2px; } }
 .tabs .dot { position: absolute; top: -7px; right: 4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--mustard); color: var(--ink); font-size: 12px; line-height: 16px; border: 2px solid var(--ink); }
 
 /* Buttons */
@@ -167,8 +168,9 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .sizes i { display: block; border-radius: 50%; background: var(--ink); }
 
 /* Status toast */
-.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translate(-50%, 150%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 700; font-size: 15px; transition: transform .25s; max-width: calc(100% - 32px); text-align: center; z-index: 20; }
-.toast.show { transform: translate(-50%, 0); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translate(-50%, 150%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; font-weight: 700; font-size: 15px; transition: transform .25s, visibility 0s .25s; max-width: calc(100% - 32px); text-align: center; z-index: 20; visibility: hidden; }
+/* Hidden for real when not showing: on iPhones the home-bar inset lifts it, and sliding down 150% alone left its top peeking out. */
+.toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform .25s; }
 .toast.bad { background: var(--bad); }
 </style>
 </head>
