@@ -322,6 +322,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       </div>
       <div class="row-btns"><button type="button" class="btn plain small" id="tinnyFind">Find town</button></div>
       <div class="row-btns" id="tinnyPlaces"></div>
+      <label class="check"><input type="checkbox" id="littleFlip"> Flip the little screen upside down <span class="hint">For Tinny or the magnet board on the touchscreen Pi. Changes within a few seconds.</span></label>
       <div class="label">Send Zelda a hug <span class="hint">Tinny gives her a big squeeze, with your name</span></div>
       <div class="row2">
         <select id="hugFrom" aria-label="Hug from"></select>
@@ -1127,6 +1128,7 @@ function renderSettings() {
   }
   $("home").value = doc.screen?.home || "today";
   $("boardPower").value = doc.screen?.board || "same";
+  $("littleFlip").checked = !!doc.screen?.littleFlip;
   const s = state.settings;
   if (document.activeElement?.closest?.("#mailForm") == null) {
     $("imapUser").value = s.imap.user || "";
@@ -1193,7 +1195,7 @@ function renderTinny() {
   if (keep) $("hugFrom").value = keep;
   const link = `http://${tinnyHost()}/tinny`;
   $("tinnyLink").textContent = link;
-  $("tinnyOpen").href = "/tinny";
+  $("tinnyOpen").href = "/tinny#preview=1";   // never flipped on your phone
   $("tinnyCmd").textContent = `sudo bash ~/tin-can/board/setup.sh '${link}'`;
 }
 const copyText = (text) => navigator.clipboard?.writeText(text).then(() => toast("Copied."), () => toast("Couldn't copy; press and hold to select it.", true));
@@ -1322,6 +1324,7 @@ for (const b of document.querySelectorAll("[data-act]")) b.onclick = async () =>
   catch (e) { toast(e.message, true); }
 };
 $("home").onchange = () => save({ ...doc, screen: { ...doc.screen, home: $("home").value } }, "Home screen saved.");
+$("littleFlip").onchange = () => save({ ...doc, screen: { ...doc.screen, littleFlip: $("littleFlip").checked } }, "Little screen flipped.");
 $("boardPower").onchange = () => save({ ...doc, screen: { ...doc.screen, board: $("boardPower").value } }, "Board screen saved.");
 $("goRemote").onclick = () => { showTab("settings"); $("remote").scrollIntoView({ behavior: "smooth" }); };
 

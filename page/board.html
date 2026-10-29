@@ -118,6 +118,8 @@ function tileCanvas(t) {
 
 function render() {
   if (!doc) return;
+  // "Flip the little screen" on the admin page: only on the touchscreen Pi.
+  document.body.style.transform = KIOSK && doc.screen?.littleFlip ? "rotate(180deg)" : "";
   const today = PB.weekdayOf(new Date());
   document.documentElement.style.setProperty("--day", PB.DAY_COLORS[day]);
   document.documentElement.style.setProperty("--dayText", PB.DAY_TEXT[day]);
@@ -184,8 +186,10 @@ function startDrag(tile, e) {
 }
 function move(e) {
   if (!dragging) return;
-  dragging.ghost.style.left = e.clientX + "px";
-  dragging.ghost.style.top = e.clientY + "px";
+  // The ghost lives inside the page, so when the page is flipped its spot is too.
+  const flipped = !!document.body.style.transform;
+  dragging.ghost.style.left = (flipped ? innerWidth - e.clientX : e.clientX) + "px";
+  dragging.ghost.style.top = (flipped ? innerHeight - e.clientY : e.clientY) + "px";
   const t = targetAt(e.clientX, e.clientY);
   if (t !== dragging.over) {
     dragging.over?.classList.remove("over");

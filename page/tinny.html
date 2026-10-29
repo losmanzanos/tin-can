@@ -43,6 +43,9 @@ async function refresh() {
     if (!version || v.version !== version.version) {
       [doc, cards] = await Promise.all([getJSON("/api/contacts"), getJSON("/api/postcards")]);
       version = v;
+      // "Flip the little screen" on the admin page. Not on a preview from a phone.
+      const preview = new URLSearchParams(location.hash.slice(1)).has("preview");
+      c.style.transform = doc.screen?.littleFlip && !preview ? "rotate(180deg)" : "";
       for (const t of doc.tiles || []) if (t.kind === "photo" && t.photo && !photos[t.photo]) loadImg("/photos/" + encodeURIComponent(t.photo), (img) => (photos[t.photo] = img));
       if (cards[0]?.photo) loadImg(`/postcards/${cards[0].id}.jpg`);
       if (!weather && doc.tinny?.lat != null) getWeather();

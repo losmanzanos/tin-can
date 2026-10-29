@@ -285,7 +285,8 @@ def clean_doc(doc):
     home = screen.get("home") if screen.get("home") in ("today", "book") else "today"
     board = screen.get("board") if screen.get("board") in ("same", "on", "off") else "same"
     return {"people": out, "number": number, "tinny": clean_tinny(doc.get("tinny")),
-            "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home, "board": board},
+            "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home, "board": board,
+                       "littleFlip": bool(screen.get("littleFlip", False))},
             "tiles": tiles, "week": clean_week, "keys": clean_keys,
             "postcards": {"approve": bool((doc.get("postcards") or {}).get("approve", False))}}
 
