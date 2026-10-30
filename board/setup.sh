@@ -66,15 +66,15 @@ dtoverlay=$OVERLAY,speed=24000000,rotate=$ROTATE
 CFG
 
 # X draws on the little screen, not HDMI. Its number (fb0 or fb1) depends on what the Pi
-# finds at boot, so udev gives it a name that doesn't change: /dev/fb-spi, the framebuffer
-# whose driver is one of the fb_ SPI drivers (fb_ili9486 on these boards).
-echo 'SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", ATTR{name}=="fb_*", SYMLINK+="fb-spi"' > /etc/udev/rules.d/99-zelda-fb.rules
+# finds at boot, and X won't take a symlink, so fbconf.sh writes the right one in at every
+# boot, before the screen logs in.
+rm -f /etc/udev/rules.d/99-zelda-fb.rules     # an earlier try at this; X ignored the name
 mkdir -p /etc/X11/xorg.conf.d
 cat > /etc/X11/xorg.conf.d/99-zelda-board.conf <<'XCONF'
 Section "Device"
     Identifier "spi-screen"
     Driver "fbdev"
-    Option "fbdev" "/dev/fb-spi"
+    Option "fbdev" "/dev/fb1"
 EndSection
 Section "ServerFlags"
     Option "AutoAddGPU" "false"
@@ -108,6 +108,23 @@ echo "options 8192cu rtw_power_mgnt=0 rtw_enusbss=0" > /etc/modprobe.d/zelda-wif
 echo "== Kiosk: log in on the screen and open the board"
 install -d "$OPT"
 install -m 755 "$APP/screen.sh" "$OPT/screen.sh"
+install -m 755 "$APP/fbconf.sh" "$OPT/fbconf.sh"
+cat > /etc/systemd/system/zelda-fbconf.service <<UNIT
+[Unit]
+Description=Point X at the little screen (fb0 or fb1)
+After=local-fs.target systemd-udev-trigger.service
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=$OPT/fbconf.sh
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable zelda-fbconf.service
+$OPT/fbconf.sh
 echo "$SERVER" > "$OPT/server"
 echo "$LINK" > "$OPT/link"
 OPEN=$LINK; [[ "$LINK" == *"#key="* ]] && OPEN="$LINK&kiosk=1"   # the board page only goes dark at night here

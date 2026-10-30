@@ -134,6 +134,9 @@ changes about 20 seconds after she stops.
 - **Upside down:** run setup again with `ROTATE=270 sudo -E bash ~/tin-can/board/setup.sh '...'`.
 - **Taps land in the wrong place:** tell Claude where you tapped and where it
   landed. The fix is one line in `/etc/X11/xorg.conf.d/99-zelda-touch.conf`.
+- **Screen stays black after a restart, Tinny never appears:** the little screen can come up as
+  fb0 or fb1; `zelda-fbconf.service` points X at whichever it is before the screen logs in.
+  `cat /etc/X11/xorg.conf.d/99-zelda-board.conf` shows which one it picked.
 - **Screen stays white:** the driver didn't load. Try
   `OVERLAY=waveshare35a sudo -E bash ~/tin-can/board/setup.sh '...'`.
 
