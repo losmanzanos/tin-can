@@ -127,8 +127,10 @@ changes about 20 seconds after she stops.
 **If it isn't right the first time:**
 - **"Off" still glows a little:** most of these 3.5" boards wire the backlight
   straight to the Pi's power pins, so software can only make the picture black,
-  not turn the light behind it off. Check on the little Pi with
-  `ls /sys/class/backlight/`: if it lists nothing, the backlight can't be switched.
+  not turn the light behind it off. The driver may still list a switch
+  (`/sys/class/backlight/fb_ili9486`) that isn't wired to anything. To test it:
+  `echo 1 | sudo tee /sys/class/backlight/fb_ili9486/bl_power` (and `echo 0` to undo).
+  If the light stays on, only cutting the power makes it fully dark.
 - **Upside down:** run setup again with `ROTATE=270 sudo -E bash ~/tin-can/board/setup.sh '...'`.
 - **Taps land in the wrong place:** tell Claude where you tapped and where it
   landed. The fix is one line in `/etc/X11/xorg.conf.d/99-zelda-touch.conf`.

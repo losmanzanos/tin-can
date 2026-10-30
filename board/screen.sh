@@ -35,38 +35,36 @@ else
   if [[ ! "$NOW" < "$ON_AT" || "$NOW" < "$OFF_AT" ]]; then WANT=on; else WANT=off; fi
 fi
 
+# All three, every time: a backlight switch can be there and not be wired to the light
+# (the 3.5" ILI9486 boards have one that does nothing), so it can't be the only one.
 # 1. Touchscreens with a backlight control (the official Raspberry Pi display).
-done_any=0
 for bl in /sys/class/backlight/*/bl_power; do
   [ -e "$bl" ] || continue
   [ "$WANT" = on ] && echo 0 > "$bl" || echo 1 > "$bl"
-  done_any=1
 done
 
 # 2. The little SPI screen: blank its framebuffer (turns the backlight off on
 #    boards that wire it up; otherwise the page itself goes black).
-if [ "$done_any" = 0 ] && [ -e /sys/class/graphics/fb1/blank ]; then
+if [ -e /sys/class/graphics/fb1/blank ]; then
   [ "$WANT" = on ] && echo 0 > /sys/class/graphics/fb1/blank || echo 1 > /sys/class/graphics/fb1/blank
 fi
 
 # 3. And through the X or Wayland session, for screens that listen to that.
-if [ "$done_any" = 0 ]; then
-  U=$(getent passwd 1000 | cut -d: -f1)
-  H=$(getent passwd 1000 | cut -d: -f6)
-  UID1=$(id -u "$U")
-  RT=/run/user/$UID1
-  WL=$(ls "$RT" 2>/dev/null | grep -m1 '^wayland-[0-9]*$')
-  if [ -n "$WL" ]; then
-    OUT=$(sudo -u "$U" XDG_RUNTIME_DIR=$RT WAYLAND_DISPLAY=$WL wlr-randr | awk '/^[A-Za-z]/{print $1; exit}')
-    sudo -u "$U" XDG_RUNTIME_DIR=$RT WAYLAND_DISPLAY=$WL wlr-randr --output "$OUT" --"$WANT"
-  elif [ -e /tmp/.X11-unix/X0 ]; then
-    if [ "$WANT" = on ]; then
-      sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset dpms force on
-      sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset -dpms
-    else
-      sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset +dpms
-      sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset dpms force off
-    fi
+U=$(getent passwd 1000 | cut -d: -f1)
+H=$(getent passwd 1000 | cut -d: -f6)
+UID1=$(id -u "$U")
+RT=/run/user/$UID1
+WL=$(ls "$RT" 2>/dev/null | grep -m1 '^wayland-[0-9]*$')
+if [ -n "$WL" ]; then
+  OUT=$(sudo -u "$U" XDG_RUNTIME_DIR=$RT WAYLAND_DISPLAY=$WL wlr-randr | awk '/^[A-Za-z]/{print $1; exit}')
+  sudo -u "$U" XDG_RUNTIME_DIR=$RT WAYLAND_DISPLAY=$WL wlr-randr --output "$OUT" --"$WANT"
+elif [ -e /tmp/.X11-unix/X0 ]; then
+  if [ "$WANT" = on ]; then
+    sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset dpms force on
+    sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset -dpms
+  else
+    sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset +dpms
+    sudo -u "$U" DISPLAY=:0 XAUTHORITY="$H/.Xauthority" xset dpms force off
   fi
 fi
 # The board page also goes black at night by itself, as a backup.
