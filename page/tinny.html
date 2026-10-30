@@ -18,7 +18,11 @@ canvas { display: block; width: min(100vw, 150vh); height: min(66.667vw, 100vh);
 <script>
 // Tinny: a little tin-can pet for the 3.5" touchscreen. Its mood comes from the
 // house: a new postcard, her calendar, the weather, bedtime, hugs from the
-// admin page, and a gentle "call Grandpa?" now and then. Any tap pets it.
+// admin page, and a gentle "call Grandpa?" now and then. Zelda can also play
+// with it: feed it, bath it, play ball, three little games (colors, counting,
+// peekaboo), tap its head to dress it up, and help it get ready for bed.
+// Nothing ever goes wrong for Tinny: it only gets a bit hungry or dusty and
+// asks. Every tap on the rough touchscreen does something; the targets are big.
 const PB = window.PhoneBook;
 const W = 480, H = 320, FPS = 8;
 const c = document.getElementById("c"), ctx = c.getContext("2d");
@@ -27,12 +31,23 @@ const COL = { k: "#16181f", g: "#b9c0cc", l: "#e4e8ef", d: "#8b93a3", w: "#fffff
 const NUDGE_EVERY_MIN = 30, NUDGE_FOR_MIN = 1;   // a "call someone?" minute every half hour
 const MORNING_MIN = 20;                          // "good morning" for the first 20 minutes
 const HUG_SECONDS = 20;
+const PLAY_IDLE_S = 25;                          // a game she walks away from ends after this
+const WIND_DOWN_MIN = 20;                        // the bedtime routine, before her big screen turns off
 
 let doc = null, cards = [], seenTs = 0, hug = {}, weather = null, version = null;
 let hearts = [], wiggleUntil = 0, nudgeDismissed = -1, tick = 0;
 const images = {}, photos = {};
 let hugShown = 0;
 try { hugShown = +localStorage.getItem("tinny-hug") || 0; } catch (e) {}
+// What Tinny remembers on this screen: when it last ate and had a bath, the stars
+// Zelda has won, what she dressed it in, and the night she put it to bed.
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const care = store.get("tinny-care", { fed: 0, bathed: 0 });
+let stars = store.get("tinny-stars", 0), dress = store.get("tinny-dress", null), tuckedIn = store.get("tinny-tucked", "");
+let act = null, lastTap = 0, zones = [], confetti = [], said = null;
 
 /* ---------------- data ---------------- */
 async function getJSON(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
@@ -118,11 +133,14 @@ function nudgeFor(now) {
 function scene(now) {
   if (!doc) return "loading";
   if (doc.screen?.board === "off") return "off";
-  if (asleep(now)) return "bedtime";
+  if (asleep(now) || tuckedIn === dayKey(now)) return "bedtime";
+  if (act && (Date.now() - lastTap) / 1000 > PLAY_IDLE_S && act.kind !== "done") act = null;
+  if (act) return "play";
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
   const since = hm(now) - toMin(doc.screen?.on || "08:00");
   if (since >= 0 && since < MORNING_MIN) return "morning";
+  if (windingDown(now)) return "winddown";
   if (nudgeFor(now)) return "nudge";
   return "day";
 }
@@ -143,6 +161,13 @@ function outfit(tiles) {
   if (weather?.cold) o.scarf = true;
   if (weather?.rain) { o.umbrella = true; if (o.hat === "helmet") delete o.hat; }
   if (weather?.snow && !o.hat) o.snowcap = true;
+  const pick = dressNow();
+  if (pick) {
+    delete o.snowcap;
+    if (pick === "specs") o.specs = true;
+    else if (pick === "shades") o.shades = true;
+    else if (!o.umbrella) o.hat = pick;
+  }
   return o;
 }
 
@@ -186,6 +211,8 @@ function tinny(ox, oy, u, o = {}) {
   px(5, top + 1, "g", 16, bot - top - 1);
   px(5, top + 1, "l", 16, 2); px(5, top + 3, "d", 16, 1); px(5, bot - 3, "d", 16, 1);
   px(6, top + 5, "l", 1, bot - top - 9); px(7, top + 5, "l", 1, 2);
+  if (o.pj) for (let y = top + 15; y < bot - 1; y += 2) px(5, y, "#9fc3ea", 16, 1);
+  if (o.dirt) for (const [x, y] of [[8, 4], [17, 5], [10, 15], [16, 16], [13, 18], [7, 12]]) px(x, top + y, "#8a6a45");
   if (o.snowcap) { px(5, top - 1, "w", 16, 2); px(7, top - 2, "w", 5, 1); px(14, top - 2, "w", 4, 1); }
   if (o.backpack) { px(6, top + 4, "r", 1, 15); px(19, top + 4, "r", 1, 15); }
   // face
@@ -196,12 +223,14 @@ function tinny(ox, oy, u, o = {}) {
   else { px(9, ey, "k", 2, 3); px(9, ey, "w"); px(15, ey, "k", 2, 3); px(15, ey, "w"); }
   if (o.goggles) { px(5, ey, "t", 16, 1); px(7, ey - 1, "k", 6, 5); px(14, ey - 1, "k", 6, 5); px(8, ey, "t", 4, 3); px(15, ey, "t", 4, 3); px(9, ey, "w"); px(16, ey, "w"); }
   if (o.shades) { px(7, ey - 1, "k", 5, 4); px(14, ey - 1, "k", 5, 4); px(12, ey, "k", 2, 1); px(8, ey, "d"); px(15, ey, "d"); }
+  if (o.specs) { for (const x of [7, 14]) { px(x, ey - 1, "k", 5, 1); px(x, ey + 3, "k", 5, 1); px(x, ey - 1, "k", 1, 5); px(x + 4, ey - 1, "k", 1, 5); } px(12, ey, "k", 2, 1); }
   px(7, ey + 3, "p", 2, 1); px(17, ey + 3, "p", 2, 1);
   const my = ey + 4;
   if (o.mouth === "open") { px(12, my, "k", 3, 1); px(12, my + 1, "r", 3, 1); px(13, my + 2, "k"); px(11, my, "k", 1, 2); px(15, my, "k", 1, 2); }
   else if (o.mouth === "flat") px(12, my + 1, "k", 3, 1);
   else if (o.mouth === "o") px(12, my, "k", 2, 2);
   else { px(11, my, "k"); px(12, my + 1, "k", 3, 1); px(15, my, "k"); }
+  if (o.foam) { px(10, my - 1, "w", 7, 1); px(11, my + 2, "w", 5, 1); px(9, my + 1, "w"); px(17, my, "w"); }
   if (o.scarf) { px(4, my + 3, "r", 18, 2); px(6, my + 3, "w", 2, 2); px(12, my + 3, "w", 2, 2); px(18, my + 3, "w", 2, 2); px(17, my + 5, "r", 3, 4); }
   // arms
   if (o.arms === "up") { px(2, top + 2, "k", 2, 6); px(22, top + 2, "k", 2, 6); }
@@ -216,6 +245,9 @@ function tinny(ox, oy, u, o = {}) {
   if (hat === "party") { px(10, top - 1, "v", 7, 1); px(11, top - 3, "v", 5, 2); px(12, top - 5, "y", 3, 2); px(13, top - 7, "v", 1, 2); px(12, top - 8, "y", 3, 1); px(11, top - 2, "y"); px(14, top - 4, "w"); }
   if (hat === "beret") { px(6, top - 2, "r", 14, 2); px(8, top - 3, "r", 10, 1); px(13, top - 4, "k", 1, 1); }
   if (hat === "bow") { px(14, top - 2, "p", 3, 3); px(18, top - 2, "p", 3, 3); px(17, top - 1, "r", 1, 1); }
+  if (hat === "crown") { px(7, top - 3, "y", 12, 3); for (const x of [7, 12, 17]) px(x, top - 5, "y", 2, 2); px(12, top - 2, "r", 2, 1); px(8, top - 2, "b"); px(17, top - 2, "s"); }
+  if (hat === "flower") { px(16, top - 4, "p", 5, 1); px(17, top - 5, "p", 3, 3); px(16, top - 3, "p", 5, 1); px(18, top - 4, "y"); px(17, top - 1, "s", 1, 2); }
+  if (hat === "cowboy") { px(4, top - 1, "#8a5a2b", 18, 1); px(7, top - 4, "#8a5a2b", 12, 3); px(8, top - 5, "#8a5a2b", 3, 1); px(15, top - 5, "#8a5a2b", 3, 1); px(7, top - 2, "y", 12, 1); }
 }
 
 // A tile from her calendar, framed like a magnet, for Tinny to "hold up".
@@ -237,7 +269,11 @@ function drawDay(now, o, u, bob) {
   if (snow) for (let i = 0; i < 22; i++) { const x = (i * 61 + tick * 3 + Math.sin(tick / 3 + i) * 6) % W, y = (i * 29 + tick * 6) % 262; rect(x, y, 4, 4, "#fff"); }
   if (weather?.cold && tick % 16 < 8) { ctx.globalAlpha = 0.6; rect(52 + 12 * u, 120 + bob - tick % 8 * 3, 10, 8, "#fff"); ctx.globalAlpha = 1; }
   const tiles = nowTiles(now);
-  tinny(40, 266 - 27 * u + bob, u, { ...o, ...outfit(tiles) });
+  const ty = 266 - 27 * u + bob, want = wants(now);
+  tinny(40, ty, u, { ...o, ...outfit(tiles), dirt: dusty(now) });
+  zone(40, ty - 9 * u, 26 * u, 17 * u, nextDress);     // its head and hat: try on the next one
+  zone(40, ty + 8 * u, 26 * u, 19 * u, pet);
+  if (want && !said) thought(40 + 21 * u, ty - 2 * u, want === "eat" ? "🍎" : "🫧");
   // What's happening now, on the right.
   const label = tiles.length ? tiles.map(t => t.label).join(" + ") : "Free time";
   pill(270, 26, 186, 34, PB.PERIODS[p] + (tiles.length ? "" : ""), 18, PB.DAY_COLORS[PB.weekdayOf(now)]);
@@ -245,6 +281,18 @@ function drawDay(now, o, u, bob) {
   else { ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.roundRect(300, 76, 120, 120, 16); ctx.fill(); text("😊", 360, 152, 56, "#000", "center"); }
   if (tiles[1]) tileCard(tiles[1], 392, 150, 58);
   text(label, 363, 236, fit(label, 21, 190), "#16181f", "center");
+  playBar(now, want);
+}
+
+// The four things she can do, along the bottom. The one Tinny wants glows.
+function playBar(now, want) {
+  const btns = [["🍎 Eat", "eat", startEat], ["🛁 Bath", "bath", startBath], ["⚽ Ball", "ball", startBall], ["🎲 Play", "play", startGame]];
+  btns.forEach(([label, key, go], i) => {
+    const x = 10 + i * 117, glow = want === key && tick % 8 < 5;
+    if (glow) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, 268, 113, 50, 25); ctx.fill(); }
+    pill(x, 272, 105, 42, label, 19, "#16181f");
+    zone(x - 4, 264, 113, 56, go);
+  });
 }
 
 function drawScene(now) {
@@ -255,6 +303,7 @@ function drawScene(now) {
   const petting = Date.now() < wiggleUntil;
   const wig = petting ? (tick % 2 ? 4 : -4) : 0;
   ctx.save();
+  zones = [];
   if (name === "off" || name === "loading") { rect(0, 0, W, H, "#000"); ctx.restore(); return; }
 
   if (name === "bedtime") {
@@ -307,7 +356,9 @@ function drawScene(now) {
     const day = PB.DAYS[PB.weekdayOf(now)];
     bubble(220, 22, 240, 86, ["Good morning,", "Zelda!"], 26, 246);
     pill(232, 128, 216, 36, `It's ${day}!`, 20, PB.DAY_COLORS[PB.weekdayOf(now)]);
-    if (first) { tileCard(first, 240, 178, 64); text(first.label, 318, 218, fit(first.label, 20, 110)); }
+    if (first) { tileCard(first, 240, 176, 64); text(first.label, 318, 216, fit(first.label, 20, 110)); }
+    zone(40, 266 - 27 * u - 9 * u, 26 * u, 17 * u, nextDress);
+    playBar(now, wants(now));
   }
 
   else if (name === "nudge") {
@@ -326,19 +377,333 @@ function drawScene(now) {
     PB.drawPerson(ctx, p, { x: 248, y: 180, w: 200, h: 74 }, 74, photos);
   }
 
+  else if (name === "play") {
+    const k = act.kind;
+    if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
+    else if (k === "done") drawDone(now); else drawGame(now);
+    if (act && act.kind !== "done") {          // home: back to the day, any time
+      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("🏠", 28, 304, 20, "#000", "center");
+      zone(4, 272, 48, 48, () => { act = null; said = null; });
+    }
+  }
+
+  else if (name === "winddown") drawWindDown(now);
+
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (name === "day" || name === "nudge" || name === "morning") pill(14, 14, 112, 32, `⭐ Week ${weeks}`, 17);
+  if (saying() && (name === "day" || name === "play" || name === "winddown")) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (name === "day" || name === "nudge" || name === "morning") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   // hearts from petting float up and fade
   hearts = hearts.filter(h => h.life > 0);
   for (const h of hearts) { ctx.globalAlpha = Math.min(1, h.life / 6); heart(h.x, h.y, h.u, h.col); h.y -= 7; h.x += Math.sin(h.life) * 2; h.life--; }
+  confetti = confetti.filter(p => p.life-- > 0);
+  for (const p of confetti) { ctx.globalAlpha = Math.min(1, p.life / 6); rect(p.x, p.y, 7, 7, p.col); p.x += p.vx; p.y += p.vy; p.vy += 3; }
   ctx.globalAlpha = 1;
   ctx.restore();
 }
 
+
+/* ---------------- playing with Tinny ---------------- */
+// Every frame lists its tap targets here; a tap goes to the last one it lands
+// in, a little generously, since the touchscreen is rough. Anywhere else pets.
+function zone(x, y, w, h, fn) { zones.push({ x, y, w, h, fn }); }
+const SLOP = 8;
+function hit(x, y) {
+  for (let i = zones.length - 1; i >= 0; i--) {
+    const z = zones[i];
+    if (x >= z.x - SLOP && x <= z.x + z.w + SLOP && y >= z.y - SLOP && y <= z.y + z.h + SLOP) return z.fn;
+  }
+  return null;
+}
+const pick3 = (list) => { const a = [...list].sort(() => Math.random() - 0.5); return a.slice(0, 3); };
+const ago = (t) => (Date.now() - t) / 1000;
+function dayKey(now) { return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`; }
+function todayOn(now) { const d = new Date(now); const m = toMin(doc?.screen?.on || "08:00"); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.getTime(); }
+// Hungry for breakfast each morning, and again four hours after a meal. Dusty ten hours after a bath.
+const hungry = (now) => care.fed < todayOn(now) || now - care.fed > 4 * 3600e3;
+const dusty = (now) => now - care.bathed > 10 * 3600e3;
+const wants = (now) => hungry(now) ? "eat" : dusty(now) ? "bath" : null;
+function windingDown(now) {
+  if (!doc || doc.screen?.board === "off") return false;
+  const off = toMin(doc.screen?.off || "20:00"), m = hm(now);
+  const left = (off - m + 1440) % 1440;
+  return left > 0 && left <= WIND_DOWN_MIN && !asleep(now);
+}
+function say(lines, secs = 2.5) { said = { lines, until: Date.now() + secs * 1000 }; }
+function saying() { if (said && Date.now() > said.until) said = null; return said; }
+function burst(x, y, n = 18) {
+  const cols = ["#e2413b", "#ffd84a", "#46bfc0", "#b768d6", "#5fae4a", "#ef7f2c"];
+  for (let i = 0; i < n; i++) confetti.push({ x, y, vx: (Math.random() - 0.5) * 22, vy: -8 - Math.random() * 14, col: cols[i % cols.length], life: 16 + Math.random() * 8 });
+}
+function thought(x, y, emoji) {
+  const b = tick % 8 < 4 ? 0 : -3;
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3;
+  for (const [cx, cy, r] of [[x - 6, y + 34 + b, 5], [x + 4, y + 24 + b, 8]]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); ctx.stroke(); }
+  ctx.beginPath(); ctx.roundRect(x + 6, y - 30 + b, 56, 48, 22); ctx.fill(); ctx.stroke();
+  text(emoji, x + 34, y + 6 + b, 28, "#000", "center");
+}
+function choiceCircle(cx, cy, r, fill, shake) {
+  const dx = shake ? (tick % 2 ? 5 : -5) : 0;
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(cx + dx, cy, r + 4, 0, 7); ctx.fill();
+  ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(cx + dx, cy, r, 0, 7); ctx.fill();
+  return dx;
+}
+function begin(kind, extra = {}) { act = { kind, t0: Date.now(), ...extra }; lastTap = Date.now(); said = null; }
+function award() { stars++; store.set("tinny-stars", stars); }
+function finish(lines = ["You did it!"]) { award(); begin("done", { lines }); burst(240, 140, 30); }
+
+// Dress up: each tap on its head tries the next thing, kept until the part of the day changes.
+const WARDROBE = ["party", "crown", "beret", "bow", "flower", "cowboy", "helmet", "specs", "shades", null];
+const WARDROBE_SAYS = { party: "Party!", crown: "A king!", beret: "Fancy!", bow: "So pretty!", flower: "A flower!", cowboy: "Yee-haw!", helmet: "Safe!", specs: "Smart!", shades: "Cool!" };
+function dressNow() {
+  if (!dress) return null;
+  const now = new Date();
+  if (dress.key !== dayKey(now) + PB.periodAt(now)) { dress = null; store.set("tinny-dress", null); return null; }
+  return dress.pick;
+}
+function nextDress() {
+  const now = new Date(), cur = dressNow();
+  const pick = WARDROBE[(WARDROBE.indexOf(cur) + 1) % WARDROBE.length];
+  dress = pick ? { pick, key: dayKey(now) + PB.periodAt(now) } : null;
+  store.set("tinny-dress", dress);
+  say([pick ? WARDROBE_SAYS[pick] : "Just me!"], 1.6);
+  burst(40 + 13 * 8, 90, 8);
+}
+
+// Eat: three snacks to pick from; it munches, then would like one more.
+const SNACKS = [["🍎", "apple"], ["🥕", "carrot"], ["🍌", "banana"], ["🧀", "cheese"], ["🍇", "grapes"], ["🍓", "berry"], ["🥦", "broccoli"],
+                ["🍐", "pear"], ["🥞", "pancake"], ["🍪", "cookie"], ["🍕", "pizza"], ["🥒", "pickle"], ["🍉", "melon"], ["🥚", "egg"]];
+function startEat() { begin("eat", { menu: pick3(SNACKS), eaten: 0, chew: null }); say(["I'm hungry!"]); }
+function eat(snack, i) {
+  if (!act) return;
+  if (act.chew) return;
+  act.chew = { snack, i, t: Date.now() };
+  care.fed = Date.now(); store.set("tinny-care", care);
+}
+function drawEat(now, u) {
+  sky("#ffe3b8", "#fff4e2"); ground("#d9b48a");
+  rect(0, 228, W, 8, "#b8875a");                                            // a table edge
+  const c = act.chew, t = c ? ago(c.t) : 0, chewing = c && t > 0.8 && t < 2.6;
+  const ty = 266 - 27 * u;
+  tinny(30, ty, u, { eyes: chewing ? "happy" : undefined, mouth: chewing ? (tick % 2 ? "open" : "flat") : c && t < 0.8 ? "open" : "smile", ...outfit(nowTiles(now)) });
+  if (c && t < 0.8) {                                                       // the snack flies to its mouth
+    const k = t / 0.8, sx = 260 + c.i * 76, mx = 30 + 13 * u, my = ty + 16 * u;
+    text(c.snack[0], sx + (mx - sx) * k, 150 + (my - 150) * k - Math.sin(k * Math.PI) * 60, 52 - k * 24, "#000", "center");
+  }
+  if (chewing && tick % 2) for (let i = 0; i < 3; i++) rect(30 + 11 * u + i * 9, ty + 20 * u + (tick % 4) * 3, 5, 5, "#e9ad1c");
+  if (c && t >= 2.6) {
+    act.eaten++;
+    const [, word] = c.snack;
+    say(word === "broccoli" ? ["Broccoli!", "So strong!"] : word === "cookie" ? ["A cookie!", "What a treat!"] : ["Yum!", `I love ${word}!`], 2.2);
+    for (let i = 0; i < 3; i++) hearts.push({ x: 60 + i * 50, y: ty, u: 5, col: "#e2413b", life: 14 });
+    if (act.eaten >= 2) { finish(["I'm full!", "Thank you!"]); return; }
+    act.menu = pick3(SNACKS); act.chew = null;
+    setTimeout(() => act && act.kind === "eat" && !act.chew && say(["One more?"]), 2300);
+  }
+  if (!c) act.menu.forEach((sn, i) => {
+    const x = 222 + i * 86;
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(x + 38, 196, 40, 14, 0, 0, 7); ctx.fill(); ctx.stroke();  // a plate
+    text(sn[0], x + 38, 186, 56, "#000", "center");
+    text(sn[1], x + 38, 254, fit(sn[1], 20, 84), "#16181f", "center");
+    zone(x, 120, 80, 140, () => eat(sn, i));
+  });
+}
+
+// Bath: every tap scrubs and makes bubbles; six and it's squeaky clean.
+function startBath() { begin("bath", { scrubs: 0, bubbles: [] }); say(["Scrub me!", "Tap tap tap!"]); }
+function scrub(x, y) {
+  if (!act) return;
+  if (act.scrubs >= 6) return;
+  act.scrubs++;
+  for (let i = 0; i < 5; i++) act.bubbles.push({ x: 60 + Math.random() * 170, y: 150 + Math.random() * 60, r: 6 + Math.random() * 12, life: 30 + Math.random() * 20 });
+  if (act.scrubs === 6) { care.bathed = Date.now(); store.set("tinny-care", care); setTimeout(() => act && act.kind === "bath" && finish(["Squeaky", "clean!"]), 1400); }
+}
+function drawBath(now, u) {
+  sky("#cfeaf7", "#eaf6fc");
+  for (let y = 0; y < 230; y += 32) for (let x = (y / 32) % 2 ? 16 : 0; x < W; x += 32) rect(x, y, 30, 30, "#bfe0ef");
+  rect(0, 230, W, 90, "#9fd2e6");
+  const u2 = u, ty = 240 - 27 * u2 + (tick % 4 < 2 ? 0 : 2);
+  tinny(50, ty, u2, { eyes: act.scrubs >= 6 ? "happy" : tick % 9 ? undefined : "closed", mouth: "open", arms: "up", dirt: act.scrubs < 4 });
+  // the tub, in front
+  ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.roundRect(24, 196, 260, 80, [10, 10, 40, 40]); ctx.fill(); ctx.stroke();
+  rect(50, 276, 12, 16, "k"); rect(246, 276, 12, 16, "k");
+  act.bubbles = act.bubbles.filter(b => b.life-- > 0);
+  for (const b of act.bubbles) { b.y -= 2; ctx.strokeStyle = "#5aa7c9"; ctx.fillStyle = "#ffffffb0"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill(); ctx.stroke(); }
+  for (let i = 0; i < 9; i++) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(40 + i * 28, 198, 16, 0, 7); ctx.fill(); }
+  if (act.scrubs >= 6 && tick % 4 < 2) { sparkle(70, 120, 6, "#ffd84a"); sparkle(220, 100, 5, "#ffd84a"); }
+  // how clean: six bubbles fill up
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = i < act.scrubs ? "#46bfc0" : "#ffffff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(330 + (i % 3) * 46, 200 + Math.floor(i / 3) * 46, 18, 0, 7); ctx.fill(); ctx.stroke(); }
+  if (act.scrubs >= 6) text("🦆", 250, 196, 40, "#000", "center");
+  zone(0, 0, W, H, scrub);
+}
+
+// Ball: each tap bounces it off Tinny's head, and it counts. Ten fills the ten-frame.
+function startBall() { begin("ball", { n: 0, at: 0 }); say(["Tap to", "bounce it!"], 2); }
+function bounce() {
+  if (!act) return;
+  if (act.n >= 10 || ago(act.at) < 0.45) return;
+  act.n++; act.at = Date.now();
+  if (act.n === 10) setTimeout(() => act && act.kind === "ball" && finish(["Ten!", "Wow!"]), 1300);
+}
+function drawBall(now, u) {
+  sky("#bfe3f5", "#e8f5fb"); ground("#8fcf6a", "#7cbd58");
+  const ty = 266 - 27 * u, t = act.at ? Math.min(1, ago(act.at) / 1.1) : 1;
+  const head = ty - 2 * u, up = act.at && t < 1 ? Math.sin(t * Math.PI) * Math.min(110, head - 50) : 0;
+  tinny(40, ty + (up > 40 ? -4 : 0), u, { eyes: up ? "happy" : undefined, mouth: up ? "open" : "smile", arms: up ? "up" : undefined, ...outfit(nowTiles(now)) });
+  const bx = 40 + 13 * u, by = act.at && t < 1 ? head - 18 - up : 248;
+  const bxx = act.at && t < 1 ? bx : 40 + 28 * u;
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bxx, by, 18, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(bxx, by, 6, 0, 7); ctx.fill();
+  // the count, big, and a ten-frame filling up: two rows of five
+  text(String(act.n), 378, 172, 72, "#16181f", "center");
+  for (let i = 0; i < 10; i++) {
+    const x = 286 + (i % 5) * 38, y = 186 + Math.floor(i / 5) * 38;
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.rect(x, y, 34, 34); ctx.fill(); ctx.stroke();
+    if (i < act.n) { ctx.fillStyle = "#e2413b"; ctx.beginPath(); ctx.arc(x + 17, y + 17, 11, 0, 7); ctx.fill(); }
+  }
+  zone(0, 0, W, H, bounce);
+}
+
+// The little games, taking turns: find the color, how many, and peekaboo. Three rounds, then a star.
+const COLORS = [["red", "#e2413b"], ["yellow", "#f2c230"], ["green", "#6cbf4a"], ["blue", "#2f6fb5"], ["purple", "#b768d6"], ["orange", "#ef7f2c"], ["pink", "#f2a1a8"]];
+const THINGS = ["⭐", "🍎", "🐟", "🌸", "🚗", "🐞", "🎈", "🐶"];
+const HIDE = ["🌳", "📦", "🧺"], SILLY = ["🐱", "🧦", "🐸", "🦆", "🍌", "🐢"];
+let nextGame = store.get("tinny-game", 0);
+function startGame() {
+  const kind = ["color", "count", "peek"][nextGame % 3];
+  nextGame++; store.set("tinny-game", nextGame);
+  begin(kind, { round: 0 }); newRound();
+}
+function newRound() {
+  act.wrong = null; act.right = null; act.demo = null; act.t1 = Date.now();
+  if (act.kind === "color") { act.opts = pick3(COLORS); act.ans = act.opts[Math.floor(Math.random() * 3)]; }
+  if (act.kind === "count") {
+    const max = act.round < 1 ? 3 : act.round < 2 ? 5 : 6;
+    act.ans = 1 + Math.floor(Math.random() * max); act.thing = THINGS[Math.floor(Math.random() * THINGS.length)];
+    const others = [1, 2, 3, 4, 5, 6].filter(n => n !== act.ans).sort(() => Math.random() - 0.5).slice(0, 2);
+    act.opts = [act.ans, ...others].sort((a, b) => a - b);
+  }
+  if (act.kind === "peek") { act.ans = Math.floor(Math.random() * 3); act.silly = {}; }
+}
+function answer(i) {
+  if (!act) return;
+  if (act.right != null || act.demo) return;
+  const ok = act.kind === "color" ? act.opts[i] === act.ans : act.kind === "count" ? act.opts[i] === act.ans : i === act.ans;
+  if (ok) {
+    act.right = i; burst(act.kind === "count" ? 210 + i * 100 : 200 + i * 100, 200, 16);
+    say(act.kind === "color" ? ["Yes!", act.ans[0] + "!"] : act.kind === "count" ? ["Yes!", act.ans + "!"] : ["Peekaboo!"], 1.6);
+    setTimeout(() => { if (!act || act.right == null) return; act.round++; if (act.round >= 3) finish(); else newRound(); }, 1700);
+  } else {
+    act.wrong = { i, at: Date.now() };
+    if (act.kind === "color") say([`That's ${act.opts[i][0]}.`, `Find ${act.ans[0]}!`], 2.4);
+    if (act.kind === "count") { act.demo = Date.now(); say(["Let's count!"], 1.4); }     // count them together, one at a time
+    if (act.kind === "peek") { act.silly[i] = SILLY[Math.floor(Math.random() * SILLY.length)]; say(["Not here!"], 1.4); }
+  }
+}
+function drawGame(now) {
+  sky(act.kind === "peek" ? "#cdebc0" : "#fdf0dc", act.kind === "peek" ? "#eef8e8" : "#fff8ee");
+  ground(act.kind === "peek" ? "#8fcf6a" : "#e9d7b8", act.kind === "peek" ? "#7cbd58" : null);
+  const u = 5, ty = 266 - 27 * u;
+  if (act.kind !== "peek") tinny(8, ty, u, { eyes: act.right != null ? "happy" : undefined, mouth: act.right != null ? "open" : "smile", arms: act.right != null ? "up" : undefined });
+  // which round: three dots
+  for (let r = 0; r < 3; r++) { ctx.fillStyle = r < act.round ? "#e9ad1c" : "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(30 + r * 26, 32, 9, 0, 7); ctx.fill(); ctx.stroke(); }
+  const shaking = (i) => act.wrong && act.wrong.i === i && ago(act.wrong.at) < 0.6;
+  if (act.kind === "color") {
+    if (!saying()) {
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 316, 66, 20); ctx.fill(); ctx.stroke();
+      text("Find", 176, 60, 30); text(act.ans[0] + "!", 252, 60, 34, act.ans[1]);
+      ctx.fillStyle = act.ans[1]; ctx.beginPath(); ctx.arc(428, 47, 20, 0, 7); ctx.fill();
+    }
+    act.opts.forEach((c, i) => {
+      const cx = 200 + i * 100, cy = 176;
+      if (act.right === i) { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; rect(cx + Math.cos(a) * 46, cy + Math.sin(a) * 46, 8, 8, c[1]); } return; }
+      ctx.strokeStyle = "#16181f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy + 44); ctx.lineTo(cx + 6, cy + 90); ctx.stroke();
+      const bob = Math.sin(tick / 3 + i) * 4;
+      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, 40, 48, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = c[1]; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, 36, 44, 0, 0, 7); ctx.fill();
+      rect(cx - 16, cy - 24 + bob, 8, 12, "#ffffff90");
+      zone(cx - 48, cy - 56, 96, 150, () => answer(i));
+    });
+  }
+  if (act.kind === "count") {
+    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 316, 58, 20); ctx.fill(); ctx.stroke(); text("How many?", 308, 54, 30, "#16181f", "center"); }
+    const n = act.ans, gap = Math.min(52, 300 / n), x0 = 308 - (n - 1) * gap / 2;
+    const shown = act.demo ? Math.min(n, Math.floor(ago(act.demo) / 0.7)) : -1;
+    for (let k = 0; k < n; k++) {
+      const lit = act.right != null || k < shown;
+      text(act.thing, x0 + k * gap, 132 + (lit && act.right != null && tick % 2 ? -4 : 0), 40, "#000", "center");
+      if (act.demo && k < shown) text(String(k + 1), x0 + k * gap, 96, 22, "#e2413b", "center");
+    }
+    if (act.demo && shown >= n && ago(act.demo) > n * 0.7 + 1.2) { act.demo = null; act.wrong = null; say([`${n}!`, "Tap " + n + "."], 2); }
+    act.opts.forEach((v, i) => {
+      const cx = 210 + i * 100, cy = 220;
+      const dx = choiceCircle(cx, cy, 38, act.right === i ? "#ffd84a" : "#fff", shaking(i));
+      text(String(v), cx + dx, cy + 18, 50, "#16181f", "center");
+      zone(cx - 46, cy - 46, 92, 92, () => answer(i));
+    });
+  }
+  if (act.kind === "peek") {
+    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(110, 14, 260, 58, 20); ctx.fill(); ctx.stroke(); text("Where's Tinny?", 240, 54, 28, "#16181f", "center"); }
+    HIDE.forEach((h, i) => {
+      const cx = 100 + i * 140, base = 258, dx = shaking(i) ? (tick % 2 ? 5 : -5) : 0;
+      if (act.right === i) tinny(cx - 13 * 4, base - 40 - 27 * 4, 4, { eyes: "happy", mouth: "open", arms: "up" });
+      else if (i === act.ans && (Date.now() / 1000) % 3 < 0.9) {     // the tip of its antenna peeks out
+        rect(cx + 18, base - 124, 4, 22, "k"); rect(cx + 15, base - 130, 10, 8, "m");
+      }
+      if (act.silly[i] && ago(act.wrong?.at || 0) < 1.4 && act.wrong?.i === i) text(act.silly[i], cx + dx, base - 112, 42, "#000", "center");
+      text(h, cx + dx, base, 96, "#000", "center");
+      zone(cx - 64, base - 150, 128, 170, () => answer(i));
+    });
+  }
+}
+function drawDone(now) {
+  sky("#fff3c4", "#fffaf0"); ground("#8fcf6a", "#7cbd58");
+  const u = 7, ty = 266 - 27 * u - (tick % 4 < 2 ? 10 : 0);
+  tinny(30, ty, u, { eyes: "happy", mouth: "open", arms: "up", ...outfit(nowTiles(now)) });
+  const k = Math.min(1, ago(act.t0) / 0.6), s = 30 + k * 60;
+  text("⭐", 350, 140 + s / 3, s, "#000", "center");
+  pill(250, 190, 200, 44, `⭐ ${stars}`, 24);
+  bubble(250, 20, 210, 64, act.lines, 24, 270);
+  if (ago(act.t0) > 3.2) act = null;
+}
+
+// Getting ready for bed, for the last minutes before her big screen turns off:
+// brush its teeth, pajamas on, then turn out the lamp.
+function drawWindDown(now) {
+  const r = store.get("tinny-routine", {});
+  if (r.day !== dayKey(now)) { r.day = dayKey(now); r.teeth = 0; r.pj = false; store.set("tinny-routine", r); }
+  const done = { teeth: r.teeth >= 5, pj: r.pj };
+  sky("#3b3f74", "#6b5f9a"); ground("#4a4676");
+  rect(330, 40, 120, 90, "#25285a"); rect(336, 46, 108, 78, "#1a1d48"); ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.arc(410, 76, 16, 0, 7); ctx.fill();   // the window, and the moon
+  const u = 7, ty = 266 - 27 * u;
+  const brushing = r.brushAt && ago(r.brushAt) < 0.6;
+  tinny(30, ty, u, { eyes: tick % 30 < 4 ? "closed" : undefined, mouth: brushing ? "open" : tick % 40 < 6 ? "o" : "smile", pj: done.pj, cap: done.pj, foam: brushing || (r.teeth > 0 && !done.teeth) });
+  if (brushing) { rect(30 + 14 * u + (tick % 2 ? 6 : -6), ty + 15 * u, 40, 6, "#46bfc0"); rect(30 + 14 * u + (tick % 2 ? 6 : -6), ty + 14 * u, 10, 4, "w"); }
+  if (done.teeth && tick % 6 < 3) sparkle(30 + 15 * u, ty + 12 * u, 4, "#fff");
+  const steps = [["🪥", "Teeth", "teeth"], ["👕", "PJs", "pj"], ["💡", "Lamp", "lamp"]];
+  const next = !done.teeth ? "teeth" : !done.pj ? "pj" : "lamp";
+  steps.forEach(([e, label, key], i) => {
+    const x = 236, y = 140 + i * 58, isNext = key === next, isDone = done[key];
+    if (isNext && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, 228, 54, 25); ctx.fill(); }
+    pill(x, y, 220, 46, `${e}  ${label}${isDone ? "  ✓" : ""}`, 21, isDone ? "#6a6f9a" : "#16181f");
+    zone(x - 4, y - 6, 228, 56, () => {
+      if (key !== next) { say([next === "teeth" ? "Teeth first!" : "PJs first!"], 1.6); return; }
+      if (key === "teeth") { r.teeth++; r.brushAt = Date.now(); store.set("tinny-routine", r); if (r.teeth === 5) say(["Sparkly", "teeth!"], 1.8); else if (r.teeth === 1) say(["Brush brush!", "Again!"], 1.8); }
+      if (key === "pj") { r.pj = true; store.set("tinny-routine", r); say(["Cozy!"], 1.6); }
+      if (key === "lamp") { tuckedIn = dayKey(now); store.set("tinny-tucked", tuckedIn); award(); }
+    });
+  });
+  if (!saying()) {
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(236, 20, 220, 96, 18); ctx.fill(); ctx.stroke();
+    text("Almost bedtime!", 346, 58, fit("Almost bedtime!", 22, 196), "#16181f", "center"); text("Help me get ready?", 346, 92, fit("Help me get ready?", 19, 196), "#16181f", "center");
+  }
+}
+
 /* ---------------- touch ---------------- */
-// The screen's touch is rough, so any tap anywhere counts.
+// Petting: a tap on Tinny, or anywhere nothing else is.
 function pet() {
   const now = new Date(), name = scene(now);
   if (name === "nudge") nudgeDismissed = Math.floor(hm(now) / NUDGE_EVERY_MIN);
@@ -348,7 +713,15 @@ function pet() {
   for (let i = 0; i < few; i++)
     hearts.push({ x: 60 + Math.random() * 200, y: 70 + Math.random() * 60, u: 4 + Math.floor(Math.random() * 3), col: i % 2 ? "#f2a1a8" : "#e2413b", life: 14 + Math.floor(Math.random() * 6) });
 }
-addEventListener("pointerdown", (e) => { e.preventDefault(); pet(); });
+addEventListener("pointerdown", (e) => {
+  e.preventDefault(); lastTap = Date.now();
+  const r = c.getBoundingClientRect();
+  let x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+  if (c.style.transform) { x = W - x; y = H - y; }     // the screen is flipped
+  const fn = hit(x, y);
+  try { if (fn) fn(x, y); else pet(); } catch (err) { act = null; }
+  drawScene(new Date());     // show the answer to the tap now, and with it the new targets
+});
 addEventListener("keydown", pet);
 
 /* ---------------- go ---------------- */

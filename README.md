@@ -137,8 +137,23 @@ postcards until she looks, dresses for what's on her calendar right now
 (backpack for school, goggles for swimming, a helmet for bike rides) and for the
 weather (umbrella, scarf, sunglasses, snow), says good morning, suggests calling
 someone she hasn't heard from now and then, gives hugs you send from the admin
-page, and says goodnight for half an hour after her big screen turns off. Any
-tap pets it. It grows a little over its first weeks.
+page, and says goodnight for half an hour after her big screen turns off. It
+grows a little over its first weeks.
+
+Zelda can play with it too. Every target is big, because the touchscreen is
+rough, and nothing ever goes wrong for Tinny: it only gets a bit hungry or
+dusty and asks (a thought bubble, and that button glows).
+
+- **🍎 Eat:** she picks one of three snacks, with its word under it; Tinny munches, then has one more. Hungry each morning, and four hours after a meal.
+- **🛁 Bath:** every tap scrubs and makes bubbles; six and it's squeaky clean. Dusty again after ten hours.
+- **⚽ Ball:** every tap bounces the ball off its head, and it counts to ten on a ten-frame.
+- **🎲 Play:** three little games, taking turns: *Find red!* (balloons), *How many?* (it counts them with her if she gets it wrong), and peekaboo. Three rounds, then a star.
+- **Dress up:** tap its head to try on the next hat (party hat, crown, beret, bow, flower, cowboy hat, helmet, glasses, sunglasses). It keeps it until the next part of the day.
+- **Bedtime:** for the last 20 minutes before her big screen turns off, it asks for help getting ready: brush its teeth, pajamas on, then turn out the lamp, and it falls asleep.
+- **Stars:** finishing a game, ten bounces, a meal, a bath or bedtime earns a star, shown top left.
+- Tapping Tinny's body pets it. 🏠 goes back, and a game she walks away from ends after 25 seconds.
+
+What Tinny remembers (meals, baths, stars, its hat) is kept in the little screen's browser.
 
 Set it up under **Settings → Tinny**: pick a town for the weather, then on the
 little Pi run
