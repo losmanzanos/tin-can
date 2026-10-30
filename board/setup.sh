@@ -65,13 +65,16 @@ dtoverlay=$OVERLAY,speed=24000000,rotate=$ROTATE
 # zelda-board end
 CFG
 
-# X draws on the little screen (/dev/fb1), not HDMI.
+# X draws on the little screen, not HDMI. Its number (fb0 or fb1) depends on what the Pi
+# finds at boot, so udev gives it a name that doesn't change: /dev/fb-spi, the framebuffer
+# whose driver is one of the fb_ SPI drivers (fb_ili9486 on these boards).
+echo 'SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", ATTR{name}=="fb_*", SYMLINK+="fb-spi"' > /etc/udev/rules.d/99-zelda-fb.rules
 mkdir -p /etc/X11/xorg.conf.d
 cat > /etc/X11/xorg.conf.d/99-zelda-board.conf <<'XCONF'
 Section "Device"
     Identifier "spi-screen"
     Driver "fbdev"
-    Option "fbdev" "/dev/fb1"
+    Option "fbdev" "/dev/fb-spi"
 EndSection
 Section "ServerFlags"
     Option "AutoAddGPU" "false"

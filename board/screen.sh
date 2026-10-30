@@ -45,9 +45,11 @@ done
 
 # 2. The little SPI screen: blank its framebuffer (turns the backlight off on
 #    boards that wire it up; otherwise the page itself goes black).
-if [ -e /sys/class/graphics/fb1/blank ]; then
-  [ "$WANT" = on ] && echo 0 > /sys/class/graphics/fb1/blank || echo 1 > /sys/class/graphics/fb1/blank
-fi
+#    It's fb0 or fb1 depending on the boot, so find it by its driver's name.
+for fb in /sys/class/graphics/fb*; do
+  grep -qs '^fb_' "$fb/name" && [ -e "$fb/blank" ] || continue
+  [ "$WANT" = on ] && echo 0 > "$fb/blank" || echo 1 > "$fb/blank"
+done
 
 # 3. And through the X or Wayland session, for screens that listen to that.
 U=$(getent passwd 1000 | cut -d: -f1)
