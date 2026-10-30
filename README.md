@@ -147,17 +147,22 @@ page, and says goodnight for half an hour after her big screen turns off. It
 grows a little over its first weeks.
 
 Zelda can play with it too. Every target is big, because the touchscreen is
-rough, and nothing ever goes wrong for Tinny: it only gets a bit hungry or
-dusty and asks (a thought bubble, and that button glows).
+small and rough: tapping Tinny's body pets it, tapping its head tries on a hat,
+and a tap anywhere else opens the play menu, four tiles a quarter of the screen
+each. Nothing ever goes wrong for Tinny: it only gets a bit hungry or dusty and
+asks (a thought bubble, the "Tap to play" strip glows, and so does that tile).
 
 - **🍎 Eat:** she picks one of three snacks, with its word under it; Tinny munches, then has one more. Hungry each morning, and four hours after a meal.
 - **🛁 Bath:** every tap scrubs and makes bubbles; six and it's squeaky clean. Dusty again after ten hours.
 - **⚽ Ball:** every tap bounces the ball off its head, and it counts to ten on a ten-frame.
-- **🎲 Play:** three little games, taking turns: *Find red!* (balloons), *How many?* (it counts them with her if she gets it wrong), and peekaboo. Three rounds, then a star.
+- **🎲 Games:** three little games, taking turns: *Find red!* (balloons), *How many?* (it counts them with her if she gets it wrong), and peekaboo. Three rounds, then a star.
 - **Dress up:** tap its head to try on the next hat (party hat, crown, beret, bow, flower, cowboy hat, helmet, glasses, sunglasses). It keeps it until the next part of the day.
 - **Bedtime:** for the last 20 minutes before her big screen turns off, it asks for help getting ready: brush its teeth, pajamas on, then turn out the lamp, and it falls asleep.
 - **Stars:** finishing a game, ten bounces, a meal, a bath or bedtime earns a star, shown top left.
-- Tapping Tinny's body pets it. 🏠 goes back, and a game she walks away from ends after 25 seconds.
+- 🏠 goes back, and a game she walks away from ends after 25 seconds.
+- **Checking the touch:** Settings → Tinny → **Show where taps land** puts a red dot,
+  with its position, wherever the little screen feels a tap. If the dots land away
+  from her finger, the touch needs calibrating.
 
 What Tinny remembers (meals, baths, stars, its hat) is kept in the little screen's browser.
 

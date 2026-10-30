@@ -47,7 +47,7 @@ const store = {
 };
 const care = store.get("tinny-care", { fed: 0, bathed: 0 });
 let stars = store.get("tinny-stars", 0), dress = store.get("tinny-dress", null), tuckedIn = store.get("tinny-tucked", "");
-let act = null, lastTap = 0, zones = [], confetti = [], said = null;
+let act = null, lastTap = 0, zones = [], confetti = [], said = null, taps = [];
 
 /* ---------------- data ---------------- */
 async function getJSON(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
@@ -271,8 +271,9 @@ function drawDay(now, o, u, bob) {
   const tiles = nowTiles(now);
   const ty = 266 - 27 * u + bob, want = wants(now);
   tinny(40, ty, u, { ...o, ...outfit(tiles), dirt: dusty(now) });
-  zone(40, ty - 9 * u, 26 * u, 17 * u, nextDress);     // its head and hat: try on the next one
+  zone(0, 0, W, H, openMenu);                         // anywhere else: the play menu
   zone(40, ty + 8 * u, 26 * u, 19 * u, pet);
+  zone(40, ty - 9 * u, 26 * u, 17 * u, nextDress);     // its head and hat: try on the next one
   if (want && !said) thought(40 + 21 * u, ty - 2 * u, want === "eat" ? "🍎" : "🫧");
   // What's happening now, on the right.
   const label = tiles.length ? tiles.map(t => t.label).join(" + ") : "Free time";
@@ -284,15 +285,32 @@ function drawDay(now, o, u, bob) {
   playBar(now, want);
 }
 
-// The four things she can do, along the bottom. The one Tinny wants glows.
+// Along the bottom, so she knows: a tap anywhere opens the play menu. Glows when Tinny wants something.
 function playBar(now, want) {
-  const btns = [["🍎 Eat", "eat", startEat], ["🛁 Bath", "bath", startBath], ["⚽ Ball", "ball", startBall], ["🎲 Play", "play", startGame]];
-  btns.forEach(([label, key, go], i) => {
-    const x = 10 + i * 117, glow = want === key && tick % 8 < 5;
-    if (glow) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, 268, 113, 50, 25); ctx.fill(); }
-    pill(x, 272, 105, 42, label, 19, "#16181f");
-    zone(x - 4, 264, 113, 56, go);
+  const glow = want && tick % 8 < 5;
+  if (glow) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(6, 268, 468, 50, 25); ctx.fill(); }
+  pill(10, 272, 460, 42, want === "eat" ? "🍎  Tinny's hungry! Tap to play" : want === "bath" ? "🫧  Tinny's dusty! Tap to play" : "👆  Tap to play!   🍎 🛁 ⚽ 🎲", 20, "#16181f");
+}
+
+// The play menu: four tiles, a quarter of the screen each, because the touchscreen is
+// small and rough. The one Tinny wants glows. 🏠 in the middle goes back.
+function openMenu() { begin("menu"); }
+function drawMenu(now) {
+  rect(0, 0, W, H, "#16181f");
+  const want = wants(now);
+  [["🍎", "Eat", "eat", startEat], ["🛁", "Bath", "bath", startBath], ["⚽", "Ball", "ball", startBall], ["🎲", "Games", "play", startGame]].forEach(([e, label, key, go], i) => {
+    const x = 6 + (i % 2) * 237, y = 6 + Math.floor(i / 2) * 157, w = 231, h = 151;
+    const glow = want === key && tick % 8 < 5;
+    ctx.fillStyle = glow ? "#ffd84a" : ["#ffe3b8", "#cfeaf7", "#c9ecb4", "#e7d4f5"][i];
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 22); ctx.fill();
+    text(e, x + w / 2, y + 92, 70, "#000", "center");
+    text(label, x + w / 2, y + 136, 28, "#16181f", "center");
+    zone(x, y, w, h, go);
   });
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(W / 2, H / 2, 24, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(W / 2, H / 2, 20, 0, 7); ctx.fill();
+  text("🏠", W / 2, H / 2 + 8, 22, "#000", "center");
+  zone(W / 2 - 26, H / 2 - 26, 52, 52, () => { act = null; });
 }
 
 function drawScene(now) {
@@ -357,6 +375,7 @@ function drawScene(now) {
     bubble(220, 22, 240, 86, ["Good morning,", "Zelda!"], 26, 246);
     pill(232, 128, 216, 36, `It's ${day}!`, 20, PB.DAY_COLORS[PB.weekdayOf(now)]);
     if (first) { tileCard(first, 240, 176, 64); text(first.label, 318, 216, fit(first.label, 20, 110)); }
+    zone(0, 0, W, H, openMenu);
     zone(40, 266 - 27 * u - 9 * u, 26 * u, 17 * u, nextDress);
     playBar(now, wants(now));
   }
@@ -379,9 +398,10 @@ function drawScene(now) {
 
   else if (name === "play") {
     const k = act.kind;
-    if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
+    if (k === "menu") drawMenu(now);
+    else if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
     else if (k === "done") drawDone(now); else drawGame(now);
-    if (act && act.kind !== "done") {          // home: back to the day, any time
+    if (act && act.kind !== "done" && act.kind !== "menu") {          // home: back to the day, any time
       ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("🏠", 28, 304, 20, "#000", "center");
       zone(4, 272, 48, 48, () => { act = null; said = null; });
     }
@@ -397,6 +417,11 @@ function drawScene(now) {
   // hearts from petting float up and fade
   hearts = hearts.filter(h => h.life > 0);
   for (const h of hearts) { ctx.globalAlpha = Math.min(1, h.life / 6); heart(h.x, h.y, h.u, h.col); h.y -= 7; h.x += Math.sin(h.life) * 2; h.life--; }
+  // where the screen thought she touched, for checking the touchscreen
+  if (doc?.screen?.tapDots) for (const t of taps) if (ago(t.at) < 6) {
+    ctx.strokeStyle = "#e2413b"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, 12, 0, 7); ctx.stroke();
+    rect(t.x - 2, t.y - 2, 4, 4, "#e2413b"); text(`${Math.round(t.x)},${Math.round(t.y)}`, t.x + 16, t.y - 10, 14, "#e2413b");
+  }
   confetti = confetti.filter(p => p.life-- > 0);
   for (const p of confetti) { ctx.globalAlpha = Math.min(1, p.life / 6); rect(p.x, p.y, 7, 7, p.col); p.x += p.vx; p.y += p.vy; p.vy += 3; }
   ctx.globalAlpha = 1;
@@ -507,7 +532,7 @@ function drawEat(now, u) {
     ctx.beginPath(); ctx.ellipse(x + 38, 196, 40, 14, 0, 0, 7); ctx.fill(); ctx.stroke();  // a plate
     text(sn[0], x + 38, 186, 56, "#000", "center");
     text(sn[1], x + 38, 254, fit(sn[1], 20, 84), "#16181f", "center");
-    zone(x, 120, 80, 140, () => eat(sn, i));
+    zone(x - 3, 100, 86, 180, () => eat(sn, i));
   });
 }
 
@@ -625,7 +650,7 @@ function drawGame(now) {
       ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, 40, 48, 0, 0, 7); ctx.fill();
       ctx.fillStyle = c[1]; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, 36, 44, 0, 0, 7); ctx.fill();
       rect(cx - 16, cy - 24 + bob, 8, 12, "#ffffff90");
-      zone(cx - 48, cy - 56, 96, 150, () => answer(i));
+      zone(cx - 50, 84, 100, 196, () => answer(i));
     });
   }
   if (act.kind === "count") {
@@ -642,7 +667,7 @@ function drawGame(now) {
       const cx = 210 + i * 100, cy = 220;
       const dx = choiceCircle(cx, cy, 38, act.right === i ? "#ffd84a" : "#fff", shaking(i));
       text(String(v), cx + dx, cy + 18, 50, "#16181f", "center");
-      zone(cx - 46, cy - 46, 92, 92, () => answer(i));
+      zone(cx - 50, 160, 100, 120, () => answer(i));
     });
   }
   if (act.kind === "peek") {
@@ -655,7 +680,7 @@ function drawGame(now) {
       }
       if (act.silly[i] && ago(act.wrong?.at || 0) < 1.4 && act.wrong?.i === i) text(act.silly[i], cx + dx, base - 112, 42, "#000", "center");
       text(h, cx + dx, base, 96, "#000", "center");
-      zone(cx - 64, base - 150, 128, 170, () => answer(i));
+      zone(cx - 70, 80, 140, 200, () => answer(i));
     });
   }
 }
@@ -686,10 +711,10 @@ function drawWindDown(now) {
   const steps = [["🪥", "Teeth", "teeth"], ["👕", "PJs", "pj"], ["💡", "Lamp", "lamp"]];
   const next = !done.teeth ? "teeth" : !done.pj ? "pj" : "lamp";
   steps.forEach(([e, label, key], i) => {
-    const x = 236, y = 140 + i * 58, isNext = key === next, isDone = done[key];
-    if (isNext && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, 228, 54, 25); ctx.fill(); }
-    pill(x, y, 220, 46, `${e}  ${label}${isDone ? "  ✓" : ""}`, 21, isDone ? "#6a6f9a" : "#16181f");
-    zone(x - 4, y - 6, 228, 56, () => {
+    const x = 236, y = 124 + i * 64, isNext = key === next, isDone = done[key];
+    if (isNext && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, 228, 62, 29); ctx.fill(); }
+    pill(x, y, 220, 54, `${e}  ${label}${isDone ? "  ✓" : ""}`, 23, isDone ? "#6a6f9a" : "#16181f");
+    zone(226, y - 6, W - 226, 64, () => {
       if (key !== next) { say([next === "teeth" ? "Teeth first!" : "PJs first!"], 1.6); return; }
       if (key === "teeth") { r.teeth++; r.brushAt = Date.now(); store.set("tinny-routine", r); if (r.teeth === 5) say(["Sparkly", "teeth!"], 1.8); else if (r.teeth === 1) say(["Brush brush!", "Again!"], 1.8); }
       if (key === "pj") { r.pj = true; store.set("tinny-routine", r); say(["Cozy!"], 1.6); }
@@ -697,8 +722,8 @@ function drawWindDown(now) {
     });
   });
   if (!saying()) {
-    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(236, 20, 220, 96, 18); ctx.fill(); ctx.stroke();
-    text("Almost bedtime!", 346, 58, fit("Almost bedtime!", 22, 196), "#16181f", "center"); text("Help me get ready?", 346, 92, fit("Help me get ready?", 19, 196), "#16181f", "center");
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(236, 14, 220, 92, 18); ctx.fill(); ctx.stroke();
+    text("Almost bedtime!", 346, 52, fit("Almost bedtime!", 22, 196), "#16181f", "center"); text("Help me get ready?", 346, 86, fit("Help me get ready?", 19, 196), "#16181f", "center");
   }
 }
 
@@ -718,6 +743,7 @@ addEventListener("pointerdown", (e) => {
   const r = c.getBoundingClientRect();
   let x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
   if (c.style.transform) { x = W - x; y = H - y; }     // the screen is flipped
+  if (doc?.screen?.tapDots) taps = [...taps.slice(-5), { x, y, at: Date.now() }];
   const fn = hit(x, y);
   try { if (fn) fn(x, y); else pet(); } catch (err) { act = null; }
   drawScene(new Date());     // show the answer to the tap now, and with it the new targets

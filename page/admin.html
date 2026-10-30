@@ -325,6 +325,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       </div>
       <div class="row-btns"><button type="button" class="btn plain small" id="tinnyFind">Find town</button></div>
       <div class="row-btns" id="tinnyPlaces"></div>
+      <label class="check"><input type="checkbox" id="tapDots"> Show where taps land <span class="hint">A red dot wherever the little screen feels a tap, to check its touch. Turn it off after.</span></label>
       <label class="check"><input type="checkbox" id="littleFlip"> Flip the little screen upside down <span class="hint">For Tinny or the magnet board on the touchscreen Pi. Changes within a few seconds.</span></label>
       <div class="label">Send Zelda a hug <span class="hint">Tinny gives her a big squeeze, with your name</span></div>
       <div class="row2">
@@ -1132,6 +1133,7 @@ function renderSettings() {
   $("home").value = doc.screen?.home || "today";
   $("boardPower").value = $("tinnyPower").value = doc.screen?.board || "same";
   $("littleFlip").checked = !!doc.screen?.littleFlip;
+  $("tapDots").checked = !!doc.screen?.tapDots;
   const s = state.settings;
   if (document.activeElement?.closest?.("#mailForm") == null) {
     $("imapUser").value = s.imap.user || "";
@@ -1327,6 +1329,7 @@ for (const b of document.querySelectorAll("[data-act]")) b.onclick = async () =>
   catch (e) { toast(e.message, true); }
 };
 $("home").onchange = () => save({ ...doc, screen: { ...doc.screen, home: $("home").value } }, "Home screen saved.");
+$("tapDots").onchange = () => save({ ...doc, screen: { ...doc.screen, tapDots: $("tapDots").checked } }, $("tapDots").checked ? "Tap dots on." : "Tap dots off.");
 $("littleFlip").onchange = () => save({ ...doc, screen: { ...doc.screen, littleFlip: $("littleFlip").checked } }, "Little screen flipped.");
 // The magnet board and Tinny share the little screen, so both selects set the same thing.
 for (const id of ["boardPower", "tinnyPower"])

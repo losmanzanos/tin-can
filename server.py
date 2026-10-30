@@ -309,7 +309,7 @@ def clean_doc(doc):
     board = screen.get("board") if screen.get("board") in ("same", "on", "off") else "same"
     return {"people": out, "number": number, "tinny": clean_tinny(doc.get("tinny")), "tileSet": TILE_SET,
             "screen": {"on": on, "off": off, "flip": bool(screen.get("flip", False)), "home": home, "board": board,
-                       "littleFlip": bool(screen.get("littleFlip", False))},
+                       "littleFlip": bool(screen.get("littleFlip", False)), "tapDots": bool(screen.get("tapDots", False))},
             "tiles": tiles, "week": clean_week, "keys": clean_keys,
             "postcards": {"approve": bool((doc.get("postcards") or {}).get("approve", False))}}
 
