@@ -311,7 +311,10 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
     <h2>Tinny, the little screen pet</h2>
     <div class="panel">
-      <p class="hint">A tin-can pet for the 3.5" touchscreen. It holds up new postcards, dresses for her calendar and the weather, suggests calling someone now and then, and falls asleep when her big screen turns off. Any tap pets it.</p>
+      <p class="hint">A tin-can pet for the 3.5" touchscreen. It holds up new postcards, dresses for her calendar and the weather, suggests calling someone now and then, and falls asleep when her big screen turns off. Zelda can feed it, bath it, play ball and little games with it, and dress it up.</p>
+      <label>Tinny's screen <span class="hint">"Off" goes dark now and stays dark until you change it back. The same setting as the magnet board's: it's one little screen.</span>
+        <select id="tinnyPower"><option value="same">Same as her big screen</option><option value="on">Always on</option><option value="off">Off</option></select>
+      </label>
       <div class="row2">
         <label>Weather for <span class="hint" id="tinnyPlaceNow">Not set</span>
           <input type="text" id="tinnyPlace" autocomplete="off" placeholder="Town, e.g. Denver">
@@ -1127,7 +1130,7 @@ function renderSettings() {
     $("flip").checked = !!doc.screen?.flip;
   }
   $("home").value = doc.screen?.home || "today";
-  $("boardPower").value = doc.screen?.board || "same";
+  $("boardPower").value = $("tinnyPower").value = doc.screen?.board || "same";
   $("littleFlip").checked = !!doc.screen?.littleFlip;
   const s = state.settings;
   if (document.activeElement?.closest?.("#mailForm") == null) {
@@ -1325,7 +1328,9 @@ for (const b of document.querySelectorAll("[data-act]")) b.onclick = async () =>
 };
 $("home").onchange = () => save({ ...doc, screen: { ...doc.screen, home: $("home").value } }, "Home screen saved.");
 $("littleFlip").onchange = () => save({ ...doc, screen: { ...doc.screen, littleFlip: $("littleFlip").checked } }, "Little screen flipped.");
-$("boardPower").onchange = () => save({ ...doc, screen: { ...doc.screen, board: $("boardPower").value } }, "Board screen saved.");
+// The magnet board and Tinny share the little screen, so both selects set the same thing.
+for (const id of ["boardPower", "tinnyPower"])
+  $(id).onchange = () => save({ ...doc, screen: { ...doc.screen, board: $(id).value } }, "Little screen saved.");
 $("goRemote").onclick = () => { showTab("settings"); $("remote").scrollIntoView({ behavior: "smooth" }); };
 
 $("newBoard").onclick = async () => {

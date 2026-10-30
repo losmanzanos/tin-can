@@ -125,6 +125,10 @@ main screen, or pick **Always on** or **Off** under Settings → Magnet board
 changes about 20 seconds after she stops.
 
 **If it isn't right the first time:**
+- **"Off" still glows a little:** most of these 3.5" boards wire the backlight
+  straight to the Pi's power pins, so software can only make the picture black,
+  not turn the light behind it off. Check on the little Pi with
+  `ls /sys/class/backlight/`: if it lists nothing, the backlight can't be switched.
 - **Upside down:** run setup again with `ROTATE=270 sudo -E bash ~/tin-can/board/setup.sh '...'`.
 - **Taps land in the wrong place:** tell Claude where you tapped and where it
   landed. The fix is one line in `/etc/X11/xorg.conf.d/99-zelda-touch.conf`.
@@ -155,8 +159,9 @@ dusty and asks (a thought bubble, and that button glows).
 
 What Tinny remembers (meals, baths, stars, its hat) is kept in the little screen's browser.
 
-Set it up under **Settings → Tinny**: pick a town for the weather, then on the
-little Pi run
+Set it up under **Settings → Tinny**: pick a town for the weather, and choose
+**Tinny's screen**: the same hours as her big screen, always on, or off (it
+switches within a minute). Then on the little Pi run
 ```sh
 sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/tinny'
 ```
