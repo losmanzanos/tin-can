@@ -110,6 +110,19 @@ if ! command -v tailscale >/dev/null; then
     curl -fsSL https://tailscale.com/install.sh | sh
   fi
 fi
+# The family page (send-only, personal links) goes online through Tailscale
+# Funnel. Only port 8081 is shared, never the admin page.
+if command -v tailscale >/dev/null && tailscale status >/dev/null 2>&1; then
+  if tailscale funnel status 2>/dev/null | grep -q ':8081'; then
+    echo "Family page is online: $(tailscale status --json | python3 -c 'import json,sys; print("https://" + json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
+  else
+    echo
+    echo "Putting the family page online with Tailscale Funnel..."
+    if ! timeout 30 tailscale funnel --bg 8081; then
+      echo "If it printed a link above, open it, click Enable, then run:  sudo tailscale funnel --bg 8081"
+    fi
+  fi
+fi
 if command -v tailscale >/dev/null && ! tailscale status >/dev/null 2>&1; then
   echo
   echo "Tailscale is installed but not signed in. Run:  sudo tailscale up"

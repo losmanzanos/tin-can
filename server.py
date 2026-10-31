@@ -23,6 +23,7 @@ import os
 import re
 import secrets
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -729,6 +730,9 @@ def make_handler(store, mailroom):
                     "viewUrl": s["viewUrl"],
                     "inbox": mailroom.poller.status,
                     "board": s.get("board", ""),
+                    "family": [{"key": k, "name": v.get("name", ""), "created": v.get("created", 0)}
+                               for k, v in (s.get("family") or {}).items()],
+                    "familyUrl": s.get("familyUrl") or public_url(),
                 },
             }
 
@@ -855,6 +859,37 @@ def make_handler(store, mailroom):
                     raise BadRequest("unknown button")
                 write_atomic(store.dir / "remote.json", json.dumps({"seq": time.time_ns(), "action": action}).encode())
                 return self.send(HTTPStatus.OK, {"ok": True})
+
+            if path == "/api/family/links" and self.command == "POST":
+                body = self.json_body() or {}
+                name = str(body.get("name", "")).strip()[:40]
+                if not name:
+                    raise BadRequest("Who is this link for?")
+                s = store.secrets()
+                fam = s.setdefault("family", {})
+                if len(fam) >= 30:
+                    raise BadRequest("That's a lot of links. Turn some off first.")
+                k = secrets.token_urlsafe(18)
+                fam[k] = {"name": name, "created": int(time.time())}
+                store.save_secrets(s)
+                return self.send(HTTPStatus.OK, {"key": k, "name": name})
+
+            m = re.match(r"^/api/family/links/([A-Za-z0-9_-]{10,64})/off$", path)
+            if m and self.command == "POST":
+                s = store.secrets()
+                if (s.get("family") or {}).pop(m.group(1), None) is None:
+                    return self.error(HTTPStatus.NOT_FOUND, "no such link")
+                store.save_secrets(s)
+                return self.send(HTTPStatus.OK, {"ok": True})
+
+            if path == "/api/family/url" and self.command == "PUT":
+                url = str((self.json_body() or {}).get("url", "")).strip().rstrip("/")[:200]
+                if url and not re.match(r"^https?://[^\s/]+$", url):
+                    raise BadRequest("That doesn't look like an address, e.g. https://zelda-phone.example.ts.net")
+                s = store.secrets()
+                s["familyUrl"] = url
+                store.save_secrets(s)
+                return self.send(HTTPStatus.OK, {"familyUrl": url or public_url()})
 
             if path == "/api/tinny/hug" and self.command == "POST":
                 sender = str((self.json_body() or {}).get("from", "")).strip()[:40] or "someone"
@@ -1012,12 +1047,97 @@ def ask_pin():
         print("Those didn't match, try again.")
 
 
+# ------------------------------------------------------------- family page
+# A second, tiny server for family away from home: it only sends postcards and
+# hugs, with a personal link each. It listens on 127.0.0.1 only; Tailscale
+# Funnel ("tailscale funnel --bg 8081") is what puts it on the internet. The
+# admin page, contacts and everything else stay on the home network.
+FAMILY_PORT = 8081
+FAMILY_PER_HOUR = 12      # postcards per link per hour, so nobody floods her screen
+_public = {"url": None, "at": 0}
+
+
+def public_url():
+    """The Pi's Funnel address, e.g. https://zelda-phone.tail1234.ts.net."""
+    if time.time() - _public["at"] > 300:
+        _public["at"] = time.time()
+        try:
+            out = subprocess.run(["tailscale", "status", "--json"], capture_output=True, timeout=5, text=True).stdout
+            name = (json.loads(out).get("Self") or {}).get("DNSName", "").rstrip(".")
+            _public["url"] = f"https://{name}" if name else None
+        except (OSError, ValueError, subprocess.SubprocessError):
+            _public["url"] = None
+    return _public["url"] or ""
+
+
+def make_family_handler(store, mailroom):
+    sent = {}   # link -> times of recent postcards
+    lock = threading.Lock()
+    Base = make_handler(store, mailroom)
+
+    class FamilyHandler(Base):
+        def who(self):
+            k = self.headers.get("X-Family-Key", "")
+            return ((store.secrets().get("family") or {}).get(k) or {}).get("name"), k
+
+        def do_GET(self):
+            path = urlsplit(self.path).path
+            if path in ("/", "/family", "/family/"):
+                return self.file(PAGE / "family.html")
+            if path == "/api/family/me":
+                name, _ = self.who()
+                if not name:
+                    return self.error(HTTPStatus.UNAUTHORIZED, "This link doesn't work anymore. Ask for a new one.")
+                return self.send(HTTPStatus.OK, {"name": name})
+            if path.startswith("/fonts/") and re.match(r"^/fonts/[a-z0-9-]+\.woff2$", path):
+                return self.file(PAGE / "fonts" / path[7:], cache=True)
+            if path in ("/icons/zelda-180.png", "/icons/zelda-512.png"):
+                return self.file(PAGE / path.lstrip("/"), cache=True)
+            self.error(HTTPStatus.NOT_FOUND, "not found")
+
+        def do_POST(self):
+            try:
+                path = urlsplit(self.path).path
+                name, k = self.who()
+                if path not in ("/api/family/postcard", "/api/family/hug"):
+                    return self.error(HTTPStatus.NOT_FOUND, "not found")
+                if not name:
+                    return self.error(HTTPStatus.UNAUTHORIZED, "This link doesn't work anymore. Ask for a new one.")
+                with lock:
+                    now = time.time()
+                    recent = [t for t in sent.get(k, []) if now - t < 3600]
+                    if len(recent) >= FAMILY_PER_HOUR:
+                        return self.error(HTTPStatus.TOO_MANY_REQUESTS, "That's a lot of postcards! Try again in a little while.")
+                    sent[k] = recent + [now]
+                if path == "/api/family/hug":
+                    write_atomic(store.dir / "hug.json", json.dumps({"ts": int(now), "from": name}).encode())
+                    return self.send(HTTPStatus.OK, {"ok": True})
+                caption = unquote(self.headers.get("X-Caption", "")).strip()[:120]
+                jpeg = None
+                if (self.headers.get("Content-Type") or "") == "image/jpeg":
+                    jpeg = self.body(MAX_POSTCARD_BYTES)
+                    if not jpeg.startswith(b"\xff\xd8\xff"):
+                        raise BadRequest("that isn't a photo")
+                elif not caption:
+                    raise BadRequest("Add a photo, a drawing or a message")
+                cid, status = mailroom.accept(name, caption, jpeg, "family", trusted=True)
+                return self.send(HTTPStatus.OK, {"status": status})
+            except BadRequest as e:
+                self.error(HTTPStatus.BAD_REQUEST, str(e))
+
+        def do_PUT(self):
+            self.error(HTTPStatus.NOT_FOUND, "not found")
+
+    return FamilyHandler
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", default=str(DEFAULT_DATA), help="data directory")
     sub = ap.add_subparsers(dest="cmd")
     s = sub.add_parser("serve")
     s.add_argument("--port", type=int, default=8080)
+    s.add_argument("--family-port", type=int, default=FAMILY_PORT, help="the family page, on 127.0.0.1 only (0 = off)")
     s.add_argument("--host", default="0.0.0.0")
     i = sub.add_parser("init")
     i.add_argument("--number", default=os.environ.get("ZELDA_NUMBER", ""))
@@ -1048,6 +1168,15 @@ def main():
         print("python3-pil is missing: postcards can't be drawn. Run install.sh again.", flush=True)
     httpd = ThreadingHTTPServer((host, port), make_handler(store, mailroom))
     httpd.daemon_threads = True
+    family_port = getattr(args, "family_port", FAMILY_PORT)
+    if family_port:
+        try:
+            fam = ThreadingHTTPServer(("127.0.0.1", family_port), make_family_handler(store, mailroom))
+            fam.daemon_threads = True
+            threading.Thread(target=fam.serve_forever, daemon=True).start()
+            print(f"Family page on http://127.0.0.1:{family_port}/ (Tailscale Funnel puts it online)", flush=True)
+        except OSError as e:
+            print(f"Family page not started: {e}", flush=True)
     print(f"Zelda's screen on http://{host}:{port}/  (data in {store.dir})", flush=True)
     try:
         httpd.serve_forever()

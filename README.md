@@ -177,6 +177,24 @@ sudo bash ~/tin-can/board/setup.sh 'http://zelda-phone.local:8080/tinny'
 ```
 The weather comes from Open-Meteo (free, no account).
 
+### Family links (postcards from anywhere)
+Family away from home get their own send-only page: photo, drawing, message,
+or a hug for Tinny. Each person has a personal link (no password to remember),
+and the postcard is labeled with their name. They can't see or change anything
+else.
+
+1. **Put it online, once.** On the Pi: `sudo tailscale funnel --bg 8081`. If
+   it prints a link, open it and click **Enable** (it turns on HTTPS and Funnel
+   for your tailnet), then run the command again. `install.sh` does this too.
+   Only the family page goes online. It runs on its own port and can't reach
+   the admin page, contacts or settings, which stay home-only.
+2. **Make links** on the admin page: **Postcards → Family links**. Type a name
+   and tap **Make a link**. It's copied, ready to text. **Turn off** stops a
+   link right away.
+
+Each link can send up to 12 postcards an hour. "Ask me before a postcard goes
+on her screen" applies to these too.
+
 ### Postcards by text or email
 1. Make a new Gmail just for this. Turn on 2-Step Verification and create an
    [app password](https://myaccount.google.com/apppasswords).

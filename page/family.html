@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbf5e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zelda">
+<meta name="robots" content="noindex">
+<link rel="apple-touch-icon" href="/icons/zelda-180.png">
+<link rel="icon" href="/icons/zelda-180.png">
+<title>Postcards for Zelda</title>
+<style>
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+:root { --paper: #fbf5e8; --ink: #16181f; --mustard: #e9ad1c; --rule: #d8cdb4; --muted: #6f6752; --card: #fffdf7; --bad: #a3473a; }
+* { box-sizing: border-box; margin: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body { min-height: 100vh; min-height: 100dvh; background: var(--paper); color: var(--ink); font: 18px/1.4 "Andika", sans-serif;
+  border-top: 10px solid var(--mustard); padding: 22px 18px calc(32px + env(safe-area-inset-bottom)); }
+main { max-width: 460px; margin: 0 auto; display: grid; gap: 18px; }
+main > section { display: grid; gap: 18px; }
+main > section.panel { gap: 14px; }
+h1 { font-size: 30px; line-height: 1.15; }
+p { color: var(--muted); }
+button, textarea { font: inherit; color: inherit; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 0 22px; border: 3px solid var(--ink); border-radius: 999px;
+  background: var(--mustard); font-weight: 700; font-size: 20px; box-shadow: 0 4px 0 var(--ink); cursor: pointer; width: 100%; }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn.plain { background: var(--card); }
+.btn:disabled { opacity: .5; }
+.picks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pick { display: grid; justify-items: center; gap: 6px; padding: 18px 6px 14px; border: 3px solid var(--ink); border-radius: 22px; background: var(--card);
+  font-weight: 700; font-size: 17px; box-shadow: 0 4px 0 var(--ink); cursor: pointer; }
+.pick span { font-size: 40px; line-height: 1; }
+.pick:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.panel { background: var(--card); border: 2px solid var(--rule); border-radius: 22px; padding: 16px; display: grid; gap: 14px; }
+.preview { width: 100%; border-radius: 14px; border: 3px solid var(--ink); background: #fff; display: block; }
+textarea { width: 100%; min-height: 96px; padding: 12px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 20px; resize: vertical; }
+label { display: grid; gap: 6px; font-weight: 700; font-size: 16px; }
+label small { font-weight: 400; color: var(--muted); }
+.row { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.err { color: var(--bad); font-weight: 700; }
+.big { font-size: 64px; text-align: center; line-height: 1; }
+[hidden] { display: none !important; }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+/* The drawing pad, full screen. */
+.pad { position: fixed; inset: 0; background: var(--paper); display: grid; grid-template-rows: auto 1fr auto; gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom)); z-index: 10; }
+.pad canvas { width: 100%; height: 100%; background: #fff; border: 3px solid var(--ink); border-radius: 18px; touch-action: none; min-height: 0; }
+.colors { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.colors button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ink); cursor: pointer; }
+.colors button[aria-pressed=true] { box-shadow: 0 0 0 4px var(--ink); transform: scale(1.12); }
+.padbar { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; }
+.padbar .btn { min-height: 50px; font-size: 18px; padding: 0 12px; }
+</style>
+</head>
+<body>
+<main>
+  <section id="nokey" hidden>
+    <h1>Postcards for Zelda 💌</h1>
+    <p id="nokeyMsg">This page needs your own link. Ask Zelda's parents to send it to you.</p>
+  </section>
+
+  <section id="start" hidden>
+    <h1 id="hello">Hi!</h1>
+    <p>Send Zelda a postcard. It pops up on her screen at home.</p>
+    <div class="picks">
+      <button type="button" class="pick" id="pickPhoto"><span>📷</span>Photo</button>
+      <button type="button" class="pick" id="pickDraw"><span>✏️</span>Draw</button>
+      <button type="button" class="pick" id="pickNote"><span>💬</span>Message</button>
+    </div>
+    <input type="file" id="file" accept="image/*">
+    <button type="button" class="btn plain" id="hug">💛 Send a hug</button>
+  </section>
+
+  <section id="compose" class="panel" hidden>
+    <canvas class="preview" id="preview" hidden></canvas>
+    <label id="noteLabel">Message <small id="noteHint">Optional. Short is best: she's just learning to read.</small>
+      <textarea id="note" maxlength="120" placeholder="We love you, Zelda!"></textarea>
+    </label>
+    <p class="err" id="err" hidden></p>
+    <div class="row">
+      <button type="button" class="btn plain" id="cancel">Back</button>
+      <button type="button" class="btn" id="send">Send to Zelda 💌</button>
+    </div>
+  </section>
+
+  <section id="done" hidden>
+    <div class="big">💌</div>
+    <h1 id="doneTitle" style="text-align:center">Sent!</h1>
+    <p id="doneMsg" style="text-align:center">It's on its way to Zelda's screen.</p>
+    <button type="button" class="btn" id="again">Send another</button>
+  </section>
+</main>
+
+<div class="pad" id="pad" hidden>
+  <div class="colors" id="colors"></div>
+  <canvas id="drawing"></canvas>
+  <div class="padbar">
+    <button type="button" class="btn plain" id="undo">Undo</button>
+    <button type="button" class="btn plain" id="clear">Clear</button>
+    <button type="button" class="btn" id="useDrawing">Done</button>
+  </div>
+</div>
+
+<script>
+// The family page: a personal link (#k=...) lets one family member send Zelda a
+// photo, a drawing or a message, or a hug. Nothing else can be reached from here.
+const $ = (id) => document.getElementById(id);
+let key = new URLSearchParams(location.hash.slice(1)).get("k") || "";
+try { if (key) localStorage.setItem("zelda-family-key", key); else key = localStorage.getItem("zelda-family-key") || ""; } catch (e) {}
+let picture = null;   // a canvas with the photo or drawing, or null for a message only
+
+function show(id) { for (const s of ["nokey", "start", "compose", "done"]) $(s).hidden = s !== id; window.scrollTo(0, 0); }
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "X-Family-Key": key, ...(opts.headers || {}) } });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error || "Something went wrong. Try again."), { status: r.status });
+  return data;
+}
+
+async function start() {
+  if (!key) return show("nokey");
+  try {
+    const me = await api("/api/family/me");
+    $("hello").textContent = `Hi, ${me.name}!`;
+    document.title = "Postcards for Zelda";
+    show("start");
+  } catch (e) {
+    $("nokeyMsg").textContent = e.status === 401 ? e.message : "Zelda's screen can't be reached right now. Try again in a bit.";
+    show("nokey");
+  }
+}
+
+/* ---------- photo ---------- */
+$("pickPhoto").onclick = () => $("file").click();
+$("file").onchange = async () => {
+  const f = $("file").files[0];
+  $("file").value = "";
+  if (!f) return;
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error("Couldn't open that photo.")); i.src = URL.createObjectURL(f); });
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(img.src);
+    compose(c);
+  } catch (e) { alert(e.message); }
+};
+
+/* ---------- message only ---------- */
+$("pickNote").onclick = () => compose(null);
+
+function compose(canvas) {
+  picture = canvas;
+  const prev = $("preview");
+  prev.hidden = !canvas;
+  if (canvas) { prev.width = canvas.width; prev.height = canvas.height; prev.getContext("2d").drawImage(canvas, 0, 0); }
+  $("noteHint").textContent = canvas ? "Optional. Short is best: she's just learning to read." : "Short is best: she's just learning to read.";
+  $("note").value = "";
+  $("err").hidden = true;
+  show("compose");
+  if (!canvas) $("note").focus();
+}
+$("cancel").onclick = () => show("start");
+
+$("send").onclick = async () => {
+  const note = $("note").value.trim();
+  if (!picture && !note) { $("err").textContent = "Write a message first."; $("err").hidden = false; return; }
+  $("send").disabled = true; $("send").textContent = "Sending…";
+  try {
+    const body = picture ? await new Promise(ok => picture.toBlob(ok, "image/jpeg", 0.85)) : null;
+    const res = await api("/api/family/postcard", { method: "POST", body,
+      headers: { "Content-Type": picture ? "image/jpeg" : "text/plain", "X-Caption": encodeURIComponent(note) } });
+    $("doneTitle").textContent = "Sent!";
+    $("doneMsg").textContent = res.status === "pending" ? "Zelda's parents will put it on her screen soon." : "It's on Zelda's screen now. 💛";
+    show("done");
+  } catch (e) { $("err").textContent = e.message; $("err").hidden = false; }
+  finally { $("send").disabled = false; $("send").textContent = "Send to Zelda 💌"; }
+};
+$("again").onclick = () => show("start");
+
+$("hug").onclick = async () => {
+  try {
+    await api("/api/family/hug", { method: "POST" });
+    $("doneTitle").textContent = "Hug sent! 💛";
+    $("doneMsg").textContent = "Tinny, the little pet on her screen, will give her a big squeeze from you.";
+    show("done");
+  } catch (e) { alert(e.message); }
+};
+
+/* ---------- drawing pad ---------- */
+const COLORS = ["#16181f", "#e2413b", "#ef7f2c", "#e9ad1c", "#5aa64b", "#2b8fb0", "#b768d6", "#f2a1a8"];
+let color = COLORS[1], strokes = [], cur = null;
+const pad = $("drawing"), pctx = pad.getContext("2d");
+$("colors").replaceChildren(...COLORS.map(c => {
+  const b = document.createElement("button");
+  b.type = "button"; b.style.background = c; b.setAttribute("aria-label", "color"); b.setAttribute("aria-pressed", String(c === color));
+  b.onclick = () => { color = c; for (const x of $("colors").children) x.setAttribute("aria-pressed", String(x === b)); };
+  return b;
+}));
+function sizePad() {
+  const r = pad.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  pad.width = Math.round(r.width * d); pad.height = Math.round(r.height * d);
+  redraw();
+}
+function redraw() {
+  pctx.fillStyle = "#fff"; pctx.fillRect(0, 0, pad.width, pad.height);
+  pctx.lineCap = pctx.lineJoin = "round";
+  for (const s of strokes) {
+    pctx.strokeStyle = s.color; pctx.lineWidth = Math.max(6, pad.width / 70);
+    pctx.beginPath();
+    s.pts.forEach(([x, y], i) => (i ? pctx.lineTo(x * pad.width, y * pad.height) : pctx.moveTo(x * pad.width, y * pad.height)));
+    if (s.pts.length === 1) pctx.lineTo(s.pts[0][0] * pad.width + 0.1, s.pts[0][1] * pad.height);
+    pctx.stroke();
+  }
+}
+const at = (e) => { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; };
+pad.onpointerdown = (e) => { pad.setPointerCapture(e.pointerId); cur = { color, pts: [at(e)] }; strokes.push(cur); redraw(); };
+pad.onpointermove = (e) => { if (cur) { cur.pts.push(at(e)); redraw(); } };
+pad.onpointerup = pad.onpointercancel = () => (cur = null);
+$("undo").onclick = () => { strokes.pop(); redraw(); };
+$("clear").onclick = () => { strokes = []; redraw(); };
+$("pickDraw").onclick = () => { $("pad").hidden = false; requestAnimationFrame(sizePad); };
+$("useDrawing").onclick = () => {
+  $("pad").hidden = true;
+  if (!strokes.length) return;
+  const out = document.createElement("canvas");
+  out.width = pad.width; out.height = pad.height;
+  out.getContext("2d").drawImage(pad, 0, 0);
+  compose(out);
+};
+addEventListener("resize", () => { if (!$("pad").hidden) sizePad(); });
+
+start();
+</script>
+</body>
+</html>

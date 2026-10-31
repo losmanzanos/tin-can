@@ -114,6 +114,8 @@ code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padd
 
 /* Postcards */
 .cards { list-style: none; display: grid; gap: 12px; }
+.famlinks { list-style: none; display: grid; gap: 10px; }
+.famlinks li { display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
 .cardrow { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 14px; }
 .cardrow img, .cardrow .txt { width: 76px; height: 76px; object-fit: cover; border-radius: 12px; border: 2px solid var(--ink); background: #fff; }
 .cardrow .txt { display: grid; place-items: center; font-size: 12px; padding: 4px; text-align: center; overflow: hidden; }
@@ -226,6 +228,24 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       <label>From<select id="cardFrom"></select></label>
       <button class="btn" type="submit" id="sendCard">Send to her screen</button>
     </form>
+    <h2>Family links <small>Send-only pages for family away from home</small></h2>
+    <div class="panel">
+      <p class="hint">Each person gets their own link. They open it on their phone, tap "Add to Home Screen", and can send Zelda a photo, a drawing, a message or a hug, labeled with their name. They can't see or change anything else. Turn a link off any time.</p>
+      <p class="hint" id="famUrlNote"></p>
+      <ul class="famlinks" id="famLinks"></ul>
+      <div class="row2">
+        <input type="text" id="famName" list="famNames" maxlength="40" autocomplete="off" placeholder="Who's it for?" aria-label="Who's it for?">
+        <button type="button" class="btn small" id="famAdd">Make a link</button>
+      </div>
+      <datalist id="famNames"></datalist>
+      <details><summary class="hint">Family page address</summary>
+        <div class="row2" style="margin-top:8px">
+          <input type="url" id="famUrl" autocomplete="off" placeholder="https://zelda-phone.example.ts.net" aria-label="Family page address">
+          <button type="button" class="btn plain small" id="famUrlSave">Save</button>
+        </div>
+        <p class="hint" style="margin-top:6px">Filled in from Tailscale. Change it only if you use a different address.</p>
+      </details>
+    </div>
     <h2>Postcards <small id="cardCount"></small></h2>
     <ul class="cards" id="cardList"></ul>
     <div id="ignoredBox" hidden>
@@ -982,7 +1002,7 @@ function renderPostcards() {
     if (c.caption && c.photo) info.append(el("div", null, "“" + c.caption + "”"));
     const when = new Date(c.ts * 1000);
     info.append(el("div", "meta", when.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + " · " +
-      when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) + " · " + (c.via === "email" ? "by text/email" : "from here") +
+      when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) + " · " + (c.via === "email" ? "by text/email" : c.via === "family" ? "by family link" : "from here") +
       (c.status === "pending" ? " · waiting for your OK" : "")));
     const acts = el("div", "row-btns");
     acts.style.marginTop = "8px";
@@ -1154,6 +1174,7 @@ function renderSettings() {
   renderKeys();
   renderBoard();
   renderTinny();
+  renderFamily();
   renderScreenState();
 }
 function renderBoard() {
@@ -1186,6 +1207,49 @@ function renderBoard() {
   pi.append(l2);
   box.append(l, pi);
 }
+/* ---------- family links ---------- */
+function famLink(k) { return (state.settings.familyUrl || "") + "/#k=" + k; }
+function renderFamily() {
+  const s = state.settings;
+  $("famUrlNote").textContent = s.familyUrl ? "" : "Turn on Tailscale Funnel first (see the README), or the links only work at home.";
+  $("famUrlNote").hidden = !!s.familyUrl;
+  if (document.activeElement !== $("famUrl")) $("famUrl").value = s.familyUrl || "";
+  $("famNames").replaceChildren(...[...new Set((doc.people || []).map(p => p.name).filter(Boolean))].map(n => { const o = el("option"); o.value = n; return o; }));
+  const list = $("famLinks");
+  list.replaceChildren(...(s.family || []).map(f => {
+    const li = el("li");
+    li.append(el("b", null, f.name));
+    const btns = el("div", "row-btns");
+    const copy = el("button", "btn plain small", "Copy link");
+    copy.type = "button";
+    copy.onclick = () => copyText(famLink(f.key));
+    const off = el("button", "btn plain small", "Turn off");
+    off.type = "button";
+    off.onclick = async () => {
+      if (!confirm(`Turn off ${f.name}'s link? It stops working right away.`)) return;
+      try { await api("POST", `/api/family/links/${f.key}/off`, {}); await reload(); toast("Link turned off."); } catch (e) { toast(e.message, true); }
+    };
+    btns.append(copy, off);
+    li.append(el("code", null, famLink(f.key)), btns);
+    return li;
+  }));
+  if (!(s.family || []).length) list.append(el("li", "hint", "No links yet."));
+}
+$("famAdd").onclick = async () => {
+  const name = $("famName").value.trim();
+  if (!name) return toast("Type who it's for first.", true);
+  try {
+    const { key } = await api("POST", "/api/family/links", { name });
+    $("famName").value = "";
+    await reload();
+    copyText(famLink(key));
+    toast(`${name}'s link is copied. Text it to them!`);
+  } catch (e) { toast(e.message, true); }
+};
+$("famUrlSave").onclick = async () => {
+  try { await api("PUT", "/api/family/url", { url: $("famUrl").value.trim() }); await reload(); toast("Saved."); } catch (e) { toast(e.message, true); }
+};
+
 /* ---------- Tinny ---------- */
 function tinnyHost() {
   return location.hostname.endsWith(".local") || /^\d/.test(location.hostname) ? location.host : location.hostname.split(".")[0] + ".local:" + (location.port || 80);
