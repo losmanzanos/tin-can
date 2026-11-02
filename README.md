@@ -162,19 +162,21 @@ Tinny: it only gets a bit hungry or dusty and asks.
   - Spell: tap the letters in order (copying first, then from the picture, then with extra letters, then 4-letter words). Her own words (her name, this week's words) go in on the admin page.
   - Count: count to 5, to 10, which is more, adding, taking away, number sentences.
 - **Her garden:** every round waters it. Plants bloom after a few rounds; eight fill a garden, then a new one starts.
+- **The mystery egg:** every game and routine warms it. When it wobbles, a tap hatches a new friend with a name: kittens and unicorns in lots of colors, a few of them rare (a rainbow kitty, a starry night unicorn). One friend sits beside Tinny each day; tap the egg to see them all.
 - **🍎 Feed** (snacks with their words) and **🎈 Play** (ball to ten, colors, peekaboo; a bath when it's dusty).
-- **Surprises** every couple of minutes on the home screen: a letter balloon ("B is for bus"), a word of the day, a butterfly, juggling.
+- **Surprises** every couple of minutes on the home screen: a letter balloon ("B is for bus"), a word of the day, a joke, a fun fact (lots of cats and unicorns), a butterfly, juggling. The jokes and facts are written into Tinny, not fetched, so nothing unexpected shows up.
 - **Holidays:** costumes and decorations for Halloween, Thanksgiving, Christmas, New Year, Valentine's, St. Patrick's, Easter, the Fourth of July, her birthday (set on the admin page) and Tinny's.
 - **Dress up:** tap its head to try on the next hat.
-- **Bedtime:** for the last 20 minutes before her big screen turns off, one giant button at a time (teeth, pajamas, lights out). A tap anywhere does it, and Tinny acts it out.
+- **Morning and evening routines:** one giant button at a time; a tap anywhere does it and Tinny acts it out. Mornings (her first 20 minutes): wake up, breakfast, get dressed, what's on today. Evenings (the last 20 minutes before her big screen turns off): teeth, pajamas, "How was today?" 😊😐😢, lights out, with tonight's real moon. They grow with her: every couple of weeks a step joins (brushing teeth and making the bed in the morning, then a look outside that picks a coat or umbrella from the real weather; a one-line story at her reading level and a bath at night).
 - **Stars:** every finished round or activity earns one.
 
 **Touch:** if taps don't land where she touches, tap **Calibrate the touch** on
 the admin page (**Settings → Tinny**), then tap the middle of each of the five
 stars on the little screen.
 
-The admin page shows what she's practicing: each game's level and how this
-week went.
+The admin page shows what she's practicing (each game's level, how this week
+went, and you can set any level), how her days went, and her friends. Letters
+start at first sounds.
 
 What Tinny remembers (levels, garden, meals, stars, its hat, the touch calibration) is kept in the little screen's browser.
 

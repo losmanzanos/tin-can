@@ -333,6 +333,10 @@ def clean_tinny(t):
         out["birthday"] = b
     # Her own words for the spelling game (her name, this week's words...).
     words = t.get("words") if isinstance(t.get("words"), list) else []
+    # Levels a parent set for the learning games (Tinny applies them once per "ts").
+    lv = t.get("levels") if isinstance(t.get("levels"), dict) else {}
+    if isinstance(lv.get("ts"), int):
+        out["levels"] = {"ts": lv["ts"], **{k: max(1, min(7, int(lv[k]))) for k in ("P", "R", "S", "M") if str(lv.get(k, "")).isdigit()}}
     out["words"] = sorted({w.strip().lower() for w in words if isinstance(w, str) and re.match(r"^[A-Za-z]{2,8}$", w.strip())})[:30]
     return out
 

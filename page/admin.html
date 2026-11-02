@@ -116,7 +116,8 @@ code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padd
 .cards { list-style: none; display: grid; gap: 12px; }
 .learnlist { list-style: none; display: grid; gap: 8px; }
 .learnlist li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 10px 12px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
-.learnlist li > span:first-child { font-size: 28px; grid-row: span 2; }
+.learnlist li > span:first-child { font-size: 28px; grid-row: span 3; align-self: start; }
+.learnlist .lvlpick { min-height: 40px; font-size: 15px; padding: 6px 40px 6px 10px; background-position: right 12px center; margin-top: 4px; }
 .learnlist small { color: var(--muted); }
 .famlinks { list-style: none; display: grid; gap: 10px; }
 .famlinks li { display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
@@ -338,6 +339,8 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       <p class="hint">A tin-can pet for the 3.5" touchscreen. It holds up new postcards, dresses for her calendar, the weather and holidays, suggests calling someone now and then, and falls asleep when her big screen turns off. Zelda plays four learning games with it that find her level by themselves, and her right answers grow a garden.</p>
       <div class="label">What Zelda's practicing <span class="hint" id="learnAt"></span></div>
       <ul class="learnlist" id="learnList"></ul>
+      <p class="hint" id="learnMoods"></p>
+      <p class="hint" id="learnFriends"></p>
       <label>Tinny's screen <span class="hint">"Off" goes dark now and stays dark until you change it back. The same setting as the magnet board's: it's one little screen.</span>
         <select id="tinnyPower"><option value="same">Same as her big screen</option><option value="on">Always on</option><option value="off">Off</option></select>
       </label>
@@ -1282,10 +1285,20 @@ function renderLearning() {
   $("learnList").replaceChildren(...Object.entries(LEARN).map(([k, [e, name, levels]]) => {
     const l = lv[k] || 1, tried = week.reduce((n, d) => n + ((days[d] || {})[k]?.[0] || 0), 0), first = week.reduce((n, d) => n + ((days[d] || {})[k]?.[1] || 0), 0);
     const li = el("li");
-    li.append(el("span", null, e), el("b", null, `${name}: level ${l} of ${levels.length}, ${levels[l - 1]}`),
-      el("small", null, tried ? `This week: ${tried} tried, ${first} right the first time` : "Not played this week"));
+    const sel = el("select", "lvlpick");
+    sel.setAttribute("aria-label", `${name} level`);
+    levels.forEach((lname, i) => { const o = el("option", null, `Level ${i + 1}: ${lname}`); o.value = i + 1; sel.append(o); });
+    sel.value = l;
+    sel.onchange = () => save({ ...doc, tinny: { ...doc.tinny, levels: { ...(doc.tinny?.levels || {}), [k]: +sel.value, ts: Math.floor(Date.now() / 1000) } } },
+      `${name} set to level ${sel.value}. Tinny picks it up in a few seconds.`);
+    li.append(el("span", null, e), el("b", null, name),
+      el("small", null, tried ? `This week: ${tried} tried, ${first} right the first time` : "Not played this week"), sel);
     return li;
   }));
+  const moods = pr.moods || {}, mk = Object.keys(moods).sort().slice(-7);
+  const dayName = (d) => new Date(d.replace(/-(\d)(?!\d)/g, "-0$1") + "T12:00").toLocaleDateString(undefined, { weekday: "short" });
+  $("learnMoods").textContent = mk.length ? "How was today? " + mk.map(d => `${dayName(d)} ${moods[d]}`).join("  ") : "";
+  $("learnFriends").textContent = (pr.friends || []).length ? `Her friends: ${pr.friends.join(", ")}` : "";
 }
 function renderTinny() {
   const t = doc.tinny || {};

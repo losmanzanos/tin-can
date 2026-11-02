@@ -50,6 +50,7 @@ const store = {
 };
 const care = store.get("tinny-care", { fed: 0, bathed: 0 });
 let stars = store.get("tinny-stars", 0), dress = store.get("tinny-dress", null), tuckedIn = store.get("tinny-tucked", "");
+let palPet = 0;
 let act = null, lastTap = 0, zones = [], confetti = [], said = null, taps = [], rings = [], lastDown = 0;
 
 /* ---------------- data ---------------- */
@@ -67,6 +68,7 @@ async function refresh() {
       for (const t of doc.tiles || []) if (t.kind === "photo" && t.photo && !photos[t.photo]) loadImg("/photos/" + encodeURIComponent(t.photo), (img) => (photos[t.photo] = img));
       if (cards[0]?.photo) loadImg(`/postcards/${cards[0].id}.jpg`);
       if (!weather && doc.tinny?.lat != null) getWeather();
+      applyLevelSet();
     }
     const t = await getJSON("/api/tinny");
     seenTs = t.seen || 0; hug = t.hug || {};
@@ -144,7 +146,7 @@ function scene(now) {
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
   const since = hm(now) - toMin(doc.screen?.on || "08:00");
-  if (since >= 0 && since < MORNING_MIN) return "morning";
+  if (since >= 0 && since < MORNING_MIN && !routineDone("morning", now)) return "morning";
   if (windingDown(now)) return "winddown";
   if (nudgeFor(now)) return "nudge";
   return "day";
@@ -291,7 +293,7 @@ function drawDay(now, o, u, bob) {
   zone(40, ty - 9 * u, 26 * u, 17 * u, nextDress);     // its head and hat: try on the next one
   if (want && !said) thought(40 + 21 * u, ty - 2 * u, want === "eat" ? "🍎" : "🫧");
   const hol = holiday(now);
-  if (hol) hol.decor.forEach((d, i) => text(d, [228, 258, 460][i], 262 + (tick % 8 < 4 && i === 1 ? -3 : 0), 24, "#000", "center"));   // sitting on the ground
+  if (hol) hol.decor.forEach((d, i) => text(d, [300, 330, 460][i], 262 + (tick % 8 < 4 && i === 1 ? -3 : 0), 24, "#000", "center"));   // sitting on the ground
   // What's happening now, on the right.
   const label = tiles.length ? tiles.map(t => t.label).join(" + ") : "Free time";
   pill(270, 26, 186, 34, PB.PERIODS[p] + (tiles.length ? "" : ""), 18, PB.DAY_COLORS[PB.weekdayOf(now)]);
@@ -299,6 +301,15 @@ function drawDay(now, o, u, bob) {
   else { ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.roundRect(300, 76, 120, 120, 16); ctx.fill(); text("😊", 360, 152, 56, "#000", "center"); }
   if (tiles[1]) tileCard(tiles[1], 392, 150, 58);
   text(label, 363, 236, fit(label, 21, 190), "#16181f", "center");
+  const pal = friendOfDay(now);
+  if (pal) {
+    const fu = pal.kind === "cat" ? 4 : 3, fh = (pal.kind === "cat" ? 14 : 16) * fu, happy = ago(palPet) < 1.5;
+    drawFriend(pal, 2, 264 - fh + (happy ? -5 : 0), fu, happy);
+    zone(0, 262 - fh, 60, fh + 4, () => { palPet = Date.now(); say([pal.kind === "cat" ? `${pal.name} says` : `${pal.name} says`, pal.kind === "cat" ? "Meow! 🐱" : "Neigh! 🦄"], 1.8); hearts.push({ x: 20, y: 200, u: 4, col: "#e2413b", life: 12 }); });
+  }
+  drawEgg(250, 238, 46);
+  if (eggReady() && tick % 8 < 4) text("!", 276, 214, 24, "#e2413b", "center");
+  zone(222, 200, 58, 66, tapEgg);
   dayEvent(now, u, ty);
   playBar(now, want);
 }
@@ -356,8 +367,9 @@ function drawScene(now) {
     sky("#121a3a", "#283567"); ground("#1d2547");
     for (const [x, y, s] of [[40, 30, 2], [120, 70, 3], [220, 24, 2], [300, 90, 2], [430, 140, 3], [380, 40, 2], [70, 190, 2], [200, 140, 2]])
       rect(x, y, s * 2, s * 2, (tick + x) % 24 < 3 ? "#7d86b8" : "#fff6c8");
-    ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.arc(80, 90, 34, 0, 7); ctx.fill();
-    ctx.fillStyle = "#16204a"; ctx.beginPath(); ctx.arc(64, 78, 32, 0, 7); ctx.fill();
+    const mn = moon(now);
+    text(mn.e, 80, 118, 64, "#000", "center");
+    text(`Tonight: ${mn.name}`, 80, 160, 14, "#c9d4ff", "center");
     ctx.globalAlpha = 0.85; tinny(120 + wig, 266 - 27 * u + 4, u, { eyes: "closed", mouth: "flat", cap: true, squish: tick % 16 < 8 }); ctx.globalAlpha = 1;
     const z = tick % 24;
     text("z", 296, 132 - (z % 8), 24, "#c9d4ff"); if (z >= 8) text("z", 318, 100 - (z % 8), 32, "#c9d4ff"); if (z >= 16) text("Z", 346, 62 - (z % 8), 42, "#c9d4ff");
@@ -392,21 +404,7 @@ function drawScene(now) {
     pill(110, 262, 260, 48, `Hug from ${hug.from || "someone"}!`, fit(`Hug from ${hug.from || "someone"}!`, 24, 230));
   }
 
-  else if (name === "morning") {
-    sky("#ffc9a1", "#fff1dc"); ground("#8fcf6a", "#7cbd58");
-    ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.arc(462, 266, 40, Math.PI, 0); ctx.fill();
-    for (let i = 0; i < 5; i++) { const a = Math.PI + (i + 0.5) * Math.PI / 5; rect(462 + Math.cos(a) * 56 - 4, 266 + Math.sin(a) * 56 - 4, 8, 8, "#ffd84a"); }
-    const stretch = tick % 12 < 6;
-    tinny(40, 266 - 27 * u + (stretch ? -4 : 0), u, { eyes: stretch ? "closed" : "happy", mouth: stretch ? "o" : "open", arms: stretch ? "up" : undefined, ...outfit(nowTiles(now)) });
-    const first = nowTiles(now)[0];
-    const day = PB.DAYS[PB.weekdayOf(now)];
-    bubble(220, 22, 240, 86, ["Good morning,", "Zelda!"], 26, 246);
-    pill(232, 128, 216, 36, `It's ${day}!`, 20, PB.DAY_COLORS[PB.weekdayOf(now)]);
-    if (first) { tileCard(first, 240, 176, 64); text(first.label, 318, 216, fit(first.label, 20, 110)); }
-    zone(0, 0, W, H, openMenu);
-    zone(40, 266 - 27 * u - 9 * u, 26 * u, 17 * u, nextDress);
-    playBar(now, wants(now));
-  }
+  else if (name === "morning") drawRoutine("morning", now);
 
   else if (name === "nudge") {
     const n = nudgeFor(now), p = n.person;
@@ -428,20 +426,22 @@ function drawScene(now) {
     const k = act.kind;
     if (k === "menu") drawMenu(now);
     else if (k === "learn") drawLearn(now);
+    else if (k === "hatch") drawHatch(now);
+    else if (k === "friends") drawFriends(now);
     else if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
     else if (k === "done") drawDone(now); else drawGame(now);
-    if (act && act.kind !== "done" && act.kind !== "menu" && act.kind !== "learn") {          // home: back to the menu, any time
+    if (act && !["done", "menu", "learn", "hatch", "friends"].includes(act.kind)) {          // home: back to the menu, any time
       ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("🏠", 28, 304, 20, "#000", "center");
       zone(0, 266, 60, 54, () => { begin("menu"); });
     }
   }
 
-  else if (name === "winddown") drawWindDown(now);
+  else if (name === "winddown") drawRoutine("evening", now);
 
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (saying() && (name === "day" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
-  if (name === "day" || name === "nudge" || name === "morning") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
+  if (saying() && (name === "day" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (name === "day" || name === "nudge") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   // hearts from petting float up and fade
   hearts = hearts.filter(h => h.life > 0);
@@ -506,7 +506,7 @@ function choiceCircle(cx, cy, r, fill, shake) {
 }
 function begin(kind, extra = {}) { act = { kind, t0: Date.now(), ...extra }; lastTap = Date.now(); said = null; }
 function award() { stars++; store.set("tinny-stars", stars); }
-function finish(lines = ["You did it!"]) { award(); begin("done", { lines, back: "menu" }); burst(240, 140, 30); }
+function finish(lines = ["You did it!"]) { award(); warmEgg(1); begin("done", { lines, back: "menu" }); burst(240, 140, 30); }
 
 // Dress up: each tap on its head tries the next thing, kept until the part of the day changes.
 const WARDROBE = ["party", "crown", "beret", "bow", "flower", "cowboy", "helmet", "specs", "shades", null];
@@ -693,49 +693,153 @@ function drawDone(now) {
   bubble(206, 14, 260, 72, act.lines, 24, 230);
   drawGarden(16, 292, 448, act.garden, t);
   if (act.garden) text(`🌷 ${garden.total} flowers`, 240, 252, 18, "#6f6752", "center");
+  drawEgg(440, 214, 40);
+  text(eggReady() ? "Ready to hatch!" : "Warmer!", 440, 252, 14, eggReady() ? "#e2413b" : "#6f6752", "center");
   const leave = () => { if (act.back === "menu") begin("menu"); else act = null; };
   zone(0, 0, W, H, () => { if (t > 1.5) leave(); });
   if (t > (act.garden ? 5 : 3.2)) leave();
 }
 
-// Getting ready for bed, for the last minutes before her big screen turns off.
-// One step at a time, shown as one giant button; a tap anywhere does it and
-// Tinny acts it out (brushes, puts its pajamas on, turns the lamp off).
-const STEPS = [["🪥", "Brush teeth", "Brush my teeth?", 3], ["👕", "Pajamas", "Pajamas next!", 2], ["💡", "Lights out", "Lights out?", 3]];
-function drawWindDown(now) {
-  const r = store.get("tinny-routine", {});
-  if (r.day !== dayKey(now)) { Object.assign(r, { day: dayKey(now), step: 0, doing: 0 }); store.set("tinny-routine", r); }
-  const step = r.step || 0, doing = r.doing && ago(r.doing) < STEPS[Math.min(step, 2)][3] ? ago(r.doing) : null;
-  if (r.doing && doing == null) {                                   // that step just finished
-    r.doing = 0; r.step = step + 1; store.set("tinny-routine", r);
-    if (r.step >= STEPS.length) { tuckedIn = dayKey(now); store.set("tinny-tucked", tuckedIn); award(); return; }
-    say([["Sparkly teeth!"], ["So cozy!"]][step] || ["Goodnight!"], 1.8);
+// Morning and evening routines: one giant step at a time; a tap anywhere does
+// it and Tinny acts it out. They grow with her: every couple of weeks a new step
+// joins (brushing teeth, making the bed, a look at the weather, a bath, a
+// one-line story at her reading level). The evening asks how her day was; the
+// answer shows up on the admin page. Finishing one earns a star and warms the egg.
+function weatherWear() {
+  if (!weather) return { e: "👕", say: "Have a great day!" };
+  if (weather.snow) return { e: "🧤", say: "Snow! Mittens on!" };
+  if (weather.rain) return { e: "☂️", say: "Rainy! Umbrella!" };
+  if (weather.cold) return { e: "🧥", say: "Brr! Wear a coat!" };
+  if (weather.hot) return { e: "🕶️", say: "Hot! Sunglasses!" };
+  return { e: "👕", say: "Nice out today!" };
+}
+const STORIES = [   // by her reading level: short words first, then longer ones
+  ["The cat sat.", "A pig in a hat.", "The dog can run.", "Sun on the bus.", "The cat naps.", "A bug on a rug.", "Mom and the cat.", "The fox hid."],
+  ["The cat sat on the mat.", "A big pig had a nap.", "The dog got a red hat.", "Ten bugs in a box.", "The hen sat in the sun."],
+  ["The frog sat on a log.", "A duck can swim fast.", "The kite went up and up.", "My cat likes milk.", "The fish can swim."],
+  ["The little unicorn can fly.", "The cat and the duck are best friends.", "We went to the zoo and saw a lion.", "The moon is big and bright tonight."],
+];
+function routineSteps(kind, now) {
+  const wk = weeksOld(now), s = [];
+  if (kind === "morning") {
+    s.push({ e: "🥱", label: "Wake up", ask: "Good morning!|Wake me up?", act: "stretch", t: 2.5, done: "Good morning, Zelda!" });
+    s.push({ e: "🥣", label: "Breakfast", ask: "Breakfast time!", act: "eat", t: 3, done: "Yum!" });
+    if (wk >= 2) s.push({ e: "🪥", label: "Brush teeth", ask: "Brush my teeth?", act: "brush", t: 3, done: "Sparkly!" });
+    s.push({ e: "👕", label: "Get dressed", ask: "Help me get dressed?", act: "dress", t: 2.5, done: "Looking good!" });
+    if (wk >= 3) s.push({ e: "🛏️", label: "Make the bed", ask: "Make my bed?", act: "bed", t: 2.5, done: "So neat!" });
+    if (wk >= 4 && weather) s.push({ e: weather.icon, label: "Look outside", ask: "What's it like outside?", act: "weather", t: 3.5, done: weatherWear().say });
+    s.push({ e: "📅", label: "Today", ask: "What are we doing today?", act: "today", t: 3.5, done: "Let's go!" });
+  } else {
+    if (wk >= 3) s.push({ e: "🛁", label: "Bath", ask: "Bath time?", act: "bath", t: 3, done: "Squeaky clean!" });
+    s.push({ e: "🪥", label: "Brush teeth", ask: "Brush my teeth?", act: "brush", t: 3, done: "Sparkly teeth!" });
+    s.push({ e: "👕", label: "Pajamas", ask: "Pajamas next!", act: "pj", t: 2.5, done: "So cozy!" });
+    if (wk >= 2) s.push({ e: "📖", label: "Story", ask: "Read me a story?", act: "story", t: 1.8, done: "The end!" });
+    s.push({ e: "😊", label: "How was today?", ask: "How was your day?", act: "feel", t: 2.5 });
+    s.push({ e: "💡", label: "Lights out", ask: "Lights out?", act: "lights", t: 3 });
   }
-  const lampOff = step === 2 && doing != null ? Math.min(1, doing / 2) : 0;
-  sky("#3b3f74", "#6b5f9a"); ground("#4a4676");
-  const u = 7, ty = 266 - 27 * u;
-  const brushing = step === 0 && doing != null, dressing = step === 1 && doing != null;
-  tinny(20, ty, u, { eyes: lampOff > 0.5 ? "closed" : brushing ? "happy" : undefined, mouth: brushing ? (tick % 2 ? "open" : "o") : lampOff ? "flat" : "smile",
-    pj: step >= 2 || (dressing && doing > 1), cap: step >= 2 || (dressing && doing > 1), foam: brushing, arms: dressing && doing < 1 ? "up" : undefined });
-  if (brushing) { const bx = 20 + 14 * u + (tick % 2 ? 8 : -8); rect(bx, ty + 15 * u, 44, 7, "#46bfc0"); rect(bx, ty + 14 * u, 12, 5, "w"); }
-  if (dressing) for (let i = 0; i < 4; i++) sparkle(30 + rnd(160), ty + rnd(150), 5, "#ffd84a");
-  // the three steps, as a little checklist up top
-  STEPS.forEach(([e], i) => {
-    const x = 34 + i * 58, y = 30;
-    ctx.fillStyle = i < step ? "#6cbf4a" : i === step ? "#fff" : "#ffffff55"; ctx.beginPath(); ctx.arc(x, y, 22, 0, 7); ctx.fill();
-    text(i < step ? "✓" : e, x, y + 9, i < step ? 28 : 24, i < step ? "#fff" : "#000", "center");
+  return s;
+}
+function routineState(kind, now) {
+  const key = "tinny-rt-" + kind, r = store.get(key, {});
+  if (r.day !== dayKey(now)) Object.assign(r, { day: dayKey(now), step: 0, doing: 0, sub: 0 });
+  return [r, () => store.set(key, r)];
+}
+function routineDone(kind, now) { const [r] = routineState(kind, now); return r.step >= routineSteps(kind, now).length; }
+function storyFor(now) { const lv = Math.min(STORIES.length, learn.R.lv) - 1; const list = STORIES[lv]; return list[(new Date(now).getDate() + lv) % list.length]; }
+const MOODS = [["😊", "Happy"], ["😐", "Okay"], ["😢", "Sad"]];
+function drawRoutine(kind, now) {
+  const steps = routineSteps(kind, now), [r, save] = routineState(kind, now);
+  const step = Math.min(r.step || 0, steps.length), S = steps[step];
+  let doing = S && r.doing && ago(r.doing) < S.t ? ago(r.doing) : null;
+  if (S && r.doing && doing == null) {                                // that step just finished
+    r.doing = 0; r.sub = 0; r.step = step + 1; save();
+    if (S.done) say([S.done], 2);
+    if (r.step >= steps.length) {
+      award(); warmEgg(2);
+      if (kind === "evening") { tuckedIn = dayKey(now); store.set("tinny-tucked", tuckedIn); }
+      return;
+    }
+    return drawRoutine(kind, now);
+  }
+  const night = kind === "evening";
+  if (night) { sky("#3b3f74", "#6b5f9a"); ground("#4a4676"); }
+  else { sky("#ffc9a1", "#fff1dc"); ground("#8fcf6a", "#7cbd58"); ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.arc(462, 266, 40, Math.PI, 0); ctx.fill(); }
+  const did = (a) => steps.findIndex(x => x.act === a) > -1 && steps.findIndex(x => x.act === a) < step;
+  const now0 = (a) => S?.act === a && doing != null;
+  const big = S && (S.act === "feel" || S.act === "story");
+  const u = big ? 3 : 7, tx = big ? 24 : 20, ty = big ? 16 : 266 - 27 * u;
+  const lampOff = now0("lights") ? Math.min(1, doing / 2) : 0;
+  const dressed = !night && (did("dress") || (now0("dress") && doing > 1));
+  const sad = S?.act === "feel" && doing != null && r.mood === 2;
+  tinny(tx, ty, u, {
+    eyes: lampOff > 0.5 ? "closed" : now0("stretch") && doing < 1.2 ? "closed" : (now0("brush") || now0("eat") || (doing != null && !sad)) ? "happy" : undefined,
+    mouth: now0("brush") || now0("eat") ? (tick % 2 ? "open" : "o") : lampOff ? "flat" : now0("stretch") ? "o" : "smile",
+    arms: now0("stretch") || (now0("dress") && doing < 1) || (now0("pj") && doing < 1) ? "up" : sad ? "hug" : undefined,
+    foam: now0("brush"), pj: night && (did("pj") || (now0("pj") && doing > 1)), cap: night && (did("pj") || (now0("pj") && doing > 1)),
+    ...(dressed ? outfit(nowTiles(now)) : {}),
   });
-  if (step < STEPS.length) {
-    const [e, label, ask] = STEPS[step];
-    const x = 236, y = 110, w = 230, h = 196;
-    if (doing == null && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 6, y - 6, w + 12, h + 12, 30); ctx.fill(); }
-    ctx.fillStyle = doing == null ? "#fffdf7" : "#c9f0b4"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(x, y, w, h, 26); ctx.fill(); ctx.stroke();
-    text(e, x + w / 2, y + 110, 80, "#000", "center");
-    text(label, x + w / 2, y + 170, fit(label, 28, w - 20), "#16181f", "center");
-    if (!saying()) bubble(x, 14, w, 74, doing != null ? [["Brush brush!"], ["Arms up!"], ["Goodnight!"]][step] : [ask], 24, x + 26);
-    if (doing == null) zone(0, 0, W, H, () => { r.doing = Date.now(); store.set("tinny-routine", r); });   // a tap anywhere does the next step
+  if (now0("brush")) { const bx = tx + 14 * u + (tick % 2 ? 8 : -8); rect(bx, ty + 15 * u, 44, 7, "#46bfc0"); rect(bx, ty + 14 * u, 12, 5, "w"); }
+  if (now0("eat")) text("🥣", tx + 13 * u, ty + 25 * u, 40, "#000", "center");
+  if (now0("dress") || now0("pj") || now0("bed")) for (let i = 0; i < 4; i++) sparkle(tx + 10 + rnd(160), ty + rnd(150), 5, "#ffd84a");
+  if (now0("bath")) for (let i = 0; i < 6; i++) { ctx.strokeStyle = "#5aa7c9"; ctx.fillStyle = "#ffffffb0"; ctx.beginPath(); ctx.arc(tx + 20 + rnd(150), ty + 60 + rnd(120), 6 + rnd(10), 0, 7); ctx.fill(); ctx.stroke(); }
+  if (sad) for (let i = 0; i < 3; i++) heart(tx + 20 + i * 40, ty - 10 - (tick % 6) * 3, 4, "#e2413b");
+  // the steps, as a row of little circles along the bottom
+  steps.forEach((x, i) => {
+    const cx = 24 + i * 34, cy = 293;
+    ctx.fillStyle = i < step ? "#6cbf4a" : i === step ? "#fff" : "#ffffff55"; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill();
+    text(i < step ? "✓" : x.e, cx, cy + 6, i < step ? 20 : 16, i < step ? "#fff" : "#000", "center");
+  });
+  if (!S) return;
+  if (S.act === "feel") {                                        // three big faces
+    if (!saying()) bubble(140, 14, 320, 70, [doing != null ? ["Yay! Me too!", "Tomorrow will be fun!", "Big hug!"][r.mood] : S.ask], 24, 166);
+    MOODS.forEach(([e, label], i) => {
+      const x = 8 + i * 158, y = 110, w = 148, h = 160;
+      const dx = card(x, y, w, h, doing != null && r.mood === i ? "#c9f0b4" : "#fffdf7", { faded: doing != null && r.mood !== i });
+      text(e, x + w / 2 + dx, y + 96, 70, "#000", "center"); text(label, x + w / 2 + dx, y + 144, 24, "#16181f", "center");
+      ctx.globalAlpha = 1;
+      if (doing == null) zone(x - 4, y - 6, w + 8, h + 12, () => {
+        r.mood = i; r.doing = Date.now(); save();
+        const moods = store.get("tinny-moods", {}); moods[dayKey(now)] = e; for (const k of Object.keys(moods).sort().slice(0, -21)) delete moods[k];
+        store.set("tinny-moods", moods); postProgress();
+      });
+    });
+    return;
   }
+  if (S.act === "story") {                                       // she reads it, a word at a time: each tap lights the next
+    const words = storyFor(now).split(" ");
+    if (!saying()) bubble(140, 14, 320, 70, [r.sub >= words.length ? "The end!" : r.sub ? "Keep going!" : "Read it to me!"], 24, 166);
+    ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(8, 110, 464, 160, 22); ctx.fill(); ctx.stroke();
+    const size = fit(words.join(" "), 40, 430);
+    ctx.font = `700 ${size}px Andika`;
+    let x = 240 - ctx.measureText(words.join(" ")).width / 2;
+    words.forEach((w, i) => {
+      const ww = ctx.measureText(w + " ").width;
+      if (i === r.sub && tick % 6 < 4) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, 160, ctx.measureText(w).width + 8, size + 18, 10); ctx.fill(); }
+      text(w, x, 200, size, i < r.sub ? "#16181f" : "#b8b0a0", "left");
+      ctx.font = `700 ${size}px Andika`; x += ww;
+    });
+    text("👆 Tap each word as you read it", 240, 256, 16, "#6f6752", "center");
+    if (doing == null) zone(0, 0, W, H, () => { r.sub++; if (r.sub >= words.length) r.doing = Date.now(); save(); });
+    return;
+  }
+  const x = 236, y = 110, w = 230, h = 168;
+  if (doing == null && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 6, y - 6, w + 12, h + 12, 30); ctx.fill(); }
+  ctx.fillStyle = doing == null ? "#fffdf7" : "#c9f0b4"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(x, y, w, h, 26); ctx.fill(); ctx.stroke();
+  const first = nowTiles(now)[0];
+  if (S.act === "today" && doing != null && first) { tileCard(first, x + 55, y + 12, 120); }
+  else if (S.act === "weather" && doing != null) { text(`${weather.icon} ${weather.temp}${weather.unit}`, x + w / 2, y + 80, 40, "#16181f", "center"); text(weatherWear().e, x + w / 2, y + 140, 50, "#000", "center"); }
+  else { text(S.e, x + w / 2, y + 100, 72, "#000", "center"); text(S.label, x + w / 2, y + 150, fit(S.label, 28, w - 20), "#16181f", "center"); }
+  const talk = doing != null ? ({ stretch: "Big stretch!", eat: "Munch munch!", brush: "Brush brush!", dress: "Arms up!", bed: "Fluff fluff!", weather: weatherWear().say,
+    today: first ? `Today: ${first.label}!` : "A free day!", bath: "Splash!", pj: "Arms up!", lights: `${moon(now).e} Goodnight!` })[S.act] : S.ask;
+  if (!saying()) bubble(x, 14, w, 74, talk.split("|"), 24, x + 26);
+  if (doing == null) zone(0, 0, W, H, () => { r.doing = Date.now(); save(); });   // a tap anywhere does the next step
   if (lampOff) { ctx.globalAlpha = lampOff * 0.7; rect(0, 0, W, H, "#05061a"); ctx.globalAlpha = 1; }
+}
+// Tonight's real moon, worked out from the date (no internet needed).
+function moon(now) {
+  const age = (((now - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % 29.530588 + 29.530588) % 29.530588;
+  const i = Math.floor(age / 29.530588 * 8 + 0.5) % 8;
+  return { e: ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"][i], name: ["a new moon", "a crescent moon", "a half moon", "an almost-full moon", "a full moon", "an almost-full moon", "a half moon", "a crescent moon"][i] };
 }
 
 /* ---------------- holidays ---------------- */
@@ -749,7 +853,8 @@ function easter(y) {   // the Gregorian computus
 function holiday(now) {
   const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate();
   const b = (doc?.tinny?.birthday || "").split("-").map(Number);
-  if (b.length === 3 && b[1] === m && b[2] === d) return { hat: "party", decor: ["🎂", "🎈", "🎁"], greet: ["Happy birthday,", `Zelda! You're ${y - b[0]}!`] };
+  if (b.length === 3 && b[1] === m && b[2] === d) return { hat: "party", decor: m === 3 && d === 14 ? ["🎂", "🥧", "🎈"] : ["🎂", "🎈", "🎁"],
+    greet: Math.random() < 0.5 || !(m === 3 && d === 14) ? ["Happy birthday,", `Zelda! You're ${y - b[0]}!`] : ["Happy birthday", "and happy Pi Day! 🥧"] };
   const born = new Date((doc?.tinny?.born || 0) * 1000);
   if (born.getFullYear() < y && born.getMonth() + 1 === m && born.getDate() === d) return { hat: "party", decor: ["🎂", "🎈"], greet: ["It's MY birthday!", `I'm ${y - born.getFullYear()}!`] };
   if (m === 10 && d >= 24) return { hat: "pumpkin", decor: ["🎃", "🦇", "🍬"], greet: ["Happy", "Halloween!"] };
@@ -793,7 +898,14 @@ const TRACKS = {
 };
 const ROUND = 5;
 const learn = store.get("tinny-learn", {});
-for (const k of Object.keys(TRACKS)) learn[k] = Object.assign({ lv: 1, streak: 0, miss: 0 }, learn[k]);
+for (const k of Object.keys(TRACKS)) learn[k] = Object.assign({ lv: k === "P" ? 3 : 1, streak: 0, miss: 0 }, learn[k]);
+// Levels set on the admin page win, once each time they're set.
+function applyLevelSet() {
+  const set = doc?.tinny?.levels;
+  if (!set || !set.ts || set.ts <= (learn.setTs || 0)) return;
+  for (const k of Object.keys(TRACKS)) if (set[k]) learn[k] = { lv: Math.max(1, Math.min(TRACKS[k].levels.length, set[k])), streak: 0, miss: 0 };
+  learn.setTs = set.ts; store.set("tinny-learn", learn); postProgress();
+}
 learn.days = learn.days || {};
 const rnd = (n) => Math.floor(Math.random() * n);
 const pickOne = (a) => a[rnd(a.length)];
@@ -903,7 +1015,7 @@ function tapTile(k, x, y) {
   }
 }
 function finishLearn() {
-  award(); const grew = water(ROUND);
+  award(); warmEgg(2); const grew = water(ROUND);
   begin("done", { lines: act.right >= 4 ? ["You did it!", "So smart!"] : ["You did it!", "Great try!"], garden: grew, back: "menu" });
   burst(240, 120, 30);
 }
@@ -1042,10 +1154,17 @@ function homeButton(fn) {
 let ev = null, nextEv = Date.now() + 45e3;
 function startEvent(now) {
   const hol = holiday(now);
-  const kinds = ["letter", "word", "butterfly", "juggle"].concat(hol ? ["greet", "greet"] : []);
+  const kinds = ["letter", "word", "butterfly", "juggle", "joke", "joke", "fact", "fact"].concat(hol ? ["greet", "greet"] : []);
   const kind = pickOne(kinds), [w, e] = pickOne([...W3, ...W4]);
   ev = { kind, w, e, t0: Date.now(), len: kind === "juggle" ? 9 : 14 };
   if (kind === "greet") { say(hol.greet, 5); ev.len = 5; }
+  if (kind === "fact") { say(pickOne(FACTS), 7); ev.len = 7; }
+  if (kind === "joke") {                       // the question, then the answer
+    const [q, a] = pickOne(JOKES); ev.len = 11;
+    const words = q.split(" "), half = Math.ceil(words.length / 2);
+    say([words.slice(0, half).join(" "), words.slice(half).join(" ")], 5.5);
+    setTimeout(() => { if (ev?.kind === "joke") { say([a, "😂"], 5); wiggleUntil = Date.now() + 2000; } }, 5600);
+  }
 }
 function dayEvent(now, u, ty) {
   if (ev && ago(ev.t0) > ev.len) ev = null;
@@ -1084,6 +1203,125 @@ function dayEvent(now, u, ty) {
     if (!saying()) say([["One!"], ["Two!"], ["Three!"]][Math.floor(t) % 3], 0.9);
   }
 }
+
+/* ---------------- the mystery egg, and her friends ---------------- */
+// Every round, game and routine warms the egg. When it's ready it wobbles; a
+// tap hatches a new friend with a name: mostly kittens and unicorns in many
+// colors, a few of them rare. One friend sits beside Tinny each day; tapping
+// the egg shows them all.
+const CATS = [{ b: "#ef8a3a", d: "#c4621c", kind: "orange kitten" }, { b: "#3a3d4c", d: "#22242e", eye: "#ffd84a", kind: "black kitten" },
+  { b: "#ffffff", d: "#d8dce4", kind: "white kitten" }, { b: "#9aa1ad", d: "#6d7480", kind: "gray kitten" },
+  { b: "#ffffff", d: "#ef8a3a", spot: "#3a3d4c", kind: "calico kitten" }, { b: "#c9a6e8", d: "#9f78c9", kind: "purple kitty", rare: 1 },
+  { b: "rainbow", d: "#b768d6", kind: "RAINBOW kitty", rare: 2 }];
+const UNIS = [{ b: "#ffffff", mane: "rainbow", kind: "rainbow unicorn" }, { b: "#ffd0e0", mane: "#e2417b", kind: "pink unicorn" },
+  { b: "#e7d4f5", mane: "#8a5ad1", kind: "purple unicorn" }, { b: "#d6efff", mane: "#2f8fd1", kind: "blue unicorn" },
+  { b: "#ffe9a8", mane: "#e9ad1c", kind: "golden unicorn", rare: 1 }, { b: "#3b3f74", mane: "#ffd84a", kind: "starry night unicorn", rare: 2 }];
+const CAT_NAMES = ["Luna", "Mittens", "Pumpkin", "Biscuit", "Pepper", "Coco", "Noodle", "Whiskers", "Muffin", "Pickles", "Bean", "Oreo", "Ziggy", "Peanut"];
+const UNI_NAMES = ["Sparkle", "Twinkle", "Glitter", "Daisy", "Moonbeam", "Sunny", "Clover", "Pixie", "Dream", "Stardust", "Cupcake", "Rainbow"];
+const RAINBOW = ["#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2f6fb5", "#b768d6"];
+const CAT_PX = [
+  ".k.........k.", "kpk.......kpk", "kbbk.....kbbk", "kbbbkkkkkbbbk", "kbbbbbbbbbbbk", "kbbebbbbbebbk", "kbbbbbnbbbbbk",
+  ".kbbbbbbbbbk.", "..kkbbbbbkk..", ".kbbbbbbbbbk.", "kbbbbbbbbbbbk", "kbbbbbbbbbbbk", "kbbbkbbbkbbbk", ".kkk.kkk.kkk."];
+const UNI_PX = [
+  "...........y....", "..........yy....", "..........yk....", ".........mkkk...", "........mkbbbk..", ".......mmkbebbk.", "......mm.kbbbbnk",
+  ".....mm..kbbkkk.", ".........kbbk...", "..kkkkkkkkbbk...", ".kbbbbbbbbbbk...", "mkbbbbbbbbbbk...", "mmkbbbbbbbbk....", "m.kbk.kbk.kbk...", "..kbk.kbk.kbk...", "..kkk.kkk.kkk..."];
+function drawFriend(f, x, y, u, happy) {
+  const c = (f.kind === "cat" ? CATS : UNIS)[f.coat] || CATS[0];
+  const rows = f.kind === "cat" ? CAT_PX : UNI_PX;
+  rows.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === ".") return;
+    let col = { k: "#16181f", y: "#e9ad1c", p: "#f2a1a8", n: "#f2a1a8", e: happy ? "#16181f" : (c.eye || "#16181f") }[ch];
+    if (ch === "b") col = c.b === "rainbow" ? RAINBOW[j % 6] : (c.spot && (i + j * 3) % 7 === 0 ? c.spot : (c.spot && (i * 2 + j) % 5 === 0 ? c.d : c.b));
+    if (ch === "m") col = c.mane === "rainbow" ? RAINBOW[j % 6] : c.mane;
+    if (ch === "e" && happy) { rect(x + i * u, y + j * u + u / 2, u, u / 2, col); return; }
+    rect(x + i * u, y + j * u, u, u, col);
+  }));
+  if (f.kind === "cat") { const tw = tick % 8 < 4 ? 0 : u; rect(x + 13 * u, y + 9 * u - tw, u, 4 * u, "#16181f"); rect(x + 13 * u, y + 8 * u - tw, u, u, c.b === "rainbow" ? RAINBOW[1] : c.b); }
+}
+let friends = store.get("tinny-friends", []);
+function rollFriend() {
+  const kind = Math.random() < 0.5 ? "cat" : "unicorn", list = kind === "cat" ? CATS : UNIS, r = Math.random();
+  const pool = list.map((c, i) => i).filter(i => (list[i].rare || 0) === (r < 0.04 ? 2 : r < 0.18 ? 1 : 0));
+  const names = kind === "cat" ? CAT_NAMES : UNI_NAMES, used = friends.map(f => f.name);
+  return { kind, coat: pickOne(pool), name: pickOne(names.filter(n => !used.includes(n)).concat(used.length >= names.length ? names : [])) };
+}
+let egg = store.get("tinny-egg", null);
+function newEgg() { egg = { warm: 0, inside: rollFriend(), spots: pickOne(["#f2a1a8", "#b768d6", "#46bfc0", "#ffd84a", "#6cbf4a"]) }; store.set("tinny-egg", egg); }
+if (!egg) newEgg();
+const eggNeed = () => (friends.length === 0 ? 3 : 6);      // the first one hatches quickly
+const eggReady = () => egg.warm >= eggNeed();
+function warmEgg(n) { egg.warm = Math.min(eggNeed(), egg.warm + n); store.set("tinny-egg", egg); }
+function drawEgg(cx, cy, s, crack = 0) {
+  const ready = eggReady(), wob = ready ? (tick % 2 ? 0.12 : -0.12) : egg.warm >= eggNeed() / 2 && tick % 12 < 2 ? 0.08 : 0;
+  ctx.save(); ctx.translate(cx, cy + s * 0.6); ctx.rotate(wob); ctx.translate(-cx, -(cy + s * 0.6));
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.42 + 3, s * 0.55 + 3, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fffaf0"; ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.42, s * 0.55, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = egg.spots;
+  for (const [dx, dy, r] of [[-0.18, -0.25, 0.09], [0.15, -0.05, 0.11], [-0.1, 0.22, 0.08], [0.2, 0.3, 0.06], [-0.25, 0.05, 0.05]]) { ctx.beginPath(); ctx.arc(cx + dx * s, cy + dy * s, r * s, 0, 7); ctx.fill(); }
+  const cracks = crack || (egg.warm / eggNeed() >= 0.66 ? 1 : 0);
+  if (cracks) { ctx.strokeStyle = "#16181f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - s * 0.3, cy - s * 0.05); for (let k = 0; k < 6; k++) ctx.lineTo(cx - s * 0.3 + k * s * 0.12, cy - s * 0.05 + (k % 2 ? -s * 0.1 : s * 0.05) * cracks); ctx.stroke(); }
+  ctx.restore();
+}
+function tapEgg() { if (eggReady()) begin("hatch"); else begin("friends"); }
+function drawHatch(now) {
+  const t = ago(act.t0);
+  sky("#fff3c4", "#fffaf0"); ground("#8fcf6a", "#7cbd58");
+  const f = egg.inside;
+  if (t < 2.2) {
+    drawEgg(240, 160, 150 + Math.sin(t * 20) * 4, 1 + Math.floor(t));
+    bubble(270, 14, 200, 64, [t < 1 ? "It's hatching!" : "Crack… crack…"], 24, 290);
+    tinny(20, 266 - 27 * 5, 5, { eyes: "happy", mouth: "o", arms: "up" });
+    return;
+  }
+  if (!act.born) {                                                  // out it comes
+    act.born = true; friends.push({ ...f, at: Date.now() }); store.set("tinny-friends", friends); newEgg(); burst(240, 150, 40); postProgress();
+  }
+  const fu = f.kind === "cat" ? 9 : 8, fw = (f.kind === "cat" ? 13 : 16) * fu;
+  drawFriend(f, 240 - fw / 2, 262 - (f.kind === "cat" ? 14 : 16) * fu + (tick % 4 < 2 ? -6 : 0), fu, true);
+  const c = (f.kind === "cat" ? CATS : UNIS)[f.coat];
+  bubble(150, 10, 316, 70, [`A ${c.kind}!${c.rare === 2 ? " So rare!" : c.rare ? " Rare!" : ""}`, `Meet ${f.name}!`], 24, 176);
+  tinny(14, 266 - 27 * 4, 4, { eyes: "happy", mouth: "open", arms: "up" });
+  zone(0, 0, W, H, () => { if (t > 3.5) begin("friends"); });
+  if (t > 9) act = null;
+}
+function drawFriends(now) {
+  rect(0, 0, W, H, "#2a2d3a");
+  homeButton(() => { act = null; });
+  const left = eggNeed() - egg.warm;
+  // the egg, and how warm it is
+  drawEgg(440, 30, 36);
+  text(eggReady() ? "Tap me! 🥚" : `${left} more game${left === 1 ? "" : "s"}`, 410, 34, 16, "#fff", "right");
+  if (eggReady()) zone(380, 0, 100, 60, () => begin("hatch"));
+  if (friends.length) text(`My friends: ${friends.length}`, 240, 32, 18, "#ffd84a", "center");
+  const show = friends.slice(-8);
+  show.forEach((f, i) => {
+    const x = 6 + (i % 4) * 118, y = 54 + Math.floor(i / 4) * 132, w = 112, h = 126;
+    ctx.fillStyle = "#fff7e8"; ctx.beginPath(); ctx.roundRect(x, y, w, h, 16); ctx.fill();
+    const happy = act.pet === i && ago(act.petAt) < 1.5;
+    const fu = f.kind === "cat" ? 6 : 5, fw = (f.kind === "cat" ? 13 : 16) * fu;
+    drawFriend(f, x + w / 2 - fw / 2, y + 12 + (happy ? -6 : 0), fu, happy);
+    text(f.name, x + w / 2, y + h - 10, fit(f.name, 18, w - 10), "#16181f", "center");
+    if (happy) text(f.kind === "cat" ? "Meow!" : "Neigh!", x + w / 2, y + 20, 18, "#e2413b", "center");
+    zone(x, y, w, h, () => { act.pet = i; act.petAt = Date.now(); hearts.push({ x: x + 40, y: y + 30, u: 4, col: "#e2413b", life: 12 }); });
+  });
+  if (!friends.length) { drawEgg(240, 160, 110); text("Who's inside? 🤔", 240, 262, 26, "#fff", "center"); text("Play games to warm the egg!", 240, 296, 18, "#ffd84a", "center"); }
+}
+// One friend keeps Tinny company on the home screen, a different one each day.
+function friendOfDay(now) { return friends.length ? friends[(new Date(now).getDate() + new Date(now).getMonth() * 31) % friends.length] : null; }
+
+/* ---------------- jokes and fun facts ---------------- */
+// Written in, not fetched, so nothing unexpected ever shows up on her screen.
+const JOKES = [["What do you call a sleeping dinosaur?", "A dino-snore!"], ["What is a cat's favorite color?", "Purr-ple!"],
+  ["What do you call a pile of kittens?", "A meow-ntain!"], ["What has ears but can't hear?", "Corn!"], ["What do you call a bear with no teeth?", "A gummy bear!"],
+  ["Why did the cookie go to the doctor?", "It felt crummy!"], ["What do you call a dog magician?", "A labracadabrador!"], ["Why are fish so smart?", "They live in schools!"],
+  ["What do unicorns eat for breakfast?", "Rainbow flakes!"], ["What do frogs eat with burgers?", "French flies!"], ["Why did the cat sit on the computer?", "To watch the mouse!"],
+  ["What do you call a cow with no legs?", "Ground beef!"], ["What falls but never gets hurt?", "Rain!"], ["What do bees chew?", "Bumble gum!"],
+  ["What's a unicorn's favorite game?", "Hide and neigh-k!"], ["Where do kittens go on field trips?", "To the meow-seum!"]];
+const FACTS = [["Cats sleep for", "16 hours a day! 😴"], ["A baby cat is", "called a kitten 🐱"], ["Unicorns are", "Scotland's animal! 🦄"],
+  ["A group of unicorns", "is called a blessing!"], ["Octopuses have", "three hearts! 🐙"], ["Bees make honey", "from flowers 🐝"],
+  ["A rainbow has", "seven colors 🌈"], ["Sea otters hold hands", "when they sleep 🦦"], ["Butterflies taste", "with their feet! 🦋"],
+  ["Giraffes have", "purple tongues 🦒"], ["Cats purr when", "they're happy 💛"], ["Owls can turn their", "heads way around 🦉"],
+  ["Penguins can't fly,", "but they swim fast 🐧"], ["Elephants are the", "biggest land animals 🐘"], ["A cat has five toes", "on each front paw 🐾"]];
 
 /* ---------------- touch calibration ---------------- */
 // The little screen's touch layer can sit a bit off from its picture. A grown-up
@@ -1133,7 +1371,8 @@ let progTimer = null;
 function postProgress() {
   clearTimeout(progTimer);
   progTimer = setTimeout(() => fetch("/api/tinny/progress", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ levels: Object.fromEntries(Object.keys(TRACKS).map(k => [k, learn[k].lv])), days: learn.days, stars, flowers: garden.total, growing: garden.plots.length }) }).catch(() => {}), 3000);
+    body: JSON.stringify({ levels: Object.fromEntries(Object.keys(TRACKS).map(k => [k, learn[k].lv])), days: learn.days, stars, flowers: garden.total, growing: garden.plots.length,
+      moods: store.get("tinny-moods", {}), friends: friends.map(f => `${f.name} the ${((f.kind === "cat" ? CATS : UNIS)[f.coat] || {}).kind}`) }) }).catch(() => {}), 3000);
 }
 
 /* ---------------- touch ---------------- */
