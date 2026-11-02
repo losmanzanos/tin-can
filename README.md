@@ -167,6 +167,7 @@ Tinny: it only gets a bit hungry or dusty and asks.
 - **Surprises** every couple of minutes on the home screen: a letter balloon ("B is for bus"), a word of the day, a joke, a fun fact (lots of cats and unicorns), a butterfly, juggling. The jokes and facts are written into Tinny, not fetched, so nothing unexpected shows up.
 - **Holidays:** costumes and decorations for Halloween, Thanksgiving, Christmas, New Year, Valentine's, St. Patrick's, Easter, the Fourth of July, her birthday (set on the admin page) and Tinny's.
 - **Dress up:** tap its head to try on the next hat.
+- **A new postcard:** Tinny holds it up. Tapping the little screen opens postcards on her big screen, the same as her controller would.
 - **Morning and evening routines:** one giant button at a time; a tap anywhere does it and Tinny acts it out. Mornings (her first 20 minutes): wake up, breakfast, get dressed, what's on today. Evenings (the last 20 minutes before her big screen turns off): teeth, pajamas, "How was today?" 😊😐😢, lights out, with tonight's real moon. They grow with her: every couple of weeks a step joins (brushing teeth and making the bed in the morning, then a look outside that picks a coat or umbrella from the real weather; a one-line story at her reading level and a bath at night).
 - **Stars:** every finished round or activity earns one.
 

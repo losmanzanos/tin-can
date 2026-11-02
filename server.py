@@ -41,7 +41,7 @@ PAGE = APP / "page"
 DEFAULT_DATA = Path(os.environ.get("ZELDA_DATA", Path.home() / "zelda-phone-data"))
 
 MAX_PEOPLE = 21  # 7 per page; the screen flips through up to 3 pages
-MAX_TILES = 60
+MAX_TILES = 100
 MAX_CARDS = 30   # postcards kept; older ones are let go
 CARDS_LOOK = 2   # bump when postcards.py draws differently, so the Pi redraws them
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
@@ -91,7 +91,22 @@ MORE_TILES = [
     ("party", "Party", "emoji", "🎉"), ("store", "Store", "emoji", "🛒"),
     ("doctor", "Doctor", "emoji", "🩺"), ("trip", "Car trip", "emoji", "🚗"),
 ]
-TILE_SET = 2
+# Everyday things, outings, sports and snow days (TILE_SET 3).
+MORE_TILES_3 = [
+    ("breakfast", "Breakfast", "emoji", "🥞"), ("lunch", "Lunch", "emoji", "🥪"), ("dinner", "Dinner", "emoji", "🍽️"),
+    ("nap", "Nap", "emoji", "😴"), ("quiet", "Quiet time", "emoji", "🧸"), ("tv", "TV time", "emoji", "📺"),
+    ("building", "Building", "emoji", "🧱"), ("singing", "Singing", "emoji", "🎤"), ("piano", "Piano", "emoji", "🎹"),
+    ("soccer", "Soccer", "emoji", "⚽"), ("gymnastics", "Gymnastics", "emoji", "🤸"), ("skating", "Skating", "emoji", "⛸️"),
+    ("skiing", "Skiing", "emoji", "⛷️"), ("sledding", "Sledding", "emoji", "🛷"), ("snow", "Snow play", "emoji", "⛄"),
+    ("hike", "Hike", "emoji", "🥾"), ("walk", "Walk", "emoji", "🚶"), ("scooter", "Scooter", "emoji", "🛴"),
+    ("camping", "Camping", "emoji", "🏕️"), ("beach", "Beach", "emoji", "🏖️"), ("horse", "Horse riding", "emoji", "🐴"),
+    ("train", "Train", "emoji", "🚆"), ("plane", "Airplane", "emoji", "✈️"), ("restaurant", "Restaurant", "emoji", "🍔"),
+    ("treat", "Treat", "emoji", "🍩"), ("bowling", "Bowling", "emoji", "🎳"), ("haircut", "Haircut", "emoji", "💇"),
+    ("dentist", "Dentist", "emoji", "🦷"), ("shower", "Shower", "emoji", "🚿"), ("cleanup", "Clean up", "emoji", "🧹"),
+    ("gardening", "Gardening", "emoji", "🌱"), ("cats", "Cat time", "emoji", "🐱"), ("unicorn", "Unicorns", "emoji", "🦄"),
+    ("call", "Call family", "emoji", "📞"), ("presents", "Presents", "emoji", "🎁"),
+]
+TILE_SET = 3
 # Monday first; morning, midday, evening. Copied from the photo of her board.
 SEED_WEEK = [
     [["school"], [], []],
@@ -158,7 +173,7 @@ def new_id():
 
 def seed_tiles(rows=None):
     out = []
-    for tid, label, kind, art in (SEED_TILES + MORE_TILES if rows is None else rows):
+    for tid, label, kind, art in (SEED_TILES + MORE_TILES + MORE_TILES_3 if rows is None else rows):
         t = {"id": tid, "label": label, "kind": kind}
         if kind == "emoji":
             t["emoji"] = art
@@ -180,13 +195,16 @@ def with_defaults(doc):
         doc["tiles"] = seed_tiles()
         doc["week"] = json.loads(json.dumps(SEED_WEEK))
         doc["tileSet"] = TILE_SET
-    if int(doc.get("tileSet") or 1) < 2:
-        # One time: add the new tiles, and the palette becomes "Crafts" as asked.
+    added = int(doc.get("tileSet") or 1)
+    if added < TILE_SET:
+        # Once each: add the tiles that came later. Ones she deleted stay deleted.
+        new = (MORE_TILES if added < 2 else []) + (MORE_TILES_3 if added < 3 else [])
         have = {t.get("id") for t in doc["tiles"]}
-        doc["tiles"] += [t for t in seed_tiles(MORE_TILES) if t["id"] not in have][:max(0, MAX_TILES - len(doc["tiles"]))]
-        for t in doc["tiles"]:
-            if t.get("id") == "art" and t.get("label") == "Art" and t.get("emoji") == "🎨":
-                t["label"] = "Crafts"
+        doc["tiles"] += [t for t in seed_tiles(new) if t["id"] not in have][:max(0, MAX_TILES - len(doc["tiles"]))]
+        if added < 2:   # the palette became "Crafts", as asked
+            for t in doc["tiles"]:
+                if t.get("id") == "art" and t.get("label") == "Art" and t.get("emoji") == "🎨":
+                    t["label"] = "Crafts"
         doc["tileSet"] = TILE_SET
     doc.setdefault("week", [[[], [], []] for _ in range(7)])
     doc.setdefault("keys", {"back": [], "next": [], "switch": []})
@@ -852,6 +870,12 @@ def make_handler(store, mailroom):
                 if len(raw) > 16000:
                     raise BadRequest("too big")
                 write_atomic(store.dir / "tinny-progress.json", json.dumps(dict(body, at=int(time.time()))).encode())
+                return self.send(HTTPStatus.OK, {"ok": True})
+
+            # Tapping Tinny's postcard opens postcards on her big screen, like her
+            # controller would. Home network only, and it can do nothing else.
+            if path == "/api/tinny/open-postcards" and self.command == "POST":
+                write_atomic(store.dir / "remote.json", json.dumps({"seq": time.time_ns(), "action": "goto:postcards"}).encode())
                 return self.send(HTTPStatus.OK, {"ok": True})
 
             if path == "/api/login" and self.command == "POST":

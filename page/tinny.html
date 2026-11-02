@@ -50,7 +50,7 @@ const store = {
 };
 const care = store.get("tinny-care", { fed: 0, bathed: 0 });
 let stars = store.get("tinny-stars", 0), dress = store.get("tinny-dress", null), tuckedIn = store.get("tinny-tucked", "");
-let palPet = 0;
+let palPet = 0, openedAt = 0;
 let act = null, lastTap = 0, zones = [], confetti = [], said = null, taps = [], rings = [], lastDown = 0;
 
 /* ---------------- data ---------------- */
@@ -295,12 +295,11 @@ function drawDay(now, o, u, bob) {
   const hol = holiday(now);
   if (hol) hol.decor.forEach((d, i) => text(d, [300, 330, 460][i], 262 + (tick % 8 < 4 && i === 1 ? -3 : 0), 24, "#000", "center"));   // sitting on the ground
   // What's happening now, on the right.
-  const label = tiles.length ? tiles.map(t => t.label).join(" + ") : "Free time";
   pill(270, 26, 186, 34, PB.PERIODS[p] + (tiles.length ? "" : ""), 18, PB.DAY_COLORS[PB.weekdayOf(now)]);
-  if (tiles[0]) tileCard(tiles[0], 300, 76, 120);
-  else { ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.roundRect(300, 76, 120, 120, 16); ctx.fill(); text("😊", 360, 152, 56, "#000", "center"); }
-  if (tiles[1]) tileCard(tiles[1], 392, 150, 58);
-  text(label, 363, 236, fit(label, 21, 190), "#16181f", "center");
+  // what's on now: just the pictures, big (no names: she knows them by sight)
+  if (tiles[0]) tileCard(tiles[0], 290, 74, 144);
+  else { ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.roundRect(290, 74, 144, 144, 18); ctx.fill(); text("😊", 362, 166, 64, "#000", "center"); }
+  if (tiles[1]) tileCard(tiles[1], 396, 170, 70);
   const pal = friendOfDay(now);
   if (pal) {
     const fu = pal.kind === "cat" ? 4 : 3, fh = (pal.kind === "cat" ? 14 : 16) * fu, happy = ago(palPet) < 1.5;
@@ -392,8 +391,13 @@ function drawScene(now) {
     } else heart(106, 64 + hop, 7, "#e2413b");
     if (tick % 4 < 2) { sparkle(30, 28, 6); sparkle(210, 128, 4); } else sparkle(222, 46, 5);
     const who = (card.from || "Someone").replace(/^from /i, "");
-    bubble(250, 40, 210, 96, [who + " sent", "you something!"], 23, 276);
-    if (tick % 8 < 6) { pill(256, 196, 200, 52, "📬  Press yellow!", 21); }
+    const opened = ago(openedAt) < 15;
+    bubble(250, 40, 210, 96, opened ? ["Look at your", "big screen! 📺"] : (who.length > 9 ? [who, "sent you something!"] : [who + " sent", "you something!"]), 23, 276);
+    if (!opened && tick % 8 < 6) pill(256, 196, 200, 52, "👆  Tap to open it!", 21);
+    if (!opened) zone(0, 0, W, H, () => {
+      openedAt = Date.now(); burst(130, 80, 20);
+      fetch("/api/tinny/open-postcards", { method: "POST" }).then(() => setTimeout(refresh, 3000)).catch(() => {});
+    });
   }
 
   else if (name === "hug") {
@@ -830,7 +834,7 @@ function drawRoutine(kind, now) {
   else if (S.act === "weather" && doing != null) { text(`${weather.icon} ${weather.temp}${weather.unit}`, x + w / 2, y + 80, 40, "#16181f", "center"); text(weatherWear().e, x + w / 2, y + 140, 50, "#000", "center"); }
   else { text(S.e, x + w / 2, y + 100, 72, "#000", "center"); text(S.label, x + w / 2, y + 150, fit(S.label, 28, w - 20), "#16181f", "center"); }
   const talk = doing != null ? ({ stretch: "Big stretch!", eat: "Munch munch!", brush: "Brush brush!", dress: "Arms up!", bed: "Fluff fluff!", weather: weatherWear().say,
-    today: first ? `Today: ${first.label}!` : "A free day!", bath: "Splash!", pj: "Arms up!", lights: `${moon(now).e} Goodnight!` })[S.act] : S.ask;
+    today: first ? "Here's today!" : "A free day!", bath: "Splash!", pj: "Arms up!", lights: `${moon(now).e} Goodnight!` })[S.act] : S.ask;
   if (!saying()) bubble(x, 14, w, 74, talk.split("|"), 24, x + 26);
   if (doing == null) zone(0, 0, W, H, () => { r.doing = Date.now(); save(); });   // a tap anywhere does the next step
   if (lampOff) { ctx.globalAlpha = lampOff * 0.7; rect(0, 0, W, H, "#05061a"); ctx.globalAlpha = 1; }
