@@ -187,6 +187,23 @@ function ground(col, tuft) { rect(0, 266, W, 54, col); if (tuft) for (let x = 0;
 function text(s, x, y, size, col = "#16181f", align = "left") {
   ctx.font = `700 ${size}px Andika, "Noto Color Emoji", sans-serif`; ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = "alphabetic"; ctx.fillText(s, x, y);
 }
+// A message written into a box: wrapped onto lines, as big as fits, and cut
+// short with "…" if it's really long. Never spills out.
+function wrapIn(s, cx, cy, maxW, maxH, size = 24) {
+  const words = s.trim().split(/\s+/);
+  let lines = [];
+  for (; size >= 12; size--) {
+    ctx.font = `700 ${size}px Andika, "Noto Color Emoji", sans-serif`;
+    lines = []; let line = "";
+    for (const w of words) { const t = line ? line + " " + w : w; if (!line || ctx.measureText(t).width <= maxW) line = t; else { lines.push(line); line = w; } }
+    lines.push(line);
+    if (lines.length * size * 1.2 <= maxH && lines.every(l => ctx.measureText(l).width <= maxW)) break;
+  }
+  const most = Math.max(1, Math.floor(maxH / (size * 1.2)));
+  if (lines.length > most) { lines = lines.slice(0, most); lines[most - 1] += "…"; }
+  lines = lines.map(l => { while (l.length > 2 && ctx.measureText(l).width > maxW) l = l.slice(0, -2) + "…"; return l; });
+  lines.forEach((l, i) => text(l, cx, cy + (i - (lines.length - 1) / 2) * size * 1.2 + size * 0.35, size, "#16181f", "center"));
+}
 function fit(s, size, maxW) { ctx.font = `700 ${size}px Andika`; while (size > 12 && ctx.measureText(s).width > maxW) { size--; ctx.font = `700 ${size}px Andika`; } return size; }
 function pill(x, y, w, h, label, size = 19, bg = "#16181f", fg = "#fff") {
   ctx.fillStyle = bg; ctx.beginPath(); ctx.roundRect(x, y, w, h, h / 2); ctx.fill();
@@ -387,7 +404,7 @@ function drawScene(now) {
       const sw = bw / s, sh = bh / s;
       ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 56, 50 + hop, bw, bh);
     } else if (card.caption) {
-      text(card.caption, 131, 96 + hop, fit(card.caption, 22, 140), "#16181f", "center");
+      wrapIn(card.caption, 131, 87 + hop, 142, 72);
     } else heart(106, 64 + hop, 7, "#e2413b");
     if (tick % 4 < 2) { sparkle(30, 28, 6); sparkle(210, 128, 4); } else sparkle(222, 46, 5);
     const who = (card.from || "Someone").replace(/^from /i, "");

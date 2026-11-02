@@ -31,6 +31,11 @@ MAX_SIDE = 1600
 
 # Andika has no emoji; drop anything it can't draw rather than show boxes.
 NOT_IN_FONT = re.compile("[^ -ɏ‘-‟…–—]")
+# Emoji in messages are drawn with Noto Color Emoji (fonts-noto-color-emoji),
+# when it's installed. Without it they're left out, as before.
+EMOJI_FONT = next((p for p in ("/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",) if Path(p).exists()), None)
+EMOJI_RUN = re.compile("([^ -ɏ‘-‟…–—]+)")
+_emoji_cache = {}
 
 
 def available():
@@ -88,6 +93,71 @@ def _fit(draw, text, px, max_w):
     return text if draw.textlength(text, font=f) <= max_w else text + "…", f
 
 
+def _emoji(run, px):
+    """An emoji (or a few in a row), as a colored picture px tall, or None."""
+    key = (run, int(px))
+    if key not in _emoji_cache:
+        img = None
+        if EMOJI_FONT:
+            try:
+                f = ImageFont.truetype(EMOJI_FONT, 109)          # the only size this bitmap font comes in
+                tmp = Image.new("RGBA", (150 * max(1, len(run)) + 40, 180), (0, 0, 0, 0))
+                ImageDraw.Draw(tmp).text((20, 20), run, font=f, embedded_color=True)
+                box = tmp.getbbox()
+                if box:
+                    tmp = tmp.crop(box)
+                    k = px / tmp.height
+                    img = tmp.resize((max(1, int(tmp.width * k)), max(1, int(px))), Image.LANCZOS)
+            except (OSError, ValueError):
+                img = None
+        _emoji_cache[key] = img
+    return _emoji_cache[key]
+
+
+def _pieces(text):
+    """Split a message into (is_emoji, text) pieces."""
+    return [(bool(i % 2), part) for i, part in enumerate(EMOJI_RUN.split(text)) if part]
+
+
+def _rich_width(d, text, f, px):
+    w = 0
+    for emo, part in _pieces(text):
+        if not emo:
+            w += d.textlength(part, font=f)
+        else:
+            img = _emoji(part, px * 0.95)
+            w += img.width + px * 0.08 if img else 0
+    return w
+
+
+def _draw_rich(im, d, text, cx, cy, f, px):
+    """Draw a line of text with its emoji, centered on (cx, cy)."""
+    x = cx - _rich_width(d, text, f, px) / 2
+    for emo, part in _pieces(text):
+        if not emo:
+            d.text((x, cy), part, font=f, fill=INK, anchor="lm")
+            x += d.textlength(part, font=f)
+        else:
+            img = _emoji(part, px * 0.95)
+            if img:
+                im.paste(img, (int(x + px * 0.04), int(cy - img.height / 2)), img)
+                x += img.width + px * 0.08
+
+
+def _fit_rich(d, text, px, max_w):
+    """Like _fit, keeping emoji: shrink to fit, then cut with an ellipsis."""
+    text = text.strip()
+    size = px
+    while size > px * 0.6 and _rich_width(d, text, _font(size), size) > max_w:
+        size -= px * 0.05
+    f = _font(size)
+    if _rich_width(d, text, f, size) > max_w:
+        while text and _rich_width(d, text + "…", f, size) > max_w:
+            text = text[:-1]
+        text += "…"
+    return text, f, size
+
+
 def render_card(card, photo_path, w, h, bpp, index=0, total=1):
     """One postcard, full screen. Drawn at 2x and shrunk for smooth edges."""
     S = 2
@@ -116,8 +186,8 @@ def render_card(card, photo_path, w, h, bpp, index=0, total=1):
             ph = ph.resize((int(ph.width * k), int(ph.height * k)), Image.LANCZOS)
         im.paste(ph, (ix0 + (ix1 - ix0 - ph.width) // 2, iy0 + (iy1 - iy0 - ph.height) // 2))
         if caption:
-            t, f = _fit(d, caption, u * 7, ix1 - ix0)
-            d.text(((ix0 + ix1) / 2, iy1 + u * 5.5), t, font=f, fill=INK, anchor="mm")
+            t, f, size = _fit_rich(d, caption, u * 7, ix1 - ix0)
+            _draw_rich(im, d, t, (ix0 + ix1) / 2, iy1 + u * 5.5, f, size)
     elif caption:
         # A text-only message: big words on the card.
         words, lines, size = caption.split(), [], u * 12
@@ -126,7 +196,7 @@ def render_card(card, photo_path, w, h, bpp, index=0, total=1):
             lines, line = [], ""
             for wd in words:
                 test = (line + " " + wd).strip()
-                if d.textlength(NOT_IN_FONT.sub("", test), font=f) <= ix1 - ix0 or not line:
+                if _rich_width(d, test, f, size) <= ix1 - ix0 or not line:
                     line = test
                 else:
                     lines.append(line)
@@ -138,7 +208,7 @@ def render_card(card, photo_path, w, h, bpp, index=0, total=1):
             f = _font(size)
         top = (iy0 + iy1) / 2 - len(lines) * size * 1.25 / 2 + size * 0.6
         for i, ln in enumerate(lines):
-            d.text(((ix0 + ix1) / 2, top + i * size * 1.25), NOT_IN_FONT.sub("", ln), font=f, fill=INK, anchor="mm")
+            _draw_rich(im, d, ln, (ix0 + ix1) / 2, top + i * size * 1.25, f, size)
 
     # "From Nana" stamp and the day it came, under the card.
     who = "From " + (card.get("from") or "someone")

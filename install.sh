@@ -18,6 +18,8 @@ NEED=()
 command -v python3 >/dev/null || NEED+=(python3)
 command -v git >/dev/null || NEED+=(git)
 python3 -c 'import PIL' 2>/dev/null || NEED+=(python3-pil)
+# Color emoji, so postcards with 😊 🐱 🦄 in them show those on her screen too.
+[ -e /usr/share/fonts/truetype/noto/NotoColorEmoji.ttf ] || NEED+=(fonts-noto-color-emoji)
 if [ ${#NEED[@]} -gt 0 ]; then
   apt-get update
   apt-get install -y "${NEED[@]}"
