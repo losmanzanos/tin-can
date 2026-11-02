@@ -149,25 +149,34 @@ someone she hasn't heard from now and then, gives hugs you send from the admin
 page, and says goodnight for half an hour after her big screen turns off. It
 grows a little over its first weeks.
 
-Zelda can play with it too. Every target is big, because the touchscreen is
-small and rough: tapping Tinny's body pets it, tapping its head tries on a hat,
-and a tap anywhere else opens the play menu, four tiles a quarter of the screen
-each. Nothing ever goes wrong for Tinny: it only gets a bit hungry or dusty and
-asks (a thought bubble, the "Tap to play" strip glows, and so does that tile).
+Zelda can play with it too. A tap anywhere on the home screen opens six big
+tiles. Every tap shows a ring where it landed, and nothing ever goes wrong for
+Tinny: it only gets a bit hungry or dusty and asks.
 
-- **🍎 Eat:** she picks one of three snacks, with its word under it; Tinny munches, then has one more. Hungry each morning, and four hours after a meal.
-- **🛁 Bath:** every tap scrubs and makes bubbles; six and it's squeaky clean. Dusty again after ten hours.
-- **⚽ Ball:** every tap bounces the ball off its head, and it counts to ten on a ten-frame.
-- **🎲 Games:** three little games, taking turns: *Find red!* (balloons), *How many?* (it counts them with her if she gets it wrong), and peekaboo. Three rounds, then a star.
-- **Dress up:** tap its head to try on the next hat (party hat, crown, beret, bow, flower, cowboy hat, helmet, glasses, sunglasses). It keeps it until the next part of the day.
-- **Bedtime:** for the last 20 minutes before her big screen turns off, it asks for help getting ready: brush its teeth, pajamas on, then turn out the lamp, and it falls asleep.
-- **Stars:** finishing a game, ten bounces, a meal, a bath or bedtime earns a star, shown top left.
-- 🏠 goes back, and a game she walks away from ends after 25 seconds.
-- **Checking the touch:** Settings → Tinny → **Show where taps land** puts a red dot,
-  with its position, wherever the little screen feels a tap. If the dots land away
-  from her finger, the touch needs calibrating.
+- **🔤 Letters, 📖 Read, ✏️ Spell, 🔢 Count:** learning games that find her
+  level by themselves. Four right in a row moves a game up a level; a few misses
+  move it back. A wrong answer is never a dead end: that choice fades, a second
+  miss lights up the right one. Five questions make a round.
+  - Letters: find the letter, big & little letters, first sounds, last sounds.
+  - Read: read a word and pick its picture, then rhyming words, longer words, little sentences.
+  - Spell: tap the letters in order (copying first, then from the picture, then with extra letters, then 4-letter words). Her own words (her name, this week's words) go in on the admin page.
+  - Count: count to 5, to 10, which is more, adding, taking away, number sentences.
+- **Her garden:** every round waters it. Plants bloom after a few rounds; eight fill a garden, then a new one starts.
+- **🍎 Feed** (snacks with their words) and **🎈 Play** (ball to ten, colors, peekaboo; a bath when it's dusty).
+- **Surprises** every couple of minutes on the home screen: a letter balloon ("B is for bus"), a word of the day, a butterfly, juggling.
+- **Holidays:** costumes and decorations for Halloween, Thanksgiving, Christmas, New Year, Valentine's, St. Patrick's, Easter, the Fourth of July, her birthday (set on the admin page) and Tinny's.
+- **Dress up:** tap its head to try on the next hat.
+- **Bedtime:** for the last 20 minutes before her big screen turns off, one giant button at a time (teeth, pajamas, lights out). A tap anywhere does it, and Tinny acts it out.
+- **Stars:** every finished round or activity earns one.
 
-What Tinny remembers (meals, baths, stars, its hat) is kept in the little screen's browser.
+**Touch:** if taps don't land where she touches, tap **Calibrate the touch** on
+the admin page (**Settings → Tinny**), then tap the middle of each of the five
+stars on the little screen.
+
+The admin page shows what she's practicing: each game's level and how this
+week went.
+
+What Tinny remembers (levels, garden, meals, stars, its hat, the touch calibration) is kept in the little screen's browser.
 
 Set it up under **Settings → Tinny**: pick a town for the weather, and choose
 **Tinny's screen**: the same hours as her big screen, always on, or off (it

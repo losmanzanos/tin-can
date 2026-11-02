@@ -90,7 +90,7 @@ a { color: inherit; }
 label, .label { display: grid; gap: 6px; font-weight: 700; font-size: 15px; }
 .hint { font-weight: 400; color: var(--muted); font-size: 14px; }
 .hint a { color: var(--ink); }
-input[type=text], input[type=tel], input[type=time], input[type=email], input[type=password], input[type=url], select, textarea { width: 100%; min-height: 50px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 18px; }
+input[type=text], input[type=tel], input[type=time], input[type=date], input[type=email], input[type=password], input[type=url], select, textarea { width: 100%; min-height: 50px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 14px; background: #fff; font-size: 18px; }
 textarea { min-height: 80px; resize: vertical; }
 /* Our own drop-down arrow: browsers draw a thin one jammed against the edge. Same weight as the borders. */
 select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Cpath d='M2 2l6 6 6-6' fill='none' stroke='%2316181f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 18px center; background-size: 16px 10px; padding-right: 50px; cursor: pointer; }
@@ -105,7 +105,7 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 .row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .row2 > label { min-width: 0; }
 /* iPhone Safari gives time fields a fixed native width that ignores width: 100%, so they spill out of the box. */
-input[type=time] { -webkit-appearance: none; appearance: none; display: block; }
+input[type=time], input[type=date] { -webkit-appearance: none; appearance: none; display: block; }
 input[type=time]::-webkit-date-and-time-value { text-align: left; }
 .status { font-size: 14px; color: var(--muted); }
 .status.ok { color: #3f7a3a; }
@@ -114,6 +114,10 @@ code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padd
 
 /* Postcards */
 .cards { list-style: none; display: grid; gap: 12px; }
+.learnlist { list-style: none; display: grid; gap: 8px; }
+.learnlist li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 10px 12px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
+.learnlist li > span:first-child { font-size: 28px; grid-row: span 2; }
+.learnlist small { color: var(--muted); }
 .famlinks { list-style: none; display: grid; gap: 10px; }
 .famlinks li { display: grid; gap: 8px; padding: 12px 14px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
 .cardrow { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; background: var(--card); border: 2px solid var(--rule); border-radius: 18px; padding: 14px; }
@@ -331,7 +335,9 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
     <h2>Tinny, the little screen pet</h2>
     <div class="panel">
-      <p class="hint">A tin-can pet for the 3.5" touchscreen. It holds up new postcards, dresses for her calendar and the weather, suggests calling someone now and then, and falls asleep when her big screen turns off. Zelda can feed it, bath it, play ball and little games with it, and dress it up.</p>
+      <p class="hint">A tin-can pet for the 3.5" touchscreen. It holds up new postcards, dresses for her calendar, the weather and holidays, suggests calling someone now and then, and falls asleep when her big screen turns off. Zelda plays four learning games with it that find her level by themselves, and her right answers grow a garden.</p>
+      <div class="label">What Zelda's practicing <span class="hint" id="learnAt"></span></div>
+      <ul class="learnlist" id="learnList"></ul>
       <label>Tinny's screen <span class="hint">"Off" goes dark now and stays dark until you change it back. The same setting as the magnet board's: it's one little screen.</span>
         <select id="tinnyPower"><option value="same">Same as her big screen</option><option value="on">Always on</option><option value="off">Off</option></select>
       </label>
@@ -345,6 +351,17 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
       </div>
       <div class="row-btns"><button type="button" class="btn plain small" id="tinnyFind">Find town</button></div>
       <div class="row-btns" id="tinnyPlaces"></div>
+      <div class="row2">
+        <label>Zelda's birthday <span class="hint">A party on Tinny's screen</span>
+          <input type="date" id="zBirthday">
+        </label>
+        <label>Her spelling words <span class="hint">Her name, this week's words</span>
+          <input type="text" id="zWords" autocomplete="off" placeholder="zelda, mom, dad">
+        </label>
+      </div>
+      <div class="row-btns"><button type="button" class="btn plain small" id="saveTinnyKid">Save</button></div>
+      <div class="label">Touch <span class="hint">If taps don't land where she touches, tap Calibrate, then on the little screen tap the middle of each of the 5 stars.</span></div>
+      <div class="row-btns"><button type="button" class="btn plain small" id="calibrate">Calibrate the touch</button></div>
       <label class="check"><input type="checkbox" id="tapDots"> Show where taps land <span class="hint">A red dot wherever the little screen feels a tap, to check its touch. Turn it off after.</span></label>
       <label class="check"><input type="checkbox" id="littleFlip"> Flip the little screen upside down <span class="hint">For Tinny or the magnet board on the touchscreen Pi. Changes within a few seconds.</span></label>
       <div class="label">Send Zelda a hug <span class="hint">Tinny gives her a big squeeze, with your name</span></div>
@@ -1254,8 +1271,27 @@ $("famUrlSave").onclick = async () => {
 function tinnyHost() {
   return location.hostname.endsWith(".local") || /^\d/.test(location.hostname) ? location.host : location.hostname.split(".")[0] + ".local:" + (location.port || 80);
 }
+const LEARN = { P: ["🔤", "Letters", ["Find the letter", "Big & little letters", "First sounds", "Last sounds"]],
+  R: ["📖", "Reading", ["Read a word", "Rhyming words", "Longer words", "Little sentences"]],
+  S: ["✏️", "Spelling", ["Copy the word", "Spell 3 letters", "3 letters + extras", "4-letter words"]],
+  M: ["🔢", "Numbers", ["Count to 5", "Count to 10", "Which is more?", "Add to 5", "Take away", "Add to 10", "Number sentences"]] };
+function renderLearning() {
+  const pr = state.settings.tinnyProgress || {}, lv = pr.levels || {}, days = pr.days || {};
+  const week = Object.keys(days).sort().slice(-7);
+  $("learnAt").textContent = pr.at ? `⭐ ${pr.stars || 0} star${pr.stars === 1 ? "" : "s"} · 🌷 ${pr.flowers || 0} flower${pr.flowers === 1 ? "" : "s"} · updated ${ago(pr.at)}` : "Nothing yet: it shows up once she plays.";
+  $("learnList").replaceChildren(...Object.entries(LEARN).map(([k, [e, name, levels]]) => {
+    const l = lv[k] || 1, tried = week.reduce((n, d) => n + ((days[d] || {})[k]?.[0] || 0), 0), first = week.reduce((n, d) => n + ((days[d] || {})[k]?.[1] || 0), 0);
+    const li = el("li");
+    li.append(el("span", null, e), el("b", null, `${name}: level ${l} of ${levels.length}, ${levels[l - 1]}`),
+      el("small", null, tried ? `This week: ${tried} tried, ${first} right the first time` : "Not played this week"));
+    return li;
+  }));
+}
 function renderTinny() {
   const t = doc.tinny || {};
+  renderLearning();
+  if (document.activeElement !== $("zBirthday")) $("zBirthday").value = t.birthday || "";
+  if (document.activeElement !== $("zWords")) $("zWords").value = (t.words || []).join(", ");
   $("tinnyPlaceNow").textContent = t.place ? "Now: " + t.place : "Not set";
   if (document.activeElement !== $("tinnyUnits")) $("tinnyUnits").value = t.units || "F";
   const keep = $("hugFrom").value;
@@ -1268,6 +1304,15 @@ function renderTinny() {
   $("tinnyCmd").textContent = `sudo bash ~/tin-can/board/setup.sh '${link}'`;
 }
 const copyText = (text) => navigator.clipboard?.writeText(text).then(() => toast("Copied."), () => toast("Couldn't copy; press and hold to select it.", true));
+$("saveTinnyKid").onclick = () => {
+  const words = $("zWords").value.split(/[\s,]+/).map(w => w.trim()).filter(Boolean);
+  const bad = words.filter(w => !/^[A-Za-z]{2,8}$/.test(w));
+  if (bad.length) return toast(`Only letters, 2 to 8 long: ${bad.join(", ")}`, true);
+  save({ ...doc, tinny: { ...doc.tinny, birthday: $("zBirthday").value || "", words } }, "Saved for Tinny.");
+};
+$("calibrate").onclick = async () => {
+  try { await api("POST", "/api/tinny/calibrate", {}); toast("Go to the little screen and tap each star."); } catch (e) { toast(e.message, true); }
+};
 $("tinnyCopy").onclick = () => copyText($("tinnyLink").textContent);
 $("tinnyCmdCopy").onclick = () => copyText($("tinnyCmd").textContent);
 $("tinnyUnits").onchange = () => save({ ...doc, tinny: { ...doc.tinny, units: $("tinnyUnits").value } }, "Saved.");

@@ -19,10 +19,12 @@ canvas { display: block; width: min(100vw, 150vh); height: min(66.667vw, 100vh);
 // Tinny: a little tin-can pet for the 3.5" touchscreen. Its mood comes from the
 // house: a new postcard, her calendar, the weather, bedtime, hugs from the
 // admin page, and a gentle "call Grandpa?" now and then. Zelda can also play
-// with it: feed it, bath it, play ball, three little games (colors, counting,
-// peekaboo), tap its head to dress it up, and help it get ready for bed.
-// Nothing ever goes wrong for Tinny: it only gets a bit hungry or dusty and
-// asks. Every tap on the rough touchscreen does something; the targets are big.
+// with it: four learning games that find her level by themselves (letters,
+// reading, spelling, numbers), feeding, a bath, ball and peekaboo, dress-up,
+// and getting it ready for bed. Right answers water her garden. Holidays bring
+// costumes. Nothing ever goes wrong for Tinny: it only gets a bit hungry or
+// dusty and asks. Every tap shows a ring where it landed; the targets are big,
+// and a grown-up can recalibrate the touch from the admin page.
 const PB = window.PhoneBook;
 const W = 480, H = 320, FPS = 8;
 const c = document.getElementById("c"), ctx = c.getContext("2d");
@@ -32,6 +34,7 @@ const NUDGE_EVERY_MIN = 30, NUDGE_FOR_MIN = 1;   // a "call someone?" minute eve
 const MORNING_MIN = 20;                          // "good morning" for the first 20 minutes
 const HUG_SECONDS = 20;
 const PLAY_IDLE_S = 25;                          // a game she walks away from ends after this
+const LEARN_IDLE_S = 60;                         // reading takes longer: a learning round waits a minute
 const WIND_DOWN_MIN = 20;                        // the bedtime routine, before her big screen turns off
 
 let doc = null, cards = [], seenTs = 0, hug = {}, weather = null, version = null;
@@ -47,7 +50,7 @@ const store = {
 };
 const care = store.get("tinny-care", { fed: 0, bathed: 0 });
 let stars = store.get("tinny-stars", 0), dress = store.get("tinny-dress", null), tuckedIn = store.get("tinny-tucked", "");
-let act = null, lastTap = 0, zones = [], confetti = [], said = null, taps = [];
+let act = null, lastTap = 0, zones = [], confetti = [], said = null, taps = [], rings = [], lastDown = 0;
 
 /* ---------------- data ---------------- */
 async function getJSON(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
@@ -67,6 +70,7 @@ async function refresh() {
     }
     const t = await getJSON("/api/tinny");
     seenTs = t.seen || 0; hug = t.hug || {};
+    if (t.calibrate && t.calibrate > calTs) { calTs = t.calibrate; store.set("tinny-cal-ts", calTs); startCalibration(); }
   } catch (e) { /* the Pi is busy or restarting: try again soon */ }
 }
 function loadImg(src, done) {
@@ -132,9 +136,10 @@ function nudgeFor(now) {
 }
 function scene(now) {
   if (!doc) return "loading";
+  if (calib) return "calibrate";
   if (doc.screen?.board === "off") return "off";
   if (asleep(now) || tuckedIn === dayKey(now)) return "bedtime";
-  if (act && (Date.now() - lastTap) / 1000 > PLAY_IDLE_S && act.kind !== "done") act = null;
+  if (act && (Date.now() - lastTap) / 1000 > (act.kind === "learn" ? LEARN_IDLE_S : PLAY_IDLE_S) && act.kind !== "done") act = null;
   if (act) return "play";
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
@@ -161,6 +166,8 @@ function outfit(tiles) {
   if (weather?.cold) o.scarf = true;
   if (weather?.rain) { o.umbrella = true; if (o.hat === "helmet") delete o.hat; }
   if (weather?.snow && !o.hat) o.snowcap = true;
+  const hol = holiday(new Date());
+  if (hol && !o.umbrella && o.hat !== "helmet") { o.hat = hol.hat; delete o.snowcap; }
   const pick = dressNow();
   if (pick) {
     delete o.snowcap;
@@ -247,6 +254,14 @@ function tinny(ox, oy, u, o = {}) {
   if (hat === "bow") { px(14, top - 2, "p", 3, 3); px(18, top - 2, "p", 3, 3); px(17, top - 1, "r", 1, 1); }
   if (hat === "crown") { px(7, top - 3, "y", 12, 3); for (const x of [7, 12, 17]) px(x, top - 5, "y", 2, 2); px(12, top - 2, "r", 2, 1); px(8, top - 2, "b"); px(17, top - 2, "s"); }
   if (hat === "flower") { px(16, top - 4, "p", 5, 1); px(17, top - 5, "p", 3, 3); px(16, top - 3, "p", 5, 1); px(18, top - 4, "y"); px(17, top - 1, "s", 1, 2); }
+  // holiday hats
+  if (hat === "santa") { px(6, top - 3, "r", 14, 3); px(9, top - 5, "r", 8, 2); px(13, top - 7, "r", 5, 2); px(17, top - 8, "w", 3, 3); px(5, top - 1, "w", 16, 2); }
+  if (hat === "pumpkin") { px(5, top - 5, "o", 16, 5); px(7, top - 6, "o", 12, 1); px(10, top - 6, "#c85f14", 1, 6); px(15, top - 6, "#c85f14", 1, 6); px(12, top - 8, "#5a8a2b", 2, 2); px(14, top - 8, "#5a8a2b", 2, 1); }
+  if (hat === "pilgrim") { px(4, top - 1, "k", 18, 1); px(8, top - 6, "k", 10, 5); px(11, top - 4, "y", 4, 3); px(12, top - 3, "k", 2, 1); }
+  if (hat === "heart") { px(13, top - 3, "k", 1, 3); px(11, top - 7, "r", 2, 1); px(14, top - 7, "r", 2, 1); px(11, top - 6, "r", 5, 1); px(12, top - 5, "r", 3, 1); px(13, top - 4, "r", 1, 1); }
+  if (hat === "lucky") { px(4, top - 1, "#2e8b3a", 18, 1); px(8, top - 7, "#2e8b3a", 10, 6); px(8, top - 3, "k", 10, 1); px(12, top - 3, "y", 2, 1); }
+  if (hat === "bunny") { for (const x of [7, 14]) { px(x, top - 10, "k", 5, 10); px(x + 1, top - 9, "w", 3, 9); px(x + 2, top - 8, "p", 1, 7); } }
+  if (hat === "uncle") { px(4, top - 1, "b", 18, 1); px(8, top - 7, "w", 10, 6); for (const y of [7, 5, 3]) px(8, top - y, "r", 10, 1); px(8, top - 2, "b", 10, 1); }
   if (hat === "cowboy") { px(4, top - 1, "#8a5a2b", 18, 1); px(7, top - 4, "#8a5a2b", 12, 3); px(8, top - 5, "#8a5a2b", 3, 1); px(15, top - 5, "#8a5a2b", 3, 1); px(7, top - 2, "y", 12, 1); }
 }
 
@@ -275,6 +290,8 @@ function drawDay(now, o, u, bob) {
   zone(40, ty + 8 * u, 26 * u, 19 * u, pet);
   zone(40, ty - 9 * u, 26 * u, 17 * u, nextDress);     // its head and hat: try on the next one
   if (want && !said) thought(40 + 21 * u, ty - 2 * u, want === "eat" ? "🍎" : "🫧");
+  const hol = holiday(now);
+  if (hol) hol.decor.forEach((d, i) => text(d, [228, 258, 460][i], 262 + (tick % 8 < 4 && i === 1 ? -3 : 0), 24, "#000", "center"));   // sitting on the ground
   // What's happening now, on the right.
   const label = tiles.length ? tiles.map(t => t.label).join(" + ") : "Free time";
   pill(270, 26, 186, 34, PB.PERIODS[p] + (tiles.length ? "" : ""), 18, PB.DAY_COLORS[PB.weekdayOf(now)]);
@@ -282,6 +299,7 @@ function drawDay(now, o, u, bob) {
   else { ctx.fillStyle = "#ffffffaa"; ctx.beginPath(); ctx.roundRect(300, 76, 120, 120, 16); ctx.fill(); text("😊", 360, 152, 56, "#000", "center"); }
   if (tiles[1]) tileCard(tiles[1], 392, 150, 58);
   text(label, 363, 236, fit(label, 21, 190), "#16181f", "center");
+  dayEvent(now, u, ty);
   playBar(now, want);
 }
 
@@ -292,25 +310,34 @@ function playBar(now, want) {
   pill(10, 272, 460, 42, want === "eat" ? "🍎  Tinny's hungry! Tap to play" : want === "bath" ? "🫧  Tinny's dusty! Tap to play" : "👆  Tap to play!   🍎 🛁 ⚽ 🎲", 20, "#16181f");
 }
 
-// The play menu: four tiles, a quarter of the screen each, because the touchscreen is
-// small and rough. The one Tinny wants glows. 🏠 in the middle goes back.
+// The play menu: six big tiles, each with a picture and a word. The four
+// learning games show her level; the one Tinny wants (food, a bath) glows.
 function openMenu() { begin("menu"); }
 function drawMenu(now) {
   rect(0, 0, W, H, "#16181f");
   const want = wants(now);
-  [["🍎", "Eat", "eat", startEat], ["🛁", "Bath", "bath", startBath], ["⚽", "Ball", "ball", startBall], ["🎲", "Games", "play", startGame]].forEach(([e, label, key, go], i) => {
-    const x = 6 + (i % 2) * 237, y = 6 + Math.floor(i / 2) * 157, w = 231, h = 151;
-    const glow = want === key && tick % 8 < 5;
-    ctx.fillStyle = glow ? "#ffd84a" : ["#ffe3b8", "#cfeaf7", "#c9ecb4", "#e7d4f5"][i];
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 22); ctx.fill();
-    text(e, x + w / 2, y + 92, 70, "#000", "center");
-    text(label, x + w / 2, y + 136, 28, "#16181f", "center");
-    zone(x, y, w, h, go);
+  homeButton(() => { act = null; });
+  pill(300, 8, 172, 34, `⭐ ${stars}   🌷 ${garden.total}`, 18, "#2a2d3a");
+  const tiles = [["🔤", "Letters", "P"], ["📖", "Read", "R"], ["✏️", "Spell", "S"], ["🔢", "Count", "M"], ["🍎", "Feed", "eat"], ["🎈", "Play", "play"]];
+  const fills = ["#ffe3b8", "#cfeaf7", "#e7d4f5", "#c9ecb4", "#ffd0c8", "#fff1a8"];
+  tiles.forEach(([e, label, key], i) => {
+    const x = 6 + (i % 3) * 157, y = 50 + Math.floor(i / 3) * 136, w = 151, h = 130;
+    const glow = ((key === "eat" && want === "eat") || (key === "play" && want === "bath")) && tick % 8 < 5;
+    if (glow) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, w + 8, h + 8, 24); ctx.fill(); }
+    ctx.fillStyle = fills[i]; ctx.beginPath(); ctx.roundRect(x, y, w, h, 20); ctx.fill();
+    text(e, x + w / 2, y + 70, 54, "#000", "center");
+    text(label, x + w / 2, y + 112, 24, "#16181f", "center");
+    if (TRACKS[key]) for (let l = 0; l < TRACKS[key].levels.length; l++) rect(x + 12 + l * 9, y + 10, 6, 6, l < learn[key].lv ? "#16181f" : "#16181f33");
+    zone(x, y, w, h, () => (TRACKS[key] ? startLearn(key) : key === "eat" ? startEat() : startPlay(now)));
   });
-  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(W / 2, H / 2, 24, 0, 7); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(W / 2, H / 2, 20, 0, 7); ctx.fill();
-  text("🏠", W / 2, H / 2 + 8, 22, "#000", "center");
-  zone(W / 2 - 26, H / 2 - 26, 52, 52, () => { act = null; });
+}
+// Play: whatever Tinny needs first (a bath), otherwise ball, colors and peekaboo in turn.
+let nextPlay = store.get("tinny-play", 0);
+function startPlay(now) {
+  if (dusty(now)) return startBath();
+  const k = ["ball", "color", "peek"][nextPlay % 3];
+  nextPlay++; store.set("tinny-play", nextPlay);
+  if (k === "ball") startBall(); else { begin(k, { round: 0 }); newRound(); }
 }
 
 function drawScene(now) {
@@ -323,6 +350,7 @@ function drawScene(now) {
   ctx.save();
   zones = [];
   if (name === "off" || name === "loading") { rect(0, 0, W, H, "#000"); ctx.restore(); return; }
+  if (name === "calibrate") { drawCalibration(); drawRings(); ctx.restore(); return; }
 
   if (name === "bedtime") {
     sky("#121a3a", "#283567"); ground("#1d2547");
@@ -399,11 +427,12 @@ function drawScene(now) {
   else if (name === "play") {
     const k = act.kind;
     if (k === "menu") drawMenu(now);
+    else if (k === "learn") drawLearn(now);
     else if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
     else if (k === "done") drawDone(now); else drawGame(now);
-    if (act && act.kind !== "done" && act.kind !== "menu") {          // home: back to the day, any time
+    if (act && act.kind !== "done" && act.kind !== "menu" && act.kind !== "learn") {          // home: back to the menu, any time
       ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("🏠", 28, 304, 20, "#000", "center");
-      zone(4, 272, 48, 48, () => { act = null; said = null; });
+      zone(0, 266, 60, 54, () => { begin("menu"); });
     }
   }
 
@@ -411,7 +440,7 @@ function drawScene(now) {
 
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (saying() && (name === "day" || name === "play" || name === "winddown")) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (saying() && (name === "day" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
   if (name === "day" || name === "nudge" || name === "morning") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   // hearts from petting float up and fade
@@ -422,6 +451,7 @@ function drawScene(now) {
     ctx.strokeStyle = "#e2413b"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, 12, 0, 7); ctx.stroke();
     rect(t.x - 2, t.y - 2, 4, 4, "#e2413b"); text(`${Math.round(t.x)},${Math.round(t.y)}`, t.x + 16, t.y - 10, 14, "#e2413b");
   }
+  drawRings();
   confetti = confetti.filter(p => p.life-- > 0);
   for (const p of confetti) { ctx.globalAlpha = Math.min(1, p.life / 6); rect(p.x, p.y, 7, 7, p.col); p.x += p.vx; p.y += p.vy; p.vy += 3; }
   ctx.globalAlpha = 1;
@@ -476,7 +506,7 @@ function choiceCircle(cx, cy, r, fill, shake) {
 }
 function begin(kind, extra = {}) { act = { kind, t0: Date.now(), ...extra }; lastTap = Date.now(); said = null; }
 function award() { stars++; store.set("tinny-stars", stars); }
-function finish(lines = ["You did it!"]) { award(); begin("done", { lines }); burst(240, 140, 30); }
+function finish(lines = ["You did it!"]) { award(); begin("done", { lines, back: "menu" }); burst(240, 140, 30); }
 
 // Dress up: each tap on its head tries the next thing, kept until the part of the day changes.
 const WARDROBE = ["party", "crown", "beret", "bow", "flower", "cowboy", "helmet", "specs", "shades", null];
@@ -594,37 +624,23 @@ function drawBall(now, u) {
 
 // The little games, taking turns: find the color, how many, and peekaboo. Three rounds, then a star.
 const COLORS = [["red", "#e2413b"], ["yellow", "#f2c230"], ["green", "#6cbf4a"], ["blue", "#2f6fb5"], ["purple", "#b768d6"], ["orange", "#ef7f2c"], ["pink", "#f2a1a8"]];
-const THINGS = ["⭐", "🍎", "🐟", "🌸", "🚗", "🐞", "🎈", "🐶"];
 const HIDE = ["🌳", "📦", "🧺"], SILLY = ["🐱", "🧦", "🐸", "🦆", "🍌", "🐢"];
-let nextGame = store.get("tinny-game", 0);
-function startGame() {
-  const kind = ["color", "count", "peek"][nextGame % 3];
-  nextGame++; store.set("tinny-game", nextGame);
-  begin(kind, { round: 0 }); newRound();
-}
 function newRound() {
   act.wrong = null; act.right = null; act.demo = null; act.t1 = Date.now();
   if (act.kind === "color") { act.opts = pick3(COLORS); act.ans = act.opts[Math.floor(Math.random() * 3)]; }
-  if (act.kind === "count") {
-    const max = act.round < 1 ? 3 : act.round < 2 ? 5 : 6;
-    act.ans = 1 + Math.floor(Math.random() * max); act.thing = THINGS[Math.floor(Math.random() * THINGS.length)];
-    const others = [1, 2, 3, 4, 5, 6].filter(n => n !== act.ans).sort(() => Math.random() - 0.5).slice(0, 2);
-    act.opts = [act.ans, ...others].sort((a, b) => a - b);
-  }
   if (act.kind === "peek") { act.ans = Math.floor(Math.random() * 3); act.silly = {}; }
 }
 function answer(i) {
   if (!act) return;
   if (act.right != null || act.demo) return;
-  const ok = act.kind === "color" ? act.opts[i] === act.ans : act.kind === "count" ? act.opts[i] === act.ans : i === act.ans;
+  const ok = act.kind === "color" ? act.opts[i] === act.ans : i === act.ans;
   if (ok) {
-    act.right = i; burst(act.kind === "count" ? 210 + i * 100 : 200 + i * 100, 200, 16);
-    say(act.kind === "color" ? ["Yes!", act.ans[0] + "!"] : act.kind === "count" ? ["Yes!", act.ans + "!"] : ["Peekaboo!"], 1.6);
+    act.right = i; burst(200 + i * 100, 200, 16);
+    say(act.kind === "color" ? ["Yes!", act.ans[0] + "!"] : ["Peekaboo!"], 1.6);
     setTimeout(() => { if (!act || act.right == null) return; act.round++; if (act.round >= 3) finish(); else newRound(); }, 1700);
   } else {
     act.wrong = { i, at: Date.now() };
     if (act.kind === "color") say([`That's ${act.opts[i][0]}.`, `Find ${act.ans[0]}!`], 2.4);
-    if (act.kind === "count") { act.demo = Date.now(); say(["Let's count!"], 1.4); }     // count them together, one at a time
     if (act.kind === "peek") { act.silly[i] = SILLY[Math.floor(Math.random() * SILLY.length)]; say(["Not here!"], 1.4); }
   }
 }
@@ -653,23 +669,6 @@ function drawGame(now) {
       zone(cx - 50, 84, 100, 196, () => answer(i));
     });
   }
-  if (act.kind === "count") {
-    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 316, 58, 20); ctx.fill(); ctx.stroke(); text("How many?", 308, 54, 30, "#16181f", "center"); }
-    const n = act.ans, gap = Math.min(52, 300 / n), x0 = 308 - (n - 1) * gap / 2;
-    const shown = act.demo ? Math.min(n, Math.floor(ago(act.demo) / 0.7)) : -1;
-    for (let k = 0; k < n; k++) {
-      const lit = act.right != null || k < shown;
-      text(act.thing, x0 + k * gap, 132 + (lit && act.right != null && tick % 2 ? -4 : 0), 40, "#000", "center");
-      if (act.demo && k < shown) text(String(k + 1), x0 + k * gap, 96, 22, "#e2413b", "center");
-    }
-    if (act.demo && shown >= n && ago(act.demo) > n * 0.7 + 1.2) { act.demo = null; act.wrong = null; say([`${n}!`, "Tap " + n + "."], 2); }
-    act.opts.forEach((v, i) => {
-      const cx = 210 + i * 100, cy = 220;
-      const dx = choiceCircle(cx, cy, 38, act.right === i ? "#ffd84a" : "#fff", shaking(i));
-      text(String(v), cx + dx, cy + 18, 50, "#16181f", "center");
-      zone(cx - 50, 160, 100, 120, () => answer(i));
-    });
-  }
   if (act.kind === "peek") {
     if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(110, 14, 260, 58, 20); ctx.fill(); ctx.stroke(); text("Where's Tinny?", 240, 54, 28, "#16181f", "center"); }
     HIDE.forEach((h, i) => {
@@ -685,46 +684,456 @@ function drawGame(now) {
   }
 }
 function drawDone(now) {
-  sky("#fff3c4", "#fffaf0"); ground("#8fcf6a", "#7cbd58");
-  const u = 7, ty = 266 - 27 * u - (tick % 4 < 2 ? 10 : 0);
-  tinny(30, ty, u, { eyes: "happy", mouth: "open", arms: "up", ...outfit(nowTiles(now)) });
-  const k = Math.min(1, ago(act.t0) / 0.6), s = 30 + k * 60;
-  text("⭐", 350, 140 + s / 3, s, "#000", "center");
-  pill(250, 190, 200, 44, `⭐ ${stars}`, 24);
-  bubble(250, 20, 210, 64, act.lines, 24, 270);
-  if (ago(act.t0) > 3.2) act = null;
+  sky("#fff3c4", "#fffaf0");
+  const t = ago(act.t0), u = 6, ty = 210 - 27 * u - (tick % 4 < 2 ? 8 : 0);
+  tinny(20, ty, u, { eyes: "happy", mouth: "open", arms: "up", ...outfit(nowTiles(now)) });
+  const k = Math.min(1, t / 0.6), sz = 30 + k * 40;
+  text("⭐", 236, 120 + sz / 3, sz, "#000", "center");
+  pill(290, 108, 170, 44, `⭐ ${stars}`, 24);
+  bubble(206, 14, 260, 72, act.lines, 24, 230);
+  drawGarden(16, 292, 448, act.garden, t);
+  if (act.garden) text(`🌷 ${garden.total} flowers`, 240, 252, 18, "#6f6752", "center");
+  const leave = () => { if (act.back === "menu") begin("menu"); else act = null; };
+  zone(0, 0, W, H, () => { if (t > 1.5) leave(); });
+  if (t > (act.garden ? 5 : 3.2)) leave();
 }
 
-// Getting ready for bed, for the last minutes before her big screen turns off:
-// brush its teeth, pajamas on, then turn out the lamp.
+// Getting ready for bed, for the last minutes before her big screen turns off.
+// One step at a time, shown as one giant button; a tap anywhere does it and
+// Tinny acts it out (brushes, puts its pajamas on, turns the lamp off).
+const STEPS = [["🪥", "Brush teeth", "Brush my teeth?", 3], ["👕", "Pajamas", "Pajamas next!", 2], ["💡", "Lights out", "Lights out?", 3]];
 function drawWindDown(now) {
   const r = store.get("tinny-routine", {});
-  if (r.day !== dayKey(now)) { r.day = dayKey(now); r.teeth = 0; r.pj = false; store.set("tinny-routine", r); }
-  const done = { teeth: r.teeth >= 5, pj: r.pj };
-  sky("#3b3f74", "#6b5f9a"); ground("#4a4676");
-  rect(330, 40, 120, 90, "#25285a"); rect(336, 46, 108, 78, "#1a1d48"); ctx.fillStyle = "#ffe08a"; ctx.beginPath(); ctx.arc(410, 76, 16, 0, 7); ctx.fill();   // the window, and the moon
-  const u = 7, ty = 266 - 27 * u;
-  const brushing = r.brushAt && ago(r.brushAt) < 0.6;
-  tinny(30, ty, u, { eyes: tick % 30 < 4 ? "closed" : undefined, mouth: brushing ? "open" : tick % 40 < 6 ? "o" : "smile", pj: done.pj, cap: done.pj, foam: brushing || (r.teeth > 0 && !done.teeth) });
-  if (brushing) { rect(30 + 14 * u + (tick % 2 ? 6 : -6), ty + 15 * u, 40, 6, "#46bfc0"); rect(30 + 14 * u + (tick % 2 ? 6 : -6), ty + 14 * u, 10, 4, "w"); }
-  if (done.teeth && tick % 6 < 3) sparkle(30 + 15 * u, ty + 12 * u, 4, "#fff");
-  const steps = [["🪥", "Teeth", "teeth"], ["👕", "PJs", "pj"], ["💡", "Lamp", "lamp"]];
-  const next = !done.teeth ? "teeth" : !done.pj ? "pj" : "lamp";
-  steps.forEach(([e, label, key], i) => {
-    const x = 236, y = 124 + i * 64, isNext = key === next, isDone = done[key];
-    if (isNext && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, 228, 62, 29); ctx.fill(); }
-    pill(x, y, 220, 54, `${e}  ${label}${isDone ? "  ✓" : ""}`, 23, isDone ? "#6a6f9a" : "#16181f");
-    zone(226, y - 6, W - 226, 64, () => {
-      if (key !== next) { say([next === "teeth" ? "Teeth first!" : "PJs first!"], 1.6); return; }
-      if (key === "teeth") { r.teeth++; r.brushAt = Date.now(); store.set("tinny-routine", r); if (r.teeth === 5) say(["Sparkly", "teeth!"], 1.8); else if (r.teeth === 1) say(["Brush brush!", "Again!"], 1.8); }
-      if (key === "pj") { r.pj = true; store.set("tinny-routine", r); say(["Cozy!"], 1.6); }
-      if (key === "lamp") { tuckedIn = dayKey(now); store.set("tinny-tucked", tuckedIn); award(); }
-    });
-  });
-  if (!saying()) {
-    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(236, 14, 220, 92, 18); ctx.fill(); ctx.stroke();
-    text("Almost bedtime!", 346, 52, fit("Almost bedtime!", 22, 196), "#16181f", "center"); text("Help me get ready?", 346, 86, fit("Help me get ready?", 19, 196), "#16181f", "center");
+  if (r.day !== dayKey(now)) { Object.assign(r, { day: dayKey(now), step: 0, doing: 0 }); store.set("tinny-routine", r); }
+  const step = r.step || 0, doing = r.doing && ago(r.doing) < STEPS[Math.min(step, 2)][3] ? ago(r.doing) : null;
+  if (r.doing && doing == null) {                                   // that step just finished
+    r.doing = 0; r.step = step + 1; store.set("tinny-routine", r);
+    if (r.step >= STEPS.length) { tuckedIn = dayKey(now); store.set("tinny-tucked", tuckedIn); award(); return; }
+    say([["Sparkly teeth!"], ["So cozy!"]][step] || ["Goodnight!"], 1.8);
   }
+  const lampOff = step === 2 && doing != null ? Math.min(1, doing / 2) : 0;
+  sky("#3b3f74", "#6b5f9a"); ground("#4a4676");
+  const u = 7, ty = 266 - 27 * u;
+  const brushing = step === 0 && doing != null, dressing = step === 1 && doing != null;
+  tinny(20, ty, u, { eyes: lampOff > 0.5 ? "closed" : brushing ? "happy" : undefined, mouth: brushing ? (tick % 2 ? "open" : "o") : lampOff ? "flat" : "smile",
+    pj: step >= 2 || (dressing && doing > 1), cap: step >= 2 || (dressing && doing > 1), foam: brushing, arms: dressing && doing < 1 ? "up" : undefined });
+  if (brushing) { const bx = 20 + 14 * u + (tick % 2 ? 8 : -8); rect(bx, ty + 15 * u, 44, 7, "#46bfc0"); rect(bx, ty + 14 * u, 12, 5, "w"); }
+  if (dressing) for (let i = 0; i < 4; i++) sparkle(30 + rnd(160), ty + rnd(150), 5, "#ffd84a");
+  // the three steps, as a little checklist up top
+  STEPS.forEach(([e], i) => {
+    const x = 34 + i * 58, y = 30;
+    ctx.fillStyle = i < step ? "#6cbf4a" : i === step ? "#fff" : "#ffffff55"; ctx.beginPath(); ctx.arc(x, y, 22, 0, 7); ctx.fill();
+    text(i < step ? "✓" : e, x, y + 9, i < step ? 28 : 24, i < step ? "#fff" : "#000", "center");
+  });
+  if (step < STEPS.length) {
+    const [e, label, ask] = STEPS[step];
+    const x = 236, y = 110, w = 230, h = 196;
+    if (doing == null && tick % 8 < 5) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 6, y - 6, w + 12, h + 12, 30); ctx.fill(); }
+    ctx.fillStyle = doing == null ? "#fffdf7" : "#c9f0b4"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(x, y, w, h, 26); ctx.fill(); ctx.stroke();
+    text(e, x + w / 2, y + 110, 80, "#000", "center");
+    text(label, x + w / 2, y + 170, fit(label, 28, w - 20), "#16181f", "center");
+    if (!saying()) bubble(x, 14, w, 74, doing != null ? [["Brush brush!"], ["Arms up!"], ["Goodnight!"]][step] : [ask], 24, x + 26);
+    if (doing == null) zone(0, 0, W, H, () => { r.doing = Date.now(); store.set("tinny-routine", r); });   // a tap anywhere does the next step
+  }
+  if (lampOff) { ctx.globalAlpha = lampOff * 0.7; rect(0, 0, W, H, "#05061a"); ctx.globalAlpha = 1; }
+}
+
+/* ---------------- holidays ---------------- */
+// Costumes and decorations by date, plus her birthday (set on the admin page) and Tinny's.
+function nthWeekday(y, m, wd, n) { const d = new Date(y, m - 1, 1); return 1 + ((wd - d.getDay() + 7) % 7) + (n - 1) * 7; }
+function easter(y) {   // the Gregorian computus
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  return new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1);
+}
+function holiday(now) {
+  const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate();
+  const b = (doc?.tinny?.birthday || "").split("-").map(Number);
+  if (b.length === 3 && b[1] === m && b[2] === d) return { hat: "party", decor: ["🎂", "🎈", "🎁"], greet: ["Happy birthday,", `Zelda! You're ${y - b[0]}!`] };
+  const born = new Date((doc?.tinny?.born || 0) * 1000);
+  if (born.getFullYear() < y && born.getMonth() + 1 === m && born.getDate() === d) return { hat: "party", decor: ["🎂", "🎈"], greet: ["It's MY birthday!", `I'm ${y - born.getFullYear()}!`] };
+  if (m === 10 && d >= 24) return { hat: "pumpkin", decor: ["🎃", "🦇", "🍬"], greet: ["Happy", "Halloween!"] };
+  const tg = nthWeekday(y, 11, 4, 4);
+  if (m === 11 && d >= tg - 4 && d <= tg) return { hat: "pilgrim", decor: ["🦃", "🍂", "🥧"], greet: ["Happy", "Thanksgiving!"] };
+  if (m === 12 && d <= 25) return { hat: "santa", decor: ["🎄", "🎁", "⛄"], greet: ["Merry", "Christmas!"] };
+  if ((m === 12 && d === 31) || (m === 1 && d === 1)) return { hat: "party", decor: ["🎉", "🎆", "🥳"], greet: ["Happy", "New Year!"] };
+  if (m === 2 && d >= 7 && d <= 14) return { hat: "heart", decor: ["💕", "💌", "🌹"], greet: ["Happy", "Valentine's Day!"] };
+  if (m === 3 && d >= 14 && d <= 17) return { hat: "lucky", decor: ["☘️", "🌈", "🪙"], greet: ["Happy", "St. Patrick's Day!"] };
+  const e = easter(y), toE = (e - new Date(y, m - 1, d)) / 864e5;
+  if (toE >= 0 && toE <= 6) return { hat: "bunny", decor: ["🥚", "🐣", "🌷"], greet: ["Happy", "Easter!"] };
+  if (m === 7 && d <= 4) return { hat: "uncle", decor: ["🎆", "⭐", "🎆"], greet: ["Happy", "Fourth of July!"] };
+  return null;
+}
+
+/* ---------------- learning: letters, reading, spelling, numbers ---------------- */
+// Four skills, each with its own level that follows Zelda: four right in a row on
+// the first try moves it up, three misses at a level move it back down. A wrong
+// answer is never a dead end: that choice fades, a second miss lights up the
+// right one, and she tries again. Five questions make a round, then a star and
+// water for her garden. No sound on the little screen, so everything is shown.
+const W3 = [["cat", "🐱"], ["dog", "🐶"], ["pig", "🐷"], ["hen", "🐔"], ["bus", "🚌"], ["sun", "☀️"], ["bed", "🛏️"], ["hat", "🎩"], ["bat", "🦇"],
+  ["fox", "🦊"], ["box", "📦"], ["bug", "🐛"], ["map", "🗺️"], ["pen", "🖊️"], ["net", "🥅"], ["web", "🕸️"], ["ant", "🐜"], ["rat", "🐀"],
+  ["log", "🪵"], ["cap", "🧢"], ["van", "🚐"], ["cab", "🚕"], ["tub", "🛁"], ["nut", "🥜"], ["leg", "🦵"], ["pin", "📌"], ["mug", "☕"],
+  ["bag", "👜"], ["hut", "🛖"], ["ten", "🔟"], ["six", "6️⃣"], ["pot", "🍲"], ["cup", "🥤"], ["jam", "🍯"], ["fan", "🪭"], ["mop", "🧹"]];
+const W4 = [["fish", "🐟"], ["frog", "🐸"], ["duck", "🦆"], ["ship", "🚢"], ["star", "⭐"], ["moon", "🌙"], ["tree", "🌳"], ["cake", "🍰"],
+  ["bike", "🚲"], ["kite", "🪁"], ["boat", "⛵"], ["goat", "🐐"], ["sock", "🧦"], ["milk", "🥛"], ["bell", "🔔"], ["drum", "🥁"],
+  ["crab", "🦀"], ["nest", "🪺"], ["hand", "✋"], ["lamp", "💡"], ["ring", "💍"], ["lion", "🦁"], ["corn", "🌽"], ["frog", "🐸"]].filter((w, i, a) => a.findIndex(x => x[0] === w[0]) === i);
+// Pictures a 4-year-old names one way only (🐔 is a "chicken", 👜 a "purse", 🧹 a
+// "broom"), for the games where she sees only the picture: sounds and spelling.
+const CLEAR = new Set(["cat", "dog", "pig", "bus", "sun", "bed", "hat", "bat", "fox", "box", "bug", "map", "pen", "web", "ant", "leg", "ten", "six",
+  "fish", "frog", "duck", "star", "moon", "tree", "cake", "bike", "kite", "boat", "goat", "sock", "milk", "bell", "drum", "crab", "nest", "hand", "lamp", "ring", "lion", "corn"]);
+const clear = (bank) => bank.filter(w => CLEAR.has(w[0]));
+const SENTENCES = ["I see a %.", "Here is a %.", "Look at the %!", "I like the %.", "Can you see a %?", "The % is big."];
+const ITEMS = ["🍎", "⭐", "🐟", "🌸", "🚗", "🐞", "🎈", "🐶", "🍪", "🦆"];
+const TRACKS = {
+  P: { name: "Letters", emoji: "🔤", bg: ["#ffe3b8", "#fff4e2"], levels: ["Find the letter", "Big & little letters", "First sounds", "Last sounds"] },
+  R: { name: "Read", emoji: "📖", bg: ["#cfeaf7", "#eef8fc"], levels: ["Read a word", "Rhyming words", "Longer words", "Little sentences"] },
+  S: { name: "Spell", emoji: "✏️", bg: ["#e7d4f5", "#f6effc"], levels: ["Copy the word", "Spell 3 letters", "3 letters + extras", "4-letter words"] },
+  M: { name: "Count", emoji: "🔢", bg: ["#c9ecb4", "#eef8e8"], levels: ["Count to 5", "Count to 10", "Which is more?", "Add to 5", "Take away", "Add to 10", "Number sentences"] },
+};
+const ROUND = 5;
+const learn = store.get("tinny-learn", {});
+for (const k of Object.keys(TRACKS)) learn[k] = Object.assign({ lv: 1, streak: 0, miss: 0 }, learn[k]);
+learn.days = learn.days || {};
+const rnd = (n) => Math.floor(Math.random() * n);
+const pickOne = (a) => a[rnd(a.length)];
+const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const UPPER = "ABCDEFGHIJKLMNOPRSTUW", LOWER = "abcdefghijklmnoprstuw";
+const LOOKALIKE = { b: "dp", d: "bp", p: "bq", q: "pd", m: "nw", n: "mu", u: "nv", w: "mv", E: "FB", F: "EP", O: "QC", M: "NW", N: "MH" };
+function threeOf(ans, pool) {   // the answer and two others, shuffled; returns [options, index of the answer]
+  const opts = shuffle([ans, ...shuffle([...new Set(pool)].filter(x => x !== ans)).slice(0, 2)]);
+  return [opts, opts.indexOf(ans)];
+}
+function numOpts(ans, lo = 0, hi = 10) {
+  const near = []; for (let v = Math.max(lo, ans - 3); v <= Math.min(hi, ans + 3); v++) if (v !== ans) near.push(v);
+  return threeOf(ans, near);
+}
+function rime(w) { return w.slice(1); }
+function makeQuestion(track) {
+  const lv = learn[track].lv;
+  const q = { track, lv, tries: 0, faded: [], glow: null, okAt: 0 };
+  if (track === "P") {
+    if (lv === 1) { const L = pickOne(UPPER); const pool = (LOOKALIKE[L] || "") + UPPER; [q.opts, q.ans] = threeOf(L, [...pool]); Object.assign(q, { ask: `Find ${L}!`, show: { big: L }, kind: "letter" }); }
+    else if (lv === 2) { const l = pickOne(LOWER); const pool = [...(LOOKALIKE[l] || ""), ...LOWER].map(x => x.toUpperCase()); [q.opts, q.ans] = threeOf(l.toUpperCase(), pool); Object.assign(q, { ask: "Find the big one!", show: { big: l }, kind: "letter" }); }
+    else { const [w, e] = pickOne(clear(lv === 3 ? [...W3, ...W4] : W3)); const ch = lv === 3 ? w[0] : w[w.length - 1]; [q.opts, q.ans] = threeOf(ch, [...LOWER]); Object.assign(q, { ask: lv === 3 ? "What does it start with?" : "What does it end with?", show: { pic: e }, kind: "letter", word: w }); }
+  }
+  if (track === "R") {
+    const bank = lv >= 3 ? W4 : W3;
+    const [w, e] = pickOne(lv === 4 ? [...W3, ...W4] : bank);
+    let pool = bank.filter(x => x[0] !== w);
+    if (lv === 2) { const rhymes = W3.filter(x => x[0] !== w && rime(x[0]) === rime(w)); pool = rhymes.length >= 2 ? rhymes : W3.filter(x => x[0] !== w && x[0][0] === w[0]).concat(rhymes).length >= 2 ? W3.filter(x => x[0] !== w && (x[0][0] === w[0] || rime(x[0]) === rime(w))) : pool; }
+    if (lv === 1) pool = pool.filter(x => x[0][0] !== w[0]);
+    const [opts, ans] = threeOf(e, shuffle(pool).map(x => x[1]));
+    Object.assign(q, { opts, ans, kind: "pic", ask: lv === 4 ? "Read it! Which one?" : "Read it!", show: lv === 4 ? { line: pickOne(SENTENCES).replace("%", w) } : { word: w } });
+  }
+  if (track === "S") {
+    const mine = (doc?.tinny?.words || []).filter(w => w.length <= 6);
+    let w, e = null;
+    if (lv >= 2 && mine.length && Math.random() < 0.3) w = pickOne(mine);
+    else [w, e] = pickOne(lv === 1 ? W3 : clear(lv >= 4 ? W4 : W3));
+    const extra = lv >= 3 ? shuffle([...LOWER].filter(ch => !w.includes(ch))).slice(0, 2) : [];
+    Object.assign(q, { kind: "spell", word: w, pic: e, ask: e ? "Spell it!" : "Spell this word!", traced: lv === 1, peekUntil: e ? 0 : Date.now() + 4000,
+      tiles: shuffle([...w, ...extra]).map(ch => ({ ch, used: false, shakeAt: 0 })), pos: 0, wrongHere: 0 });
+  }
+  if (track === "M") {
+    const thing = pickOne(ITEMS);
+    q.thing = thing; q.kind = "num";
+    if (lv === 1) { const n = 1 + rnd(5); [q.opts, q.ans] = numOpts(n, 1, 6); Object.assign(q, { ask: "How many?", show: { count: n } }); }
+    else if (lv === 2) { const n = 5 + rnd(6); [q.opts, q.ans] = numOpts(n, 3, 12); Object.assign(q, { ask: "How many?", show: { count: n, frame: true } }); }
+    else if (lv === 3) { let a = 1 + rnd(8), b = 1 + rnd(8); while (a === b) b = 1 + rnd(8); Object.assign(q, { kind: "groups", ask: "Which has more?", opts: [a, b], ans: a > b ? 0 : 1, show: {} }); }
+    else if (lv === 4) { const a = 1 + rnd(3), b = 1 + rnd(5 - a); [q.opts, q.ans] = numOpts(a + b, 0, 8); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] } }); }
+    else if (lv === 5) { const a = 3 + rnd(4), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(a - b, 0, 8); Object.assign(q, { ask: `Tinny ate ${b}. How many left?`, show: { take: [a, b] } }); }
+    else if (lv === 6) { const a = 2 + rnd(6), b = 1 + rnd(10 - a); [q.opts, q.ans] = numOpts(a + b, 0, 12); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] } }); }
+    else { const plus = Math.random() < 0.6, a = plus ? rnd(8) + 1 : 3 + rnd(8), b = plus ? 1 + rnd(10 - a) : 1 + rnd(a - 1); const v = plus ? a + b : a - b; [q.opts, q.ans] = numOpts(v, 0, 12); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` } }); }
+  }
+  return q;
+}
+function startLearn(track) { begin("learn", { track, n: 0, right: 0 }); act.q = makeQuestion(track); }
+function scoreQuestion(q) {
+  const t = learn[q.track], first = q.tries === 0, day = dayKey(new Date());
+  const d = learn.days[day] = learn.days[day] || {};
+  const rec = d[q.track] = d[q.track] || [0, 0]; rec[0]++; if (first) rec[1]++;
+  for (const k of Object.keys(learn.days).sort().slice(0, -21)) delete learn.days[k];
+  let up = false;
+  if (first) { t.streak++; if (t.streak >= 4 && t.lv < TRACKS[q.track].levels.length) { t.lv++; t.streak = 0; t.miss = 0; up = true; } }
+  store.set("tinny-learn", learn); postProgress();
+  return up;
+}
+function missed(q) {
+  const t = learn[q.track];
+  if (q.tries === 1) { t.streak = 0; t.miss++; if (t.miss >= 3 && t.lv > 1) { t.lv--; t.miss = 0; } store.set("tinny-learn", learn); }
+}
+const PRAISE = [["Yes!"], ["You got it!"], ["Great job!"], ["Wow!"], ["Super!"], ["That's right!"]];
+function rightAnswer(q, x, y) {
+  q.okAt = Date.now(); burst(x, y, 18);
+  const up = scoreQuestion(q);
+  act.right += q.tries === 0 ? 1 : 0;
+  say(up ? ["New level!", "You're so smart!"] : pickOne(PRAISE), 1.3);
+  setTimeout(() => {
+    if (!act || act.kind !== "learn" || act.q !== q) return;
+    act.n++;
+    if (act.n >= ROUND) finishLearn(); else act.q = makeQuestion(act.track);
+  }, 1400);
+}
+function wrongAnswer(q, i) {
+  q.tries++; missed(q);
+  if (i != null && !q.faded.includes(i)) q.faded.push(i);
+  q.shake = { i, at: Date.now() };
+  if (q.tries >= 2) q.glow = q.ans;
+  if (q.show?.count && q.tries === 1) q.demo = Date.now();     // count them together
+  say(q.tries >= 2 ? ["This one!"] : pickOne([["Almost!"], ["Try again!"], ["Hmm, not that one."]]), 1.4);
+}
+function chooseOpt(i, x, y) {
+  const q = act?.q;
+  if (!q || q.okAt || q.faded.includes(i)) return;
+  if (i === q.ans) rightAnswer(q, x, y); else wrongAnswer(q, i);
+}
+function tapTile(k, x, y) {
+  const q = act?.q;
+  if (!q || q.okAt) return;
+  const t = q.tiles[k];
+  if (t.used) return;
+  if (t.ch === q.word[q.pos]) {
+    t.used = true; q.pos++; q.wrongHere = 0; burst(x, y, 6);
+    if (q.pos === q.word.length) rightAnswer(q, 240, 90);
+  } else {
+    t.shakeAt = Date.now(); q.wrongHere++;
+    if (q.tries === 0) { q.tries = 1; missed(q); }
+    say(q.wrongHere >= 2 ? ["This one!"] : ["Not that one.", `Find ${q.word[q.pos]}!`], 1.6);
+  }
+}
+function finishLearn() {
+  award(); const grew = water(ROUND);
+  begin("done", { lines: act.right >= 4 ? ["You did it!", "So smart!"] : ["You did it!", "Great try!"], garden: grew, back: "menu" });
+  burst(240, 120, 30);
+}
+
+/* ---------------- her garden ---------------- */
+// Every round waters it. Each plant takes eight drops to bloom; eight plants
+// fill the garden, then it starts a new one with the next flowers.
+const PLANTS = ["🌷", "🌻", "🌼", "🍓", "🌹", "🥕", "🌸", "🍅", "🌺", "🎃"];
+const garden = store.get("tinny-garden", { plots: [], total: 0, set: 0 });
+function water(n) {
+  const grew = [];
+  for (let k = 0; k < n; k++) {
+    let i = garden.plots.findIndex(p => p.g < 8);
+    if (i < 0 && garden.plots.length < 8) { garden.plots.push({ p: PLANTS[(garden.set * 3 + garden.plots.length) % PLANTS.length], g: 0 }); i = garden.plots.length - 1; }
+    if (i < 0) { garden.set++; garden.plots = [{ p: PLANTS[(garden.set * 3) % PLANTS.length], g: 0 }]; i = 0; grew.length = 0; }
+    garden.plots[i].g++;
+    if (garden.plots[i].g === 8) garden.total++;
+    if (!grew.includes(i)) grew.push(i);
+  }
+  store.set("tinny-garden", garden); postProgress();
+  return grew;
+}
+function drawGarden(x0, base, w, grew, t) {
+  rect(x0, base, w, 14, "#8a5a2b"); rect(x0, base, w, 4, "#6e4520");
+  const gap = w / 8;
+  for (let i = 0; i < 8; i++) {
+    const cx = x0 + gap * i + gap / 2, p = garden.plots[i];
+    ctx.fillStyle = "#6e4520"; ctx.beginPath(); ctx.ellipse(cx, base + 2, 14, 6, 0, 0, 7); ctx.fill();
+    if (!p) continue;
+    const g = p.g, h = 6 + g * 6, wiggle = grew?.includes(i) && t < 2.5 ? Math.sin(t * 12) * 2 : 0;
+    rect(cx - 2 + wiggle, base - h, 4, h, "#4f9f30");
+    if (g >= 3) { rect(cx - 12 + wiggle, base - h * 0.55, 10, 5, "#5fae4a"); rect(cx + 2 + wiggle, base - h * 0.75, 10, 5, "#5fae4a"); }
+    if (g >= 6 && g < 8) { ctx.fillStyle = "#7fbf5a"; ctx.beginPath(); ctx.arc(cx + wiggle, base - h - 4, 7, 0, 7); ctx.fill(); }
+    if (g >= 8) text(p.p, cx + wiggle, base - h + 8, 30, "#000", "center");
+    if (grew?.includes(i) && t < 1.6) for (let d = 0; d < 3; d++) {      // water drops falling on it
+      const yy = base - h - 60 + ((t * 90 + d * 22) % 60);
+      ctx.fillStyle = "#5aa7e6"; ctx.beginPath(); ctx.arc(cx - 6 + d * 6, yy, 4, 0, 7); ctx.fill();
+    }
+  }
+}
+
+/* ---------------- drawing the learning screens ---------------- */
+function card(x, y, w, h, fill, opts = {}) {
+  const dx = opts.shake ? (tick % 2 ? 6 : -6) : 0;
+  if (opts.glow && tick % 6 < 4) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 6 + dx, y - 6, w + 12, h + 12, 24); ctx.fill(); }
+  ctx.globalAlpha = opts.faded ? 0.28 : 1;
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(x + dx, y + 5, w, h, 20); ctx.fill();
+  ctx.fillStyle = fill; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(x + dx, y, w, h, 20); ctx.fill(); ctx.stroke();
+  return dx;
+}
+function itemsRow(n, cx, cy, size, thing, opt = {}) {
+  const per = opt.frame ? 5 : n, rows = Math.ceil(n / per), gap = Math.min(size + 4, opt.maxW / per);
+  for (let k = 0; k < n; k++) {
+    const r = Math.floor(k / per), col = k % per;
+    const x = cx + (col - (Math.min(per, n - r * per) - 1) / 2) * gap, y = cy + (r - (rows - 1) / 2) * (size + 2);
+    ctx.globalAlpha = opt.crossFrom != null && k >= opt.crossFrom ? 0.35 : 1;
+    text(thing, x, y + size * 0.35, size, "#000", "center");
+    ctx.globalAlpha = 1;
+    if (opt.crossFrom != null && k >= opt.crossFrom) { ctx.strokeStyle = "#e2413b"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x - size / 2.4, y - size / 2.4); ctx.lineTo(x + size / 2.4, y + size / 2.4); ctx.stroke(); }
+    if (opt.demoN != null && k < opt.demoN) text(String(k + 1), x, y - size * 0.55, 16, "#e2413b", "center");
+  }
+}
+function drawLearn(now) {
+  const q = act.q, T = TRACKS[act.track];
+  sky(T.bg[0], T.bg[1]);
+  // top: home, five dots for the round, the level
+  homeButton(() => begin("menu"));
+  for (let r = 0; r < ROUND; r++) { ctx.fillStyle = r < act.n ? "#e9ad1c" : "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(190 + r * 26, 24, 9, 0, 7); ctx.fill(); ctx.stroke(); }
+  pill(380, 8, 92, 32, `Level ${q.lv}`, 16, "#ffffffcc", "#16181f");
+  // Tinny, small, beside the question
+  tinny(6, 52, 3, { eyes: q.okAt ? "happy" : undefined, mouth: q.okAt ? "open" : "smile", arms: q.okAt ? "up" : undefined });
+  // the question card
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(92, 48, 380, 110, 20); ctx.fill(); ctx.stroke();
+  const ask = saying() ? said.lines.join(" ") : q.ask;
+  text(ask, 282, 76, fit(ask, 22, 350), saying() ? "#e2413b" : "#6f6752", "center");
+  const s = q.show || {}, cx = 282, cy = 120;
+  if (s.big) text(s.big, cx, cy + 24, 64, "#16181f", "center");
+  if (s.pic) text(s.pic, cx, cy + 22, 56, "#000", "center");
+  if (s.word) text(s.word, cx, cy + 22, 56, "#16181f", "center");
+  if (s.line) text(s.line, cx, cy + 14, fit(s.line, 32, 350), "#16181f", "center");
+  if (s.expr) text(s.expr, cx, cy + 20, 52, "#16181f", "center");
+  const demoN = q.demo ? Math.min(s.count || 0, Math.floor(ago(q.demo) / 0.6)) : null;
+  if (s.count) itemsRow(s.count, cx, cy + 2, s.frame ? 26 : 34, q.thing, { frame: s.frame, maxW: 340, demoN });
+  if (s.add) { itemsRow(s.add[0], cx - 90, cy + 4, 28, q.thing, { maxW: 150, frame: s.add[0] > 5 }); text("+", cx, cy + 16, 40, "#16181f", "center"); itemsRow(s.add[1], cx + 90, cy + 4, 28, q.thing, { maxW: 150, frame: s.add[1] > 5 }); }
+  if (s.take) itemsRow(s.take[0], cx, cy + 4, 32, q.thing, { maxW: 340, crossFrom: s.take[0] - s.take[1] });
+  if (q.kind === "spell") return drawSpell(q);
+  // the answers: three big cards across the bottom (two for "which has more")
+  const n = q.opts.length, gap = 10, w = n === 2 ? 229 : 148, h = 146, y = 168;
+  q.opts.forEach((o, i) => {
+    const x = 8 + i * (w + gap), done = q.okAt && i === q.ans;
+    const dx = card(x, y, w, h, done ? "#c9f0b4" : "#fffdf7", { faded: q.faded.includes(i), glow: q.glow === i, shake: q.shake?.i === i && ago(q.shake.at) < 0.5 });
+    const mx = x + w / 2 + dx, my = y + h / 2;
+    if (q.kind === "letter") text(String(o), mx, my + 26, 76, "#16181f", "center");
+    if (q.kind === "pic") text(o, mx, my + 24, 72, "#000", "center");
+    if (q.kind === "num") text(String(o), mx, my + 24, 70, "#16181f", "center");
+    if (q.kind === "groups") itemsRow(o, mx, my, 28, q.thing, { frame: true, maxW: w - 20 });
+    ctx.globalAlpha = 1;
+    zone(x - 4, y - 8, w + 8, h + 14, (tx, ty) => chooseOpt(i, tx, ty));
+  });
+}
+function drawSpell(q) {
+  // slots for the letters, inside the question card
+  const L = q.word.length, sw = 46, sx = q.pic ? 210 : 282 - (L * (sw + 6)) / 2;
+  if (q.pic) text(q.pic, 150, 140, 56, "#000", "center");
+  const peek = q.peekUntil && Date.now() < q.peekUntil;
+  for (let k = 0; k < L; k++) {
+    const x = sx + k * (sw + 6), y = 92;
+    ctx.fillStyle = k < q.pos ? "#c9f0b4" : "#fff"; ctx.strokeStyle = k === q.pos && !q.okAt && tick % 6 < 4 ? "#e9ad1c" : "#16181f"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.roundRect(x, y, sw, 56, 10); ctx.fill(); ctx.stroke();
+    if (k < q.pos) text(q.word[k], x + sw / 2, y + 44, 40, "#16181f", "center");
+    else if (q.traced || peek) text(q.word[k], x + sw / 2, y + 44, 40, "#c9c2b0", "center");
+  }
+  // the letter tiles: one row of up to four, or two rows
+  const n = q.tiles.length, perRow = n <= 4 ? n : Math.ceil(n / 2), rows = Math.ceil(n / perRow);
+  const gap = 10, w = Math.min(148, (464 - gap * (perRow - 1)) / perRow), h = rows === 1 ? 140 : 66;
+  q.tiles.forEach((t, k) => {
+    const r = Math.floor(k / perRow), col = k % perRow, inRow = Math.min(perRow, n - r * perRow);
+    const x = 240 - (inRow * w + (inRow - 1) * gap) / 2 + col * (w + gap), y = 168 + r * (h + 10);
+    const want = !q.okAt && q.wrongHere >= 2 && !t.used && t.ch === q.word[q.pos] && q.tiles.findIndex(u => !u.used && u.ch === q.word[q.pos]) === k;
+    const dx = card(x, y, w, h, t.used ? "#e9e3d3" : "#fffdf7", { faded: t.used, glow: want, shake: ago(t.shakeAt) < 0.5 });
+    text(t.ch, x + w / 2 + dx, y + h / 2 + (rows === 1 ? 26 : 17), rows === 1 ? 76 : 48, "#16181f", "center");
+    ctx.globalAlpha = 1;
+    if (!t.used) zone(x - 4, y - 6, w + 8, h + 10, (tx, ty) => tapTile(k, tx, ty));
+  });
+}
+function homeButton(fn) {
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(8, 8, 96, 34, 17); ctx.fill();
+  text("🏠 Back", 56, 31, 17, "#fff", "center");
+  zone(0, 0, 120, 46, fn);
+}
+
+/* ---------------- little surprises on the home screen ---------------- */
+// Every couple of minutes something happens, so the screen never sits still:
+// a letter balloon floats up, a word of the day, a butterfly, juggling, or a
+// holiday hello. Tapping the balloon or the sign reads it out (on screen).
+let ev = null, nextEv = Date.now() + 45e3;
+function startEvent(now) {
+  const hol = holiday(now);
+  const kinds = ["letter", "word", "butterfly", "juggle"].concat(hol ? ["greet", "greet"] : []);
+  const kind = pickOne(kinds), [w, e] = pickOne([...W3, ...W4]);
+  ev = { kind, w, e, t0: Date.now(), len: kind === "juggle" ? 9 : 14 };
+  if (kind === "greet") { say(hol.greet, 5); ev.len = 5; }
+}
+function dayEvent(now, u, ty) {
+  if (ev && ago(ev.t0) > ev.len) ev = null;
+  if (!ev && Date.now() > nextEv && !saying() && !act) { startEvent(now); nextEv = Date.now() + (90 + rnd(90)) * 1000; }
+  if (!ev) return;
+  const t = ago(ev.t0);
+  if (ev.kind === "letter" && !ev.popped) {
+    const x = 250 + Math.sin(t * 1.5) * 20, y = 300 - t * 22;
+    ctx.strokeStyle = "#16181f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y + 36); ctx.lineTo(x + 4, y + 80); ctx.stroke();
+    ctx.fillStyle = "#e2413b"; ctx.beginPath(); ctx.ellipse(x, y, 30, 36, 0, 0, 7); ctx.fill();
+    text(ev.w[0].toUpperCase() + ev.w[0], x, y + 12, 30, "#fff", "center");
+    zone(x - 40, y - 46, 80, 92, () => { ev.popped = true; burst(x, y, 14); say([`${ev.w[0].toUpperCase()} is for`, `${ev.w} ${ev.e}`], 4); });
+  }
+  if (ev.kind === "word") {
+    const x = 274, y = 66 - Math.max(0, 1 - t) * 240;      // drops down over the calendar card
+    ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, 186 + 8, 180 + 8, 18); ctx.fill();
+    ctx.fillStyle = "#fff7d6"; ctx.beginPath(); ctx.roundRect(x, y, 186, 180, 14); ctx.fill();
+    text("Word of the day", x + 93, y + 26, 16, "#6f6752", "center");
+    text(ev.e, x + 93, y + 100, 60, "#000", "center");
+    text(ev.w, x + 93, y + 158, 40, "#16181f", "center");
+    zone(x, y, 186, 180, () => { say([`${ev.w}!`, `${ev.w.split("").join("-")}`], 3); for (let i = 0; i < 3; i++) hearts.push({ x: x + 40 * i, y: y + 40, u: 4, col: "#e2413b", life: 12 }); });
+  }
+  if (ev.kind === "butterfly") {
+    const head = [40 + 13 * u, ty - 10];
+    const x = ev.landed ? head[0] : 470 - t * 40 + Math.sin(t * 4) * 18, y = ev.landed ? head[1] : 90 + Math.sin(t * 3) * 30;
+    const flap = tick % 2 ? 12 : 6;
+    text("🦋", x, y + 12, 22 + flap, "#000", "center");
+    if (!ev.landed) zone(x - 36, y - 36, 72, 72, () => { ev.landed = true; ev.len = t + 8; say(["A butterfly!", "Hello!"], 3); });
+  }
+  if (ev.kind === "juggle") {
+    const cx = 40 + 13 * u, top = ty - 20;
+    for (let k = 0; k < 3; k++) {
+      const a = t * 4 + k * 2.1, bx = cx + Math.cos(a) * 34, by = top - Math.abs(Math.sin(a)) * 60;
+      ctx.fillStyle = ["#e2413b", "#2f6fb5", "#f2c230"][k]; ctx.beginPath(); ctx.arc(bx, by, 9, 0, 7); ctx.fill();
+    }
+    if (!saying()) say([["One!"], ["Two!"], ["Three!"]][Math.floor(t) % 3], 0.9);
+  }
+}
+
+/* ---------------- touch calibration ---------------- */
+// The little screen's touch layer can sit a bit off from its picture. A grown-up
+// starts this from the admin page and taps five stars; from then on every tap
+// is corrected (a best-fit straight-line map from where the screen thought the
+// tap was to where the star really is). Kept on this screen.
+const CAL_PTS = [[60, 60], [420, 60], [420, 260], [60, 260], [240, 160]];
+let cal = store.get("tinny-cal", null), calTs = store.get("tinny-cal-ts", 0), calib = null;
+function startCalibration() { calib = { i: 0, raw: [], msg: null, t0: Date.now() }; act = null; }
+function solveCal(raw) {
+  const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], bx = [0, 0, 0], by = [0, 0, 0];
+  raw.forEach(([x, y], k) => { const r = [x, y, 1]; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) M[i][j] += r[i] * r[j]; bx[i] += r[i] * CAL_PTS[k][0]; by[i] += r[i] * CAL_PTS[k][1]; } });
+  const det = (m) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D = det(M);
+  if (Math.abs(D) < 1e-6) return null;
+  const solve = (b) => [0, 1, 2].map(col => det(M.map((row, i) => row.map((v, j) => (j === col ? b[i] : v)))) / D);
+  return [...solve(bx), ...solve(by)];
+}
+const applyCal = (x, y, k = cal) => (k ? [k[0] * x + k[1] * y + k[2], k[3] * x + k[4] * y + k[5]] : [x, y]);
+function calibTap(x, y) {
+  calib.raw.push([x, y]); calib.i++;
+  if (calib.i < CAL_PTS.length) return;
+  const k = solveCal(calib.raw);
+  const worst = k ? Math.max(...calib.raw.map((r, i) => { const [cx, cy] = applyCal(r[0], r[1], k); return Math.hypot(cx - CAL_PTS[i][0], cy - CAL_PTS[i][1]); })) : 999;
+  if (k && worst < 40) { cal = k; store.set("tinny-cal", cal); calib = { done: Date.now() }; }
+  else calib = { i: 0, raw: [], msg: "Let's try that again: tap right on each star.", t0: Date.now() };
+}
+function drawCalibration() {
+  rect(0, 0, W, H, "#16181f");
+  if (calib.done) {
+    text("All set!", 240, 140, 40, "#fff", "center"); text("Taps now land where you touch.", 240, 184, 22, "#c9d4ff", "center");
+    if (ago(calib.done) > 2.5) calib = null;
+    return;
+  }
+  if (ago(calib.t0) > 90) { calib = null; return; }        // nobody's here: keep the old one
+  const [x, y] = CAL_PTS[calib.i];
+  for (const r of [34, 22]) { ctx.strokeStyle = "#ffd84a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r + (tick % 4), 0, 7); ctx.stroke(); }
+  rect(x - 40, y - 1, 80, 2, "#ffd84a"); rect(x - 1, y - 40, 2, 80, "#ffd84a");
+  text("⭐", x, y + 9, 24, "#000", "center");
+  const ty = y > 200 ? 40 : y < 100 ? 300 : 300;
+  text(calib.msg || "Grown-up: tap the middle of the star", 240, ty - 22, fit(calib.msg || "Grown-up: tap the middle of the star", 20, 440), "#fff", "center");
+  text(`${calib.i + 1} of ${CAL_PTS.length}`, 240, ty + 6, 18, "#c9d4ff", "center");
+}
+
+/* ---------------- telling the admin page how she's doing ---------------- */
+let progTimer = null;
+function postProgress() {
+  clearTimeout(progTimer);
+  progTimer = setTimeout(() => fetch("/api/tinny/progress", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ levels: Object.fromEntries(Object.keys(TRACKS).map(k => [k, learn[k].lv])), days: learn.days, stars, flowers: garden.total, growing: garden.plots.length }) }).catch(() => {}), 3000);
 }
 
 /* ---------------- touch ---------------- */
@@ -738,11 +1147,25 @@ function pet() {
   for (let i = 0; i < few; i++)
     hearts.push({ x: 60 + Math.random() * 200, y: 70 + Math.random() * 60, u: 4 + Math.floor(Math.random() * 3), col: i % 2 ? "#f2a1a8" : "#e2413b", life: 14 + Math.floor(Math.random() * 6) });
 }
+function drawRings() {
+  rings = rings.filter(r => ago(r.at) < 0.5);
+  for (const r of rings) {
+    const k = ago(r.at) / 0.5, rad = 10 + k * 36;
+    ctx.globalAlpha = 1 - k; ctx.lineWidth = 6; ctx.strokeStyle = "#16181f"; ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, 7); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeStyle = "#ffd84a"; ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
 addEventListener("pointerdown", (e) => {
-  e.preventDefault(); lastTap = Date.now();
+  e.preventDefault();
+  if (Date.now() - lastDown < 220) return;            // these touch panels often report one press twice
+  lastDown = lastTap = Date.now();
   const r = c.getBoundingClientRect();
   let x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
   if (c.style.transform) { x = W - x; y = H - y; }     // the screen is flipped
+  if (calib) { if (!calib.done) calibTap(x, y); drawScene(new Date()); return; }
+  [x, y] = applyCal(x, y);
+  rings.push({ x, y, at: Date.now() });
   if (doc?.screen?.tapDots) taps = [...taps.slice(-5), { x, y, at: Date.now() }];
   const fn = hit(x, y);
   try { if (fn) fn(x, y); else pet(); } catch (err) { act = null; }

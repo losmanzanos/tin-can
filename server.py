@@ -327,6 +327,13 @@ def clean_tinny(t):
     except (TypeError, ValueError):
         pass
     out["units"] = "C" if t.get("units") == "C" else "F"
+    # Zelda's birthday, for her party day (and her age on the banner).
+    b = str(t.get("birthday") or "")
+    if re.match(r"^(19|20)[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$", b):
+        out["birthday"] = b
+    # Her own words for the spelling game (her name, this week's words...).
+    words = t.get("words") if isinstance(t.get("words"), list) else []
+    out["words"] = sorted({w.strip().lower() for w in words if isinstance(w, str) and re.match(r"^[A-Za-z]{2,8}$", w.strip())})[:30]
     return out
 
 
@@ -680,6 +687,7 @@ def make_handler(store, mailroom):
                 self.wfile.write(data)
 
         def body(self, limit):
+            self.body_read = True
             n = int(self.headers.get("Content-Length") or 0)
             if n > limit:
                 raise BadRequest("too big")
@@ -733,6 +741,7 @@ def make_handler(store, mailroom):
                     "family": [{"key": k, "name": v.get("name", ""), "created": v.get("created", 0)}
                                for k, v in (s.get("family") or {}).items()],
                     "familyUrl": s.get("familyUrl") or public_url(),
+                    "tinnyProgress": read_json(store.dir / "tinny-progress.json", {}) or {},
                 },
             }
 
@@ -754,7 +763,8 @@ def make_handler(store, mailroom):
                 # What Tinny reacts to besides the calendar: has Zelda looked at
                 # her newest postcard yet, and the last hug sent from the admin page.
                 return self.send(HTTPStatus.OK, {"seen": (read_json(store.dir / "postcards-seen.json", {}) or {}).get("ts", 0),
-                                                 "hug": read_json(store.dir / "hug.json", {}) or {}})
+                                                 "hug": read_json(store.dir / "hug.json", {}) or {},
+                                                 "calibrate": (read_json(store.dir / "calibrate.json", {}) or {}).get("ts", 0)})
             if path == "/api/board":
                 if not (self.board_ok() or self.authed()):
                     return self.error(HTTPStatus.UNAUTHORIZED, "This board's link is out of date. Make a new one on the admin page.")
@@ -803,10 +813,24 @@ def make_handler(store, mailroom):
             self.error(HTTPStatus.NOT_FOUND, "not found")
 
         def do_POST(self):
+            self.body_read = False
             try:
                 self.route_write()
             except BadRequest as e:
                 self.error(HTTPStatus.BAD_REQUEST, str(e))
+            finally:
+                self.drain()
+
+        def drain(self):
+            """Read any request body a route didn't need. Left unread, its bytes
+            would be taken for the start of the next request on this connection."""
+            if getattr(self, "body_read", True):
+                return
+            n = int(self.headers.get("Content-Length") or 0)
+            if 0 < n <= 1024 * 1024:
+                self.rfile.read(n)
+            elif n:
+                self.close_connection = True
 
         def do_PUT(self):
             self.do_POST()
@@ -815,6 +839,16 @@ def make_handler(store, mailroom):
             path = urlsplit(self.path).path
             if not self.same_origin():
                 return self.error(HTTPStatus.FORBIDDEN, "wrong origin")
+
+            # Tinny reports what Zelda has been practicing, for the admin page. Home
+            # network only (the family page has no route to it), small, and just numbers.
+            if path == "/api/tinny/progress" and self.command == "POST":
+                body = self.json_body() or {}
+                raw = json.dumps(body)
+                if len(raw) > 16000:
+                    raise BadRequest("too big")
+                write_atomic(store.dir / "tinny-progress.json", json.dumps(dict(body, at=int(time.time()))).encode())
+                return self.send(HTTPStatus.OK, {"ok": True})
 
             if path == "/api/login" and self.command == "POST":
                 with failures.lock:
@@ -890,6 +924,10 @@ def make_handler(store, mailroom):
                 s["familyUrl"] = url
                 store.save_secrets(s)
                 return self.send(HTTPStatus.OK, {"familyUrl": url or public_url()})
+
+            if path == "/api/tinny/calibrate" and self.command == "POST":
+                write_atomic(store.dir / "calibrate.json", json.dumps({"ts": int(time.time())}).encode())
+                return self.send(HTTPStatus.OK, {"ok": True})
 
             if path == "/api/tinny/hug" and self.command == "POST":
                 sender = str((self.json_body() or {}).get("from", "")).strip()[:40] or "someone"
@@ -1096,6 +1134,7 @@ def make_family_handler(store, mailroom):
             self.error(HTTPStatus.NOT_FOUND, "not found")
 
         def do_POST(self):
+            self.body_read = False
             try:
                 path = urlsplit(self.path).path
                 name, k = self.who()
@@ -1124,6 +1163,8 @@ def make_family_handler(store, mailroom):
                 return self.send(HTTPStatus.OK, {"status": status})
             except BadRequest as e:
                 self.error(HTTPStatus.BAD_REQUEST, str(e))
+            finally:
+                self.drain()
 
         def do_PUT(self):
             self.error(HTTPStatus.NOT_FOUND, "not found")
