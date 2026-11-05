@@ -10,6 +10,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #16181f; tou
 body { display: grid; place-items: center; }
 /* Drawn at the little screen's own 480x320 and scaled to fit anything else. */
 canvas { display: block; width: min(100vw, 150vh); height: min(66.667vw, 100vh); image-rendering: pixelated; }
+/* On the little screen itself, Chromium won't make its window narrower than 500 px, so the
+   page is 20 px wider than the 480 px screen. Centered, the picture sat 10 px right and lost
+   its right edge; pinned to the left it lines up with the screen exactly. */
+@media (max-height: 340px) and (max-width: 520px) { body { place-items: start; } }
 </style>
 </head>
 <body>
