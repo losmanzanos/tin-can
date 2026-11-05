@@ -68,6 +68,7 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .saving { position: fixed; right: calc(var(--u) * 2); bottom: calc(var(--u) * 1.5); font-size: calc(var(--u) * 2.6); color: #8a8169; }
 .backToTinny { position: fixed; left: calc(var(--u) * 2); bottom: calc(var(--u) * 2); z-index: 20; border: 0; border-radius: 999px;
   background: var(--ink); color: #fff; font: 700 calc(var(--u) * 5) "Andika", sans-serif; padding: calc(var(--u) * 2) calc(var(--u) * 4); }
+.backToTinny.home { background: var(--mustard); color: var(--ink); box-shadow: 0 calc(var(--u) * 0.8) 0 var(--ink); }
 </style>
 </head>
 <body>
@@ -100,12 +101,16 @@ const REDRAW_AFTER_MS = 20000; // wait for her to finish before redrawing the bi
 
 let key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
 
-// Opened from Tinny on the tablet (#...&back=1): a big button back to Tinny.
-if (new URLSearchParams(location.hash.slice(1)).get("back") === "1") {
-  const b = document.createElement("button");
-  b.type = "button"; b.className = "backToTinny"; b.textContent = "🏠 Tinny";
-  b.onclick = () => { location.href = "/tinny#board=" + encodeURIComponent(key); };
-  document.body.appendChild(b);
+// On the tablet: opened from its home screen (#...&tablet=1), a big button back to the two
+// squares; opened from Tinny (#...&back=1), a big button back to Tinny.
+{
+  const h = new URLSearchParams(location.hash.slice(1)), tablet = h.get("tablet") === "1";
+  if (tablet || h.get("back") === "1") {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "backToTinny" + (tablet ? " home" : ""); b.textContent = tablet ? "⭐ Home" : "🏠 Tinny";
+    b.onclick = () => { location.href = tablet ? "/tablet#board=" + encodeURIComponent(key) : "/tinny#board=" + encodeURIComponent(key); };
+    document.body.appendChild(b);
+  }
 }
 try { if (key) localStorage.setItem("zp-board-key", key); else key = localStorage.getItem("zp-board-key") || ""; } catch (e) {}
 let doc = null, fb = null, frames = {}, seen = null, day = PB.weekdayOf(new Date()), touched = Date.now(), dragging = null;

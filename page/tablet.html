@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#fbf5e8">
+<title>Zelda's tablet</title>
+<style>
+@font-face { font-family: "Andika"; src: url("/fonts/andika-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+:root { --paper: #fbf5e8; --ink: #16181f; --mustard: #e9ad1c; --rule: #d8cdb4; --u: 1vmin; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); font-family: "Andika", sans-serif; touch-action: none; }
+body { display: grid; place-items: center; padding: calc(var(--u) * 5); }
+main { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 6); width: min(100%, 150vh); }
+@media (orientation: portrait) { main { grid-template-columns: 1fr; width: min(100%, 42vh); } }
+
+a { display: grid; grid-template-rows: 1fr auto; aspect-ratio: 1; border-radius: calc(var(--u) * 6); text-decoration: none; color: var(--ink);
+    border: calc(var(--u) * 1.2) solid var(--ink); box-shadow: 0 calc(var(--u) * 2) 0 var(--ink); transition: transform .12s, box-shadow .12s; overflow: hidden; }
+a:active, a.go { transform: translateY(calc(var(--u) * 2)); box-shadow: 0 0 0 var(--ink); }
+.pic { display: grid; place-items: center; min-height: 0; }
+.word { font-size: calc(var(--u) * 9); line-height: 1; text-align: center; padding: calc(var(--u) * 2) 0 calc(var(--u) * 4); }
+
+.tinny { background: #cfeaf7; }
+.tinny canvas { width: 62%; height: auto; image-rendering: pixelated; }
+
+.board { background: #fff1a8; }
+.mags { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 2); width: 66%; }
+.mags i { aspect-ratio: 1; border-radius: calc(var(--u) * 2.4); background: var(--c); border: calc(var(--u) * 0.8) solid var(--ink); }
+.mags i:nth-child(2) { transform: rotate(-6deg); }
+.mags i:nth-child(4) { transform: rotate(5deg); }
+</style>
+</head>
+<body>
+<main>
+  <a class="tinny" id="toTinny" href="/tinny"><div class="pic"><canvas id="pet" width="26" height="28" aria-hidden="true"></canvas></div><div class="word">Tinny</div></a>
+  <a class="board" id="toBoard" href="/board"><div class="pic"><div class="mags" aria-hidden="true">
+    <i style="--c:#e2413b"></i><i style="--c:#2f6fb5"></i><i style="--c:#5fae4a"></i><i style="--c:#ef7f2c"></i><i style="--c:#b768d6"></i><i style="--c:#46bfc0"></i>
+  </div></div><div class="word">My board</div></a>
+</main>
+<script>
+// The tablet's home screen: Fully Kiosk opens /tablet#board=<the magnet board's key>.
+// Two big squares, one for Tinny and one for her magnet board. Each of those has a
+// Home button that comes back here.
+let key = new URLSearchParams(location.hash.slice(1)).get("board") || "";
+try { if (key) localStorage.setItem("zp-board-key", key); else key = localStorage.getItem("zp-board-key") || ""; } catch (e) {}
+const k = encodeURIComponent(key);
+document.getElementById("toTinny").href = "/tinny#" + (key ? "board=" + k + "&" : "") + "tablet=1";
+document.getElementById("toBoard").href = "/board#" + (key ? "key=" + k + "&" : "") + "tablet=1";
+document.querySelectorAll("a").forEach(a => a.addEventListener("click", () => a.classList.add("go")));
+addEventListener("pageshow", () => document.querySelectorAll("a").forEach(a => a.classList.remove("go")));
+
+// Tinny, waving, from the same little grid it's drawn on in its own room.
+const COL = { k: "#16181f", g: "#b9c0cc", l: "#e4e8ef", d: "#8b93a3", w: "#ffffff", p: "#f2a1a8", m: "#e9ad1c" };
+const c = document.getElementById("pet").getContext("2d");
+const px = (x, y, col, w = 1, h = 1) => { c.fillStyle = COL[col]; c.fillRect(x, y, w, h); };
+let wave = 0;
+function draw() {
+  c.clearRect(0, 0, 26, 28);
+  const top = 5, bot = 24, ey = top + 7, my = ey + 4;
+  px(13, 1, "k", 1, top - 1); px(12, 0, "m", 3, 2); px(12, 0, "k");
+  px(5, top, "k", 16, 1); px(4, top + 1, "k", 1, bot - top - 1); px(21, top + 1, "k", 1, bot - top - 1); px(5, bot, "k", 16, 1);
+  px(5, top + 1, "g", 16, bot - top - 1); px(5, top + 1, "l", 16, 2); px(5, top + 3, "d", 16, 1); px(5, bot - 3, "d", 16, 1);
+  px(6, top + 5, "l", 1, bot - top - 9); px(7, top + 5, "l", 1, 2);
+  px(8, ey + 1, "k"); px(9, ey, "k"); px(10, ey + 1, "k"); px(15, ey + 1, "k"); px(16, ey, "k"); px(17, ey + 1, "k");
+  px(7, ey + 3, "p", 2, 1); px(17, ey + 3, "p", 2, 1);
+  px(11, my, "k"); px(12, my + 1, "k", 3, 1); px(15, my, "k");
+  px(2, top + 10, "k", 2, 4);
+  if (wave % 14 < 5 && wave % 2) px(22, top + 2, "k", 2, 6); else px(22, top + 10, "k", 2, 4);   // a few waves, then a rest
+  px(7, bot + 1, "k", 4, 2); px(15, bot + 1, "k", 4, 2);
+}
+draw();
+setInterval(() => { wave++; draw(); }, 350);
+</script>
+</body>
+</html>

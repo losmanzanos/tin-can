@@ -119,6 +119,10 @@ const RECORD = "http://192.168.68.144:8080";
 // menu gets a button to her magnet board (and the board a button back). On a tablet Tinny
 // also knows the battery: low and not charging, it gets sleepy and asks to be plugged in.
 const BOARD_KEY = new URLSearchParams(location.hash.slice(1)).get("board") || "";
+// Opened from the tablet's home screen (#...&tablet=1): the play menu's yellow button goes
+// back to the two big squares instead of straight to the board.
+const TABLET = new URLSearchParams(location.hash.slice(1)).get("tablet") === "1";
+function goTabletHome() { location.href = "/tablet" + (BOARD_KEY ? "#board=" + encodeURIComponent(BOARD_KEY) : ""); }
 let battery = null, batteryNagged = 0;
 async function checkBattery() {
   try {
@@ -424,7 +428,10 @@ function drawMenu(now) {
   const want = wants(now);
   homeButton(() => { act = null; });
   pill(300, 8, 172, 34, `⭐ ${stars}   🌷 ${garden.total}`, 18, "#2a2d3a");
-  if (BOARD_KEY) {
+  if (TABLET) {
+    pill(116, 8, 176, 34, "⭐  Home", 18, "#e9ad1c", "#16181f");
+    zone(112, 0, 184, 46, goTabletHome);
+  } else if (BOARD_KEY) {
     pill(116, 8, 176, 34, "🧲  My board", 18, "#e9ad1c", "#16181f");
     zone(112, 0, 184, 46, () => { location.href = "/board#key=" + encodeURIComponent(BOARD_KEY) + "&back=1"; });
   }

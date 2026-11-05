@@ -781,6 +781,8 @@ def make_handler(store, mailroom):
                 return self.file(PAGE / "board.html")
             if path in ("/tinny", "/tinny/"):
                 return self.file(PAGE / "tinny.html")
+            if path in ("/tablet", "/tablet/"):
+                return self.file(PAGE / "tablet.html")
             if path == "/api/tinny":
                 # What Tinny reacts to besides the calendar: has Zelda looked at
                 # her newest postcard yet, and the last hug sent from the admin page.
