@@ -69,6 +69,10 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .backToTinny { position: fixed; left: calc(var(--u) * 2); bottom: calc(var(--u) * 2); z-index: 20; border: 0; border-radius: 999px;
   background: var(--ink); color: #fff; font: 700 calc(var(--u) * 5) "Andika", sans-serif; padding: calc(var(--u) * 2) calc(var(--u) * 4); }
 .backToTinny.home { background: var(--mustard); color: var(--ink); box-shadow: 0 calc(var(--u) * 0.8) 0 var(--ink); }
+/* On the tablet, Home sits at the start of the row of days, out of the way of the magnets. */
+.tablet .days { margin-left: calc(var(--u) * 19); }
+.tablet .backToTinny.home { left: calc(var(--u) * 3); top: calc(var(--u) * 2.5); bottom: auto; height: calc(var(--u) * 13); width: calc(var(--u) * 17.5);
+  padding: 0; border-radius: calc(var(--u) * 3); font-size: calc(var(--u) * 4.2); line-height: 1.1; }
 </style>
 </head>
 <body>
@@ -107,6 +111,7 @@ let key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
   const h = new URLSearchParams(location.hash.slice(1)), tablet = h.get("tablet") === "1" || typeof window.fully !== "undefined";
   if (tablet || h.get("back") === "1") {
     const b = document.createElement("button");
+    if (tablet) document.body.classList.add("tablet");
     b.type = "button"; b.className = "backToTinny" + (tablet ? " home" : ""); b.textContent = tablet ? "🏡 Home" : "🏠 Tinny";
     b.onclick = () => { location.href = tablet ? "/tablet#board=" + encodeURIComponent(key) : "/tinny#board=" + encodeURIComponent(key); };
     document.body.appendChild(b);
