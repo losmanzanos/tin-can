@@ -113,6 +113,20 @@ async function getWeather() {
 // The record player Pi says what its stand is doing: reading a card, playing one, or
 // stuck on one it couldn't read. While a card plays, Tinny holds up the cover and dances.
 const RECORD = "http://192.168.68.144:8080";
+
+/* ---------------- on the tablet ---------------- */
+// The tablet opens Tinny as /tinny#board=<the magnet board's key>. With the key, the play
+// menu gets a button to her magnet board (and the board a button back). On a tablet Tinny
+// also knows the battery: low and not charging, it gets sleepy and asks to be plugged in.
+const BOARD_KEY = new URLSearchParams(location.hash.slice(1)).get("board") || "";
+let battery = null, batteryNagged = 0;
+async function checkBattery() {
+  try {
+    if (window.fully && fully.getBatteryLevel) battery = { level: fully.getBatteryLevel() / 100, charging: !!fully.isPlugged() };
+    else if (navigator.getBattery) { const b = await navigator.getBattery(); battery = { level: b.level, charging: b.charging }; }
+  } catch (e) { battery = null; }
+}
+const lowBattery = () => battery && !battery.charging && battery.level <= 0.2;
 let music = { state: "idle", since: 0 };
 async function pollMusic() {
   try {
@@ -410,6 +424,10 @@ function drawMenu(now) {
   const want = wants(now);
   homeButton(() => { act = null; });
   pill(300, 8, 172, 34, `⭐ ${stars}   🌷 ${garden.total}`, 18, "#2a2d3a");
+  if (BOARD_KEY) {
+    pill(116, 8, 176, 34, "🧲  My board", 18, "#e9ad1c", "#16181f");
+    zone(112, 0, 184, 46, () => { location.href = "/board#key=" + encodeURIComponent(BOARD_KEY) + "&back=1"; });
+  }
   const tiles = [["🔤", "Letters", "P"], ["📖", "Read", "R"], ["✏️", "Spell", "S"], ["🔢", "Count", "M"], ["🍎", "Feed", "eat"], ["🎈", "Play", "play"]];
   const fills = ["#ffe3b8", "#cfeaf7", "#e7d4f5", "#c9ecb4", "#ffd0c8", "#fff1a8"];
   tiles.forEach(([e, label, key], i) => {
@@ -531,6 +549,10 @@ function drawScene(now) {
   if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
   if (name === "day" || name === "nudge") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
+  if (lowBattery() && (name === "day" || name === "music")) {
+    if (tick % 8 < 6) pill(14, 90, 150, 32, "🔌 Plug me in!", 16, "#e2413b");
+    if (Date.now() - batteryNagged > 5 * 60e3 && !saying()) { batteryNagged = Date.now(); say(["I'm getting sleepy!", "Plug me in, please 🔌"], 5); }
+  }
   // hearts from petting float up and fade
   hearts = hearts.filter(h => h.life > 0);
   for (const h of hearts) { ctx.globalAlpha = Math.min(1, h.life / 6); heart(h.x, h.y, h.u, h.col); h.y -= 7; h.x += Math.sin(h.life) * 2; h.life--; }
@@ -1508,6 +1530,7 @@ document.fonts.load("700 20px Andika").finally(async () => {
   setInterval(refresh, 10000);
   setInterval(getWeather, 20 * 60 * 1000);
   pollMusic(); setInterval(pollMusic, 2000);
+  checkBattery(); setInterval(checkBattery, 60000);
   setInterval(() => { tick++; drawScene(new Date()); }, 1000 / FPS);
 });
 </script>
