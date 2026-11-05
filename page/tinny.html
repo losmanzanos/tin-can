@@ -121,7 +121,7 @@ const RECORD = "http://192.168.68.144:8080";
 const BOARD_KEY = new URLSearchParams(location.hash.slice(1)).get("board") || "";
 // Opened from the tablet's home screen (#...&tablet=1): the play menu's yellow button goes
 // back to the two big squares instead of straight to the board.
-const TABLET = new URLSearchParams(location.hash.slice(1)).get("tablet") === "1";
+const TABLET = new URLSearchParams(location.hash.slice(1)).get("tablet") === "1" || typeof window.fully !== "undefined";
 function goTabletHome() { location.href = "/tablet" + (BOARD_KEY ? "#board=" + encodeURIComponent(BOARD_KEY) : ""); }
 let battery = null, batteryNagged = 0;
 async function checkBattery() {
@@ -369,6 +369,10 @@ function drawDay(now, o, u, bob) {
   zone(222, 200, 58, 66, tapEgg);
   dayEvent(now, u, ty);
   playBar(now, want);
+  if (TABLET) {                                        // back to the two big squares
+    pill(8, 8, 112, 36, "⭐  Home", 18, "#e9ad1c", "#16181f");
+    zone(0, 0, 128, 50, goTabletHome);
+  }
 }
 
 // A card on the record player: Tinny looks while it's read, then holds up the cover and dances.

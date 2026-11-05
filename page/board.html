@@ -104,7 +104,7 @@ let key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
 // On the tablet: opened from its home screen (#...&tablet=1), a big button back to the two
 // squares; opened from Tinny (#...&back=1), a big button back to Tinny.
 {
-  const h = new URLSearchParams(location.hash.slice(1)), tablet = h.get("tablet") === "1";
+  const h = new URLSearchParams(location.hash.slice(1)), tablet = h.get("tablet") === "1" || typeof window.fully !== "undefined";
   if (tablet || h.get("back") === "1") {
     const b = document.createElement("button");
     b.type = "button"; b.className = "backToTinny" + (tablet ? " home" : ""); b.textContent = tablet ? "⭐ Home" : "🏠 Tinny";
