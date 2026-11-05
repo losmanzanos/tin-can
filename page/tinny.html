@@ -105,6 +105,24 @@ async function getWeather() {
   } catch (e) { /* no internet: Tinny just skips the weather */ }
 }
 
+/* ---------------- the record player ---------------- */
+// The record player Pi says what its stand is doing: reading a card, playing one, or
+// stuck on one it couldn't read. While a card plays, Tinny holds up the cover and dances.
+const RECORD = "http://192.168.68.144:8080";
+let music = { state: "idle", since: 0 };
+async function pollMusic() {
+  try {
+    const m = await getJSON(RECORD + "/now.json");
+    if (m.state !== music.state || m.name !== music.name) {
+      m.since = Date.now();
+      if (m.state === "playing") burst(131, 70, 24);
+    } else m.since = music.since;
+    if (m.art) loadImg(m.art);
+    music = m;
+  } catch (e) { music = { state: "idle", since: 0 }; }    // the record player is off: nothing to show
+}
+const musicOn = () => music.state === "playing" || music.state === "reading" || (music.state === "miss" && ago(music.since) < 8);
+
 /* ---------------- what's going on ---------------- */
 const hm = (d) => d.getHours() * 60 + d.getMinutes();
 const toMin = (s) => { const [h, m] = (s || "0:0").split(":").map(Number); return h * 60 + m; };
@@ -145,6 +163,7 @@ function scene(now) {
   if (act) return "play";
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
+  if (musicOn()) return "music";
   const since = hm(now) - toMin(doc.screen?.on || "08:00");
   if (since >= 0 && since < MORNING_MIN && !routineDone("morning", now)) return "morning";
   if (windingDown(now)) return "winddown";
@@ -330,6 +349,48 @@ function drawDay(now, o, u, bob) {
   playBar(now, want);
 }
 
+// A card on the record player: Tinny looks while it's read, then holds up the cover and dances.
+function drawMusic(now, u, bob, wig) {
+  if (music.state !== "playing") {
+    sky("#bfe3f5", "#e8f5fb"); ground("#8fcf6a", "#7cbd58");
+    const ty = 266 - 27 * u + bob, miss = music.state === "miss";
+    tinny(40 + wig, ty, u, { eyes: miss ? "sad" : undefined, mouth: "o" });
+    bubble(214, 14, 250, 74, miss ? ["Hmm! I don't know", "that one yet."] : ["Ooh, a card!", "Let me look" + ".".repeat(1 + tick % 3)], 24, 240);
+    zone(0, 0, W, H, openMenu);
+    return;
+  }
+  sky("#d9c8f5", "#fbe3f1"); ground("#8fcf6a", "#7cbd58");
+  const hop = tick % 4 < 2 ? -6 : 0;
+  tinny(40 + wig, 100 + hop, 7, { eyes: "happy", mouth: tick % 8 < 4 ? "open" : "o", arms: "up" });
+  // the cover, held up over its head in both hands
+  const fx = 67, fy = 4 + hop, img = music.art && images[music.art];
+  rect(54 + wig, fy + 112, 14, 40, "#16181f"); rect(194 + wig, fy + 112, 14, 40, "#16181f");
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(fx, fy, 128, 128, 10); ctx.fill();
+  if (img) {
+    const s = Math.max(120 / img.naturalWidth, 120 / img.naturalHeight), sw = 120 / s, sh = 120 / s;
+    ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, fx + 4, fy + 4, 120, 120);
+  } else { rect(fx + 4, fy + 4, 120, 120, "#2a2d3a"); text("🎵", fx + 64, fy + 82, 52, "#000", "center"); }
+  // notes floating off to the right
+  for (let i = 0; i < 4; i++) {
+    const t = (tick * 5 + i * 31) % 120;
+    ctx.globalAlpha = Math.max(0, 1 - t / 120);
+    text(i % 2 ? "♪" : "♫", 206 + i * 12 + Math.sin((tick + i * 7) / 3) * 8, 150 - t, 26, ["#b768d6", "#e2413b", "#2f6fb5", "#ef7f2c"][i]);
+  }
+  ctx.globalAlpha = 1;
+  // what's playing: the song (or album) big, who it's by smaller
+  const big = music.song ? "♪ " + music.song : music.name || "Music!", small = music.song ? music.name || music.artist : music.artist;
+  const bx = 236, by = 22, bw = 228, bh = 100;
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 18); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(262, by + bh - 2); ctx.lineTo(246, by + bh + 22); ctx.lineTo(280, by + bh - 2); ctx.fill(); ctx.stroke();
+  rect(264, by + bh - 6, 14, 6, "w");
+  wrapIn(big, bx + bw / 2, by + (small ? 40 : 50), bw - 28, small ? 56 : 76, 24);
+  if (small) text(small, bx + bw / 2, by + 86, fit(small, 16, bw - 28), "#5b6170", "center");
+  pill(236, 206, 228, 48, "🎵  Dance time!", 21);
+  zone(0, 0, W, H, openMenu);
+  zone(fx, fy, 128, 128, () => { say(["I love this one!"], 1.8); hearts.push({ x: 120, y: 120, u: 4, col: "#e2413b", life: 12 }); });
+}
+
 // Along the bottom, so she knows: a tap anywhere opens the play menu. Glows when Tinny wants something.
 function playBar(now, want) {
   const glow = want && tick % 8 < 5;
@@ -459,9 +520,11 @@ function drawScene(now) {
 
   else if (name === "winddown") drawRoutine("evening", now);
 
+  else if (name === "music") drawMusic(now, u, bob, wig);
+
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (saying() && (name === "day" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
   if (name === "day" || name === "nudge") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   // hearts from petting float up and fade
@@ -1350,7 +1413,9 @@ const FACTS = [["Cats sleep for", "16 hours a day! 😴"], ["A baby cat is", "ca
 // is corrected (a best-fit straight-line map from where the screen thought the
 // tap was to where the star really is). Kept on this screen.
 const CAL_PTS = [[60, 60], [420, 60], [420, 260], [60, 260], [240, 160]];
-let cal = store.get("tinny-cal", null), calTs = store.get("tinny-cal-ts", 0), calib = null;
+// November 5, 2026: the screen itself is now calibrated (~/.xinitrc on zelda-board), so the
+// correction saved here before then would throw taps off. A new name starts clean.
+let cal = store.get("tinny-cal-2", null), calTs = store.get("tinny-cal-ts", 0), calib = null;
 function startCalibration() { calib = { i: 0, raw: [], msg: null, t0: Date.now() }; act = null; }
 function solveCal(raw) {
   const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], bx = [0, 0, 0], by = [0, 0, 0];
@@ -1367,7 +1432,7 @@ function calibTap(x, y) {
   if (calib.i < CAL_PTS.length) return;
   const k = solveCal(calib.raw);
   const worst = k ? Math.max(...calib.raw.map((r, i) => { const [cx, cy] = applyCal(r[0], r[1], k); return Math.hypot(cx - CAL_PTS[i][0], cy - CAL_PTS[i][1]); })) : 999;
-  if (k && worst < 40) { cal = k; store.set("tinny-cal", cal); calib = { done: Date.now() }; }
+  if (k && worst < 40) { cal = k; store.set("tinny-cal-2", cal); calib = { done: Date.now() }; }
   else calib = { i: 0, raw: [], msg: "Let's try that again: tap right on each star.", t0: Date.now() };
 }
 function drawCalibration() {
@@ -1438,6 +1503,7 @@ document.fonts.load("700 20px Andika").finally(async () => {
   await refresh();
   setInterval(refresh, 10000);
   setInterval(getWeather, 20 * 60 * 1000);
+  pollMusic(); setInterval(pollMusic, 2000);
   setInterval(() => { tick++; drawScene(new Date()); }, 1000 / FPS);
 });
 </script>
