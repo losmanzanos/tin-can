@@ -107,7 +107,7 @@ let key = new URLSearchParams(location.hash.slice(1)).get("key") || "";
   const h = new URLSearchParams(location.hash.slice(1)), tablet = h.get("tablet") === "1" || typeof window.fully !== "undefined";
   if (tablet || h.get("back") === "1") {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "backToTinny" + (tablet ? " home" : ""); b.textContent = tablet ? "⭐ Home" : "🏠 Tinny";
+    b.type = "button"; b.className = "backToTinny" + (tablet ? " home" : ""); b.textContent = tablet ? "🏡 Home" : "🏠 Tinny";
     b.onclick = () => { location.href = tablet ? "/tablet#board=" + encodeURIComponent(key) : "/tinny#board=" + encodeURIComponent(key); };
     document.body.appendChild(b);
   }

@@ -370,8 +370,8 @@ function drawDay(now, o, u, bob) {
   dayEvent(now, u, ty);
   playBar(now, want);
   if (TABLET) {                                        // back to the two big squares
-    pill(8, 8, 112, 36, "⭐  Home", 18, "#e9ad1c", "#16181f");
-    zone(0, 0, 128, 50, goTabletHome);
+    pill(112, 14, 92, 32, "🏡 Home", 16, "#e9ad1c", "#16181f");   // between the stars and Tinny's thought bubble
+    zone(110, 6, 98, 46, goTabletHome);
   }
 }
 
@@ -433,7 +433,7 @@ function drawMenu(now) {
   homeButton(() => { act = null; });
   pill(300, 8, 172, 34, `⭐ ${stars}   🌷 ${garden.total}`, 18, "#2a2d3a");
   if (TABLET) {
-    pill(116, 8, 176, 34, "⭐  Home", 18, "#e9ad1c", "#16181f");
+    pill(116, 8, 176, 34, "🏡  Home", 18, "#e9ad1c", "#16181f");
     zone(112, 0, 184, 46, goTabletHome);
   } else if (BOARD_KEY) {
     pill(116, 8, 176, 34, "🧲  My board", 18, "#e9ad1c", "#16181f");
