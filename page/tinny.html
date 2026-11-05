@@ -143,7 +143,9 @@ async function pollMusic() {
     music = m;
   } catch (e) { music = { state: "idle", since: 0 }; }    // the record player is off: nothing to show
 }
-const musicOn = () => music.state === "playing" || music.state === "reading" || (music.state === "miss" && ago(music.since) < 8);
+// The record player shows on the little Pi screen for now; the tablet joins in once it has been tested.
+const MUSIC_ON_TABLET = false;
+const musicOn = () => (!TABLET || MUSIC_ON_TABLET) && (music.state === "playing" || music.state === "reading" || music.state === "seeing" || (music.state === "miss" && ago(music.since) < 8));
 
 /* ---------------- what's going on ---------------- */
 const hm = (d) => d.getHours() * 60 + d.getMinutes();
@@ -379,9 +381,24 @@ function drawDay(now, o, u, bob) {
 function drawMusic(now, u, bob, wig) {
   if (music.state !== "playing") {
     sky("#bfe3f5", "#e8f5fb"); ground("#8fcf6a", "#7cbd58");
-    const ty = 266 - 27 * u + bob, miss = music.state === "miss";
-    tinny(40 + wig, ty, u, { eyes: miss ? "sad" : undefined, mouth: "o" });
-    bubble(214, 14, 250, 74, miss ? ["Hmm! I don't know", "that one yet."] : ["Ooh, a card!", "Let me look" + ".".repeat(1 + tick % 3)], 24, 240);
+    const ty = 266 - 27 * u + bob, st = music.state, t = ago(music.since), dots = ".".repeat(1 + tick % 3);
+    if (st === "seeing") {                             // something just came into view: Tinny perks up
+      const hop = tick % 4 < 2 ? -10 : 0;
+      tinny(40 + wig, ty + hop, u, { mouth: "open", arms: "up" });
+      text("❗", 40 + 13 * u, ty - 2 * u + hop, 36, "#000", "center");
+      bubble(214, 14, 250, 74, ["Ooh! What's", "that?"], 26, 240);
+    } else if (st === "reading") {                     // reading it: a magnifying glass going over the card
+      tinny(40 + wig, ty, u, { mouth: "o", eyes: tick % 12 < 6 ? undefined : "happy" });
+      const cx = 304, cy = 128;
+      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(cx - 5, cy - 5, 122, 122, 14); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(cx, cy, 112, 112, 10); ctx.fill();
+      for (let i = 0; i < 3; i++) rect(cx + 18, cy + 26 + i * 24, [76, 56, 66][i], 8, "#d8d2c2");   // the writing it's reading
+      text("🔍", cx + 56 + Math.sin(tick / 2.2) * 30, cy + 72 + Math.cos(tick / 3.1) * 20, 50, "#000", "center");
+      bubble(214, 14, 250, 74, t < 4 ? ["Ooh, a card!", "Let me look" + dots] : t < 10 ? ["Hmm" + dots, "I'm thinking!"] : ["Almost" + dots, "This one's tricky!"], 24, 240);
+    } else {                                           // a card it couldn't place
+      tinny(40 + wig, ty, u, { eyes: "sad", mouth: "o" });
+      bubble(214, 14, 250, 74, ["Hmm! I don't know", "that one yet."], 24, 240);
+    }
     zone(0, 0, W, H, openMenu);
     return;
   }
@@ -1540,7 +1557,7 @@ document.fonts.load("700 20px Andika").finally(async () => {
   await refresh();
   setInterval(refresh, 10000);
   setInterval(getWeather, 20 * 60 * 1000);
-  pollMusic(); setInterval(pollMusic, 2000);
+  pollMusic(); setInterval(pollMusic, 1000);
   checkBattery(); setInterval(checkBattery, 60000);
   setInterval(() => { tick++; drawScene(new Date()); }, 1000 / FPS);
 });
