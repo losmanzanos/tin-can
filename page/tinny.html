@@ -463,7 +463,7 @@ function drawMenu(now) {
     pill(116, 8, 176, 34, "🧲  My board", 18, "#e9ad1c", "#16181f");
     zone(112, 0, 184, 46, () => { location.href = "/board#key=" + encodeURIComponent(BOARD_KEY) + "&back=1"; });
   }
-  const tiles = [["🔤", "Letters", "P"], ["📖", "Read", "R"], ["✏️", "Spell", "S"], ["🔢", "Count", "M"], ["🍎", "Feed", "eat"], ["🎈", "Play", "play"]];
+  const tiles = [["🔤", "Letters", "P"], ["📖", "Read", "R"], ["✏️", "Spell", "S"], ["➕", "Math", "M"], ["🍎", "Feed", "eat"], ["🎈", "Play", "play"]];
   const fills = ["#ffe3b8", "#cfeaf7", "#e7d4f5", "#c9ecb4", "#ffd0c8", "#fff1a8"];
   tiles.forEach(([e, label, key], i) => {
     const x = 6 + (i % 3) * 157, y = 50 + Math.floor(i / 3) * 136, w = 151, h = 130;
@@ -476,13 +476,30 @@ function drawMenu(now) {
     zone(x, y, w, h, () => (TRACKS[key] ? startLearn(key) : key === "eat" ? startEat() : startPlay(now)));
   });
 }
-// Play: whatever Tinny needs first (a bath), otherwise ball, colors and peekaboo in turn.
-let nextPlay = store.get("tinny-play", 0);
+// Play: whatever Tinny needs first (a bath), otherwise she picks a game.
 function startPlay(now) {
   if (dusty(now)) return startBath();
-  const k = ["ball", "color", "peek"][nextPlay % 3];
-  nextPlay++; store.set("tinny-play", nextPlay);
-  if (k === "ball") startBall(); else { begin(k, { round: 0 }); newRound(); }
+  begin("playmenu");
+}
+const GAMES = [["⚽", "Ball", "ball"], ["🎨", "Colors", "color"], ["🙈", "Hide & seek", "peek"],
+               ["🔁", "Patterns", "pattern"], ["🤔", "Odd one out", "odd"], ["🃏", "Memory", "memory"]];
+function startGame(k) {
+  if (k === "ball") return startBall();
+  if (k === "memory") return startMemory();
+  begin(k, { round: 0, rounds: 5 }); newRound();
+}
+function drawPlayMenu(now) {
+  rect(0, 0, W, H, "#16181f");
+  homeButton(() => begin("menu"));
+  pill(140, 8, 200, 34, "Pick a game!", 18, "#2a2d3a");
+  const fills = ["#fff1a8", "#ffd0c8", "#cdebc0", "#cfeaf7", "#e7d4f5", "#ffe3b8"];
+  GAMES.forEach(([e, label, k], i) => {
+    const x = 6 + (i % 3) * 157, y = 50 + Math.floor(i / 3) * 136, w = 151, h = 130;
+    ctx.fillStyle = fills[i]; ctx.beginPath(); ctx.roundRect(x, y, w, h, 20); ctx.fill();
+    text(e, x + w / 2, y + 70, 54, "#000", "center");
+    text(label, x + w / 2, y + 112, fit(label, 24, w - 16), "#16181f", "center");
+    zone(x, y, w, h, () => startGame(k));
+  });
 }
 
 function drawScene(now) {
@@ -566,12 +583,14 @@ function drawScene(now) {
   else if (name === "play") {
     const k = act.kind;
     if (k === "menu") drawMenu(now);
+    else if (k === "playmenu") drawPlayMenu(now);
+    else if (k === "memory") drawMemory(now);
     else if (k === "learn") drawLearn(now);
     else if (k === "hatch") drawHatch(now);
     else if (k === "friends") drawFriends(now);
     else if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
     else if (k === "done") drawDone(now); else drawGame(now);
-    if (act && !["done", "menu", "learn", "hatch", "friends"].includes(act.kind)) {          // home: back to the menu, any time
+    if (act && !["done", "menu", "playmenu", "learn", "hatch", "friends"].includes(act.kind)) {          // back to the menu, any time
       ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("◀", 28, 303, 20, "#fff", "center");
       zone(0, 266, 60, 54, () => { begin("menu"); });
     }
@@ -583,7 +602,7 @@ function drawScene(now) {
 
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "playmenu" && act?.kind !== "memory" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
   if (name === "day" || name === "nudge") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   if (lowBattery() && (name === "day" || name === "music")) {
@@ -771,25 +790,82 @@ function drawBall(now, u) {
 
 // The little games, taking turns: find the color, how many, and peekaboo. Three rounds, then a star.
 const COLORS = [["red", "#e2413b"], ["yellow", "#f2c230"], ["green", "#6cbf4a"], ["blue", "#2f6fb5"], ["purple", "#b768d6"], ["orange", "#ef7f2c"], ["pink", "#f2a1a8"]];
-const HIDE = ["🌳", "📦", "🧺"], SILLY = ["🐱", "🧦", "🐸", "🦆", "🍌", "🐢"];
+const HIDE = ["🌳", "📦", "🧺", "🛋️"], SILLY = ["🐱", "🧦", "🐸", "🦆", "🍌", "🐢"];
+const WHITE = ["white", "#ffffff"];
+const COLOR = (n) => COLORS.find(c => c[0] === n) || WHITE;
+const MIXES = [["red", "yellow", "orange"], ["blue", "yellow", "green"], ["red", "blue", "purple"], ["red", "white", "pink"]];
+const KINDS = {         // for odd one out: what three of them are, and what the odd one isn't
+  animal: [["🐱", "🐶", "🐰", "🐻", "🦊", "🐸", "🐷", "🐵"], "an animal"],
+  fruit: [["🍎", "🍌", "🍇", "🍓", "🍊", "🍐", "🍉", "🍒"], "a fruit"],
+  going: [["🚗", "🚌", "🚲", "🚂", "✈️", "🚀", "🚒", "⛵"], "something that goes"],
+  wear: [["👕", "👖", "🧦", "🧢", "👗", "👟", "🧤", "🎩"], "something to wear"],
+  sky: [["☀️", "🌧️", "❄️", "🌈", "⛅", "🌙", "⭐", "⚡"], "in the sky"],
+};
+const PATTERN_ITEMS = ["🍎", "🍌", "⭐", "🐟", "🌸", "🚗", "🎈", "🐞", "🍪", "🦆", "🔵", "🔺"];
 function newRound() {
   act.wrong = null; act.right = null; act.demo = null; act.t1 = Date.now();
-  if (act.kind === "color") { act.opts = pick3(COLORS); act.ans = act.opts[Math.floor(Math.random() * 3)]; }
-  if (act.kind === "peek") { act.ans = Math.floor(Math.random() * 3); act.silly = {}; }
+  if (act.kind === "color") {
+    if (act.round % 2 === 1) {     // mixing: red + yellow make…
+      const [a, b, c] = pickOne(MIXES);
+      act.mix = [COLOR(a), COLOR(b)]; act.ans = COLOR(c);
+      act.opts = shuffle([act.ans, ...shuffle(COLORS.filter(x => x !== act.ans && x[0] !== a && x[0] !== b)).slice(0, 2)]);
+    } else { act.mix = null; act.opts = shuffle(COLORS).slice(0, 4); act.ans = pickOne(act.opts); }
+  }
+  if (act.kind === "peek") { act.ans = Math.floor(Math.random() * HIDE.length); act.silly = {}; }
+  if (act.kind === "pattern") {    // AB, then ABB / AAB, then ABC: what comes next?
+    const [a, b, c] = shuffle(PATTERN_ITEMS);
+    const unit = act.round < 2 ? [a, b] : act.round < 4 ? pickOne([[a, b, b], [a, a, b]]) : [a, b, c];
+    const seq = []; for (let i = 0; seq.length < 7; i++) seq.push(unit[i % unit.length]);
+    act.seq = seq.slice(0, 6); const next = seq[6];
+    act.opts = shuffle([next, ...shuffle([a, b, c].filter(x => x !== next)).slice(0, 2)]);
+    act.ans = act.opts.indexOf(next);
+  }
+  if (act.kind === "odd") {
+    const [k1, k2] = shuffle(Object.keys(KINDS));
+    const three = shuffle(KINDS[k1][0]).slice(0, 3), odd = pickOne(KINDS[k2][0]);
+    act.opts = shuffle([...three, odd]); act.ans = act.opts.indexOf(odd); act.why = `${odd} isn't ${KINDS[k1][1]}!`;
+  }
 }
 function answer(i) {
   if (!act) return;
   if (act.right != null || act.demo) return;
   const ok = act.kind === "color" ? act.opts[i] === act.ans : i === act.ans;
   if (ok) {
-    act.right = i; burst(200 + i * 100, 200, 16);
-    say(act.kind === "color" ? ["Yes!", act.ans[0] + "!"] : ["Peekaboo!"], 1.6);
-    setTimeout(() => { if (!act || act.right == null) return; act.round++; if (act.round >= 3) finish(); else newRound(); }, 1700);
+    act.right = i; burst(150 + i * 90, 200, 16);
+    say(act.kind === "color" ? ["Yes!", act.ans[0] + "!"] : act.kind === "peek" ? ["Peekaboo!"] : act.kind === "odd" ? ["Yes!", act.why] : pickOne(PRAISE), 1.8);
+    setTimeout(() => { if (!act || act.right == null) return; act.round++; if (act.round >= (act.rounds || 3)) finish(); else newRound(); }, 1900);
   } else {
     act.wrong = { i, at: Date.now() };
-    if (act.kind === "color") say([`That's ${act.opts[i][0]}.`, `Find ${act.ans[0]}!`], 2.4);
+    if (act.kind === "color") say(act.mix ? ["Not quite!", "Try another!"] : [`That's ${act.opts[i][0]}.`, `Find ${act.ans[0]}!`], 2.4);
     if (act.kind === "peek") { act.silly[i] = SILLY[Math.floor(Math.random() * SILLY.length)]; say(["Not here!"], 1.4); }
+    if (act.kind === "pattern") say(["Hmm, look again!"], 1.6);
+    if (act.kind === "odd") say(["Those go together.", "Try another!"], 2);
   }
+}
+function startMemory() {
+  const six = shuffle(PATTERN_ITEMS).slice(0, 6);
+  begin("memory", { cards: shuffle([...six, ...six]).map(e => ({ e, up: false, done: false })), open: [], tries: 0 });
+}
+function flip(i) {
+  const c = act.cards[i];
+  if (c.up || c.done || act.open.length >= 2) return;
+  c.up = true; act.open.push(i);
+  if (act.open.length < 2) return;
+  act.tries++;
+  const [a, b] = act.open.map(k => act.cards[k]);
+  if (a.e === b.e) {
+    a.done = b.done = true; act.open = []; burst(240, 160, 12);
+    if (act.cards.every(k => k.done)) setTimeout(() => act?.kind === "memory" && finish(["You found them all!", `${act.tries} tries`]), 900);
+  } else setTimeout(() => { if (act?.kind !== "memory") return; a.up = b.up = false; act.open = []; }, 1000);
+}
+function drawMemory(now) {
+  sky("#e7d4f5", "#f6effc");
+  act.cards.forEach((c, i) => {
+    const x = 74 + (i % 4) * 100, y = 22 + Math.floor(i / 4) * 98, w = 92, h = 88;
+    if (c.up || c.done) { card(x, y, w, h, c.done ? "#c9f0b4" : "#fffdf7", {}); text(c.e, x + w / 2, y + h / 2 + 18, 48, "#000", "center"); }
+    else { card(x, y, w, h, "#b768d6", {}); text("?", x + w / 2, y + h / 2 + 14, 40, "#ffffffcc", "center"); }
+    zone(x, y, w, h, () => flip(i));
+  });
 }
 function drawGame(now) {
   sky(act.kind === "peek" ? "#cdebc0" : "#fdf0dc", act.kind === "peek" ? "#eef8e8" : "#fff8ee");
@@ -797,36 +873,63 @@ function drawGame(now) {
   const u = 5, ty = 266 - 27 * u;
   if (act.kind !== "peek") tinny(8, ty, u, { eyes: act.right != null ? "happy" : undefined, mouth: act.right != null ? "open" : "smile", arms: act.right != null ? "up" : undefined });
   // which round: three dots
-  for (let r = 0; r < 3; r++) { ctx.fillStyle = r < act.round ? "#e9ad1c" : "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(30 + r * 26, 32, 9, 0, 7); ctx.fill(); ctx.stroke(); }
+  for (let r = 0; r < (act.rounds || 3); r++) { ctx.fillStyle = r < act.round ? "#e9ad1c" : "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(22 + r * 22, 26, 8, 0, 7); ctx.fill(); ctx.stroke(); }
   const shaking = (i) => act.wrong && act.wrong.i === i && ago(act.wrong.at) < 0.6;
   if (act.kind === "color") {
     if (!saying()) {
       ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 316, 66, 20); ctx.fill(); ctx.stroke();
-      text("Find", 176, 60, 30); text(act.ans[0] + "!", 252, 60, 34, act.ans[1]);
-      ctx.fillStyle = act.ans[1]; ctx.beginPath(); ctx.arc(428, 47, 20, 0, 7); ctx.fill();
+      if (act.mix) {
+        const dot = (x, c) => { ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(x, 47, 22, 0, 7); ctx.fill(); ctx.fillStyle = c[1]; ctx.beginPath(); ctx.arc(x, 47, 19, 0, 7); ctx.fill(); };
+        dot(206, act.mix[0]); text("+", 250, 60, 36, "#16181f", "center"); dot(294, act.mix[1]); text("=  ?", 380, 60, 36, "#16181f", "center");
+      } else {
+        text("Find", 176, 60, 30); text(act.ans[0] + "!", 252, 60, 34, act.ans[1]);
+        ctx.fillStyle = act.ans[1]; ctx.beginPath(); ctx.arc(428, 47, 20, 0, 7); ctx.fill();
+      }
     }
     act.opts.forEach((c, i) => {
-      const cx = 200 + i * 100, cy = 176;
+      const n = act.opts.length, cx = n === 4 ? 176 + i * 86 : 200 + i * 100, cy = 176;
       if (act.right === i) { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; rect(cx + Math.cos(a) * 46, cy + Math.sin(a) * 46, 8, 8, c[1]); } return; }
       ctx.strokeStyle = "#16181f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy + 44); ctx.lineTo(cx + 6, cy + 90); ctx.stroke();
       const bob = Math.sin(tick / 3 + i) * 4;
-      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, 40, 48, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = c[1]; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, 36, 44, 0, 0, 7); ctx.fill();
+      const rx = n === 4 ? 34 : 40;
+      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, rx, rx + 8, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = c[1]; ctx.beginPath(); ctx.ellipse(cx + (shaking(i) ? (tick % 2 ? 5 : -5) : 0), cy + bob, rx - 4, rx + 4, 0, 0, 7); ctx.fill();
       rect(cx - 16, cy - 24 + bob, 8, 12, "#ffffff90");
-      zone(cx - 50, 84, 100, 196, () => answer(i));
+      zone(cx - 43, 84, 86, 196, () => answer(i));
+    });
+  }
+  if (act.kind === "pattern") {
+    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 300, 58, 20); ctx.fill(); ctx.stroke(); text("What comes next?", 300, 52, 26, "#16181f", "center"); }
+    act.seq.forEach((e, i) => text(e, 168 + i * 46, 128, 38, "#000", "center"));
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(424, 92, 46, 48, 10); ctx.fill(); ctx.stroke();
+    text(act.right != null ? act.opts[act.ans] : "?", 447, 128, act.right != null ? 34 : 30, "#16181f", "center");
+    act.opts.forEach((e, i) => {
+      const x = 150 + i * 110, y = 160, dx = shaking(i) ? (tick % 2 ? 5 : -5) : 0;
+      card(x, y, 100, 96, act.right === i ? "#c9f0b4" : "#fffdf7", {});
+      text(e, x + 50 + dx, y + 66, 54, "#000", "center");
+      zone(x - 4, y - 4, 108, 104, () => answer(i));
+    });
+  }
+  if (act.kind === "odd") {
+    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 316, 58, 20); ctx.fill(); ctx.stroke(); text("Which one doesn't belong?", 308, 52, fit("Which one doesn't belong?", 24, 296), "#16181f", "center"); }
+    act.opts.forEach((e, i) => {
+      const x = 140 + i * 84, y = 112, dx = shaking(i) ? (tick % 2 ? 5 : -5) : 0;
+      card(x, y, 76, 100, act.right === i ? "#c9f0b4" : "#fffdf7", {});
+      text(e, x + 38 + dx, y + 68, 46, "#000", "center");
+      zone(x - 4, y - 4, 84, 108, () => answer(i));
     });
   }
   if (act.kind === "peek") {
-    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(110, 14, 260, 58, 20); ctx.fill(); ctx.stroke(); text("Where's Tinny?", 240, 54, 28, "#16181f", "center"); }
+    if (!saying()) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(150, 14, 260, 58, 20); ctx.fill(); ctx.stroke(); text("Where's Tinny?", 280, 54, 28, "#16181f", "center"); }
     HIDE.forEach((h, i) => {
-      const cx = 100 + i * 140, base = 258, dx = shaking(i) ? (tick % 2 ? 5 : -5) : 0;
+      const cx = 72 + i * 112, base = 258, dx = shaking(i) ? (tick % 2 ? 5 : -5) : 0;
       if (act.right === i) tinny(cx - 13 * 4, base - 40 - 27 * 4, 4, { eyes: "happy", mouth: "open", arms: "up" });
-      else if (i === act.ans && (Date.now() / 1000) % 3 < 0.9) {     // the tip of its antenna peeks out
-        rect(cx + 18, base - 124, 4, 22, "k"); rect(cx + 15, base - 130, 10, 8, "m");
+      else if (i === act.ans && (Date.now() / 1000) % 4 < 0.5) {     // the tip of its antenna peeks out, now and then
+        rect(cx + 18, base - 104, 4, 22, "k"); rect(cx + 15, base - 110, 10, 8, "m");
       }
       if (act.silly[i] && ago(act.wrong?.at || 0) < 1.4 && act.wrong?.i === i) text(act.silly[i], cx + dx, base - 112, 42, "#000", "center");
-      text(h, cx + dx, base, 96, "#000", "center");
-      zone(cx - 70, 80, 140, 200, () => answer(i));
+      text(h, cx + dx, base, 84, "#000", "center");
+      zone(cx - 56, 80, 112, 200, () => answer(i));
     });
   }
 }
@@ -1041,11 +1144,13 @@ const TRACKS = {
   P: { name: "Letters", emoji: "🔤", bg: ["#ffe3b8", "#fff4e2"], levels: ["Find the letter", "Big & little letters", "First sounds", "Last sounds"] },
   R: { name: "Read", emoji: "📖", bg: ["#cfeaf7", "#eef8fc"], levels: ["Read a word", "Rhyming words", "Longer words", "Little sentences"] },
   S: { name: "Spell", emoji: "✏️", bg: ["#e7d4f5", "#f6effc"], levels: ["Copy the word", "Spell 3 letters", "3 letters + extras", "4-letter words"] },
-  M: { name: "Count", emoji: "🔢", bg: ["#c9ecb4", "#eef8e8"], levels: ["Count to 5", "Count to 10", "Which is more?", "Add to 5", "Take away", "Add to 10", "Number sentences"] },
+  M: { name: "Math", emoji: "➕", bg: ["#c9ecb4", "#eef8e8"], levels: ["Add to 10", "Take away from 10", "+ and − to 10", "Missing number", "Make 10", "+ and − to 20"] },
 };
 const ROUND = 5;
 const learn = store.get("tinny-learn", {});
 for (const k of Object.keys(TRACKS)) learn[k] = Object.assign({ lv: k === "P" ? 3 : 1, streak: 0, miss: 0 }, learn[k]);
+// Count became Math (adding and taking away within 10): everyone starts it at its first level
+if (learn.M.v !== 2) { learn.M = { lv: 1, streak: 0, miss: 0, v: 2 }; store.set("tinny-learn", learn); }
 // Levels set on the admin page win, once each time they're set.
 function applyLevelSet() {
   const set = doc?.tinny?.levels;
@@ -1097,13 +1202,31 @@ function makeQuestion(track) {
   if (track === "M") {
     const thing = pickOne(ITEMS);
     q.thing = thing; q.kind = "num";
-    if (lv === 1) { const n = 1 + rnd(5); [q.opts, q.ans] = numOpts(n, 1, 6); Object.assign(q, { ask: "How many?", show: { count: n } }); }
-    else if (lv === 2) { const n = 5 + rnd(6); [q.opts, q.ans] = numOpts(n, 3, 12); Object.assign(q, { ask: "How many?", show: { count: n, frame: true } }); }
-    else if (lv === 3) { let a = 1 + rnd(8), b = 1 + rnd(8); while (a === b) b = 1 + rnd(8); Object.assign(q, { kind: "groups", ask: "Which has more?", opts: [a, b], ans: a > b ? 0 : 1, show: {} }); }
-    else if (lv === 4) { const a = 1 + rnd(3), b = 1 + rnd(5 - a); [q.opts, q.ans] = numOpts(a + b, 0, 8); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] } }); }
-    else if (lv === 5) { const a = 3 + rnd(4), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(a - b, 0, 8); Object.assign(q, { ask: `Tinny ate ${b}. How many left?`, show: { take: [a, b] } }); }
-    else if (lv === 6) { const a = 2 + rnd(6), b = 1 + rnd(10 - a); [q.opts, q.ans] = numOpts(a + b, 0, 12); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] } }); }
-    else { const plus = Math.random() < 0.6, a = plus ? rnd(8) + 1 : 3 + rnd(8), b = plus ? 1 + rnd(10 - a) : 1 + rnd(a - 1); const v = plus ? a + b : a - b; [q.opts, q.ans] = numOpts(v, 0, 12); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` } }); }
+    if (Math.random() < 0.2) {     // about one in five is a counting one, so counting stays in the mix
+      if (Math.random() < 0.6) { const n = 6 + rnd(5); [q.opts, q.ans] = numOpts(n, 3, 12); Object.assign(q, { ask: "How many?", show: { count: n, frame: true } }); }
+      else { let a = 3 + rnd(8), b = 3 + rnd(8); while (a === b) b = 3 + rnd(8); Object.assign(q, { kind: "groups", ask: "Which has more?", opts: [a, b], ans: a > b ? 0 : 1, show: {} }); }
+      return q;
+    }
+    // within 10: a + b with both sides drawn, a − b with some crossed off, then numbers only
+    const sum10 = () => { const a = 1 + rnd(8), b = 1 + rnd(9 - a); return [a, b]; };
+    if (lv === 1) { const [a, b] = sum10(); [q.opts, q.ans] = numOpts(a + b, 0, 10); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] } }); }
+    else if (lv === 2) { const a = 4 + rnd(7), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(a - b, 0, 10); Object.assign(q, { ask: `Tinny ate ${b}. How many left?`, show: { take: [a, b] } }); }
+    else if (lv === 3) {
+      const plus = Math.random() < 0.5; let a, b, v;
+      if (plus) { [a, b] = sum10(); v = a + b; } else { a = 3 + rnd(8); b = 1 + rnd(a - 1); v = a - b; }
+      [q.opts, q.ans] = numOpts(v, 0, 10); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` } });
+    }
+    else if (lv === 4) {     // the missing number: 3 + ? = 8, or 9 − ? = 4
+      const plus = Math.random() < 0.6;
+      if (plus) { const [a, b] = sum10(); [q.opts, q.ans] = numOpts(b, 0, 10); Object.assign(q, { ask: "What's missing?", show: { expr: `${a} + ? = ${a + b}` } }); }
+      else { const a = 4 + rnd(7), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(b, 0, 10); Object.assign(q, { ask: "What's missing?", show: { expr: `${a} − ? = ${a - b}` } }); }
+    }
+    else if (lv === 5) { const a = 1 + rnd(9); [q.opts, q.ans] = numOpts(10 - a, 0, 10); Object.assign(q, { ask: "What makes 10?", show: { expr: `${a} + ? = 10` } }); }
+    else {                   // up to 20
+      const plus = Math.random() < 0.55; let a, b, v;
+      if (plus) { a = 3 + rnd(12); b = 1 + rnd(20 - a); v = a + b; } else { a = 8 + rnd(13); b = 1 + rnd(Math.min(10, a - 1)); v = a - b; }
+      [q.opts, q.ans] = numOpts(v, 0, 20); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` } });
+    }
   }
   return q;
 }
