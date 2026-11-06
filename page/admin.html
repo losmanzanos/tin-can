@@ -352,6 +352,14 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
           <select id="tinnyUnits"><option value="F">°F</option><option value="C">°C</option></select>
         </label>
       </div>
+      <div class="row2">
+        <label>Tinny wakes up <span class="hint">Separate from her big screen</span>
+          <input type="time" id="tinnyWake">
+        </label>
+        <label>Tinny goes to sleep <span class="hint">Bedtime routine starts 20 min before</span>
+          <input type="time" id="tinnySleep">
+        </label>
+      </div>
       <div class="row-btns"><button type="button" class="btn plain small" id="tinnyFind">Find town</button></div>
       <div class="row-btns" id="tinnyPlaces"></div>
       <div class="row2">
@@ -1307,6 +1315,8 @@ function renderTinny() {
   if (document.activeElement !== $("zWords")) $("zWords").value = (t.words || []).join(", ");
   $("tinnyPlaceNow").textContent = t.place ? "Now: " + t.place : "Not set";
   if (document.activeElement !== $("tinnyUnits")) $("tinnyUnits").value = t.units || "F";
+  if (document.activeElement !== $("tinnyWake")) $("tinnyWake").value = t.wake || (doc.screen || {}).on || "08:00";
+  if (document.activeElement !== $("tinnySleep")) $("tinnySleep").value = t.sleep || (doc.screen || {}).off || "20:00";
   const keep = $("hugFrom").value;
   const names = [...new Set(["Mom & Dad", ...(doc.people || []).map(p => p.name).filter(Boolean)])];
   $("hugFrom").replaceChildren(...names.map(n => { const o = el("option", null, n); o.value = n; return o; }));
@@ -1329,6 +1339,8 @@ $("calibrate").onclick = async () => {
 $("tinnyCopy").onclick = () => copyText($("tinnyLink").textContent);
 $("tinnyCmdCopy").onclick = () => copyText($("tinnyCmd").textContent);
 $("tinnyUnits").onchange = () => save({ ...doc, tinny: { ...doc.tinny, units: $("tinnyUnits").value } }, "Saved.");
+$("tinnyWake").onchange = $("tinnySleep").onchange = () =>
+  save({ ...doc, tinny: { ...doc.tinny, wake: $("tinnyWake").value, sleep: $("tinnySleep").value } }, "Saved. Tinny keeps these hours now.");
 $("tinnyFind").onclick = async () => {
   const q = $("tinnyPlace").value.trim();
   const box = $("tinnyPlaces");

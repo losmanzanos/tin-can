@@ -345,6 +345,10 @@ def clean_tinny(t):
     except (TypeError, ValueError):
         pass
     out["units"] = "C" if t.get("units") == "C" else "F"
+    # Tinny's own hours (on the tablet), separate from her big screen's on and off times
+    for k in ("wake", "sleep"):
+        if TIME_RE.match(str(t.get(k) or "")):
+            out[k] = str(t[k])
     # Zelda's birthday, for her party day (and her age on the banner).
     b = str(t.get("birthday") or "")
     if re.match(r"^(19|20)[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$", b):

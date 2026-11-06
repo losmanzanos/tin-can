@@ -158,8 +158,11 @@ const musicOn = () => (!TABLET || MUSIC_ON_TABLET) && (music.state === "playing"
 /* ---------------- what's going on ---------------- */
 const hm = (d) => d.getHours() * 60 + d.getMinutes();
 const toMin = (s) => { const [h, m] = (s || "0:0").split(":").map(Number); return h * 60 + m; };
-function asleep(now) {   // asleep whenever her big screen is off
-  const on = toMin(doc?.screen?.on || "08:00"), off = toMin(doc?.screen?.off || "20:00"), m = hm(now);
+// Tinny's own hours (set on the admin page), or her big screen's if those are blank
+const wakeAt = () => doc?.tinny?.wake || doc?.screen?.on || "08:00";
+const sleepAt = () => doc?.tinny?.sleep || doc?.screen?.off || "20:00";
+function asleep(now) {   // asleep outside Tinny's hours
+  const on = toMin(wakeAt()), off = toMin(sleepAt()), m = hm(now);
   if (on === off) return false;
   return on < off ? !(m >= on && m < off) : !(m >= on || m < off);
 }
@@ -178,7 +181,7 @@ function weeksOld(now) {
 function nudgeFor(now) {
   const m = hm(now);
   const slot = Math.floor(m / NUDGE_EVERY_MIN);
-  if (m % NUDGE_EVERY_MIN >= NUDGE_FOR_MIN || slot === nudgeDismissed || m < toMin(doc?.screen?.on) + MORNING_MIN) return null;
+  if (m % NUDGE_EVERY_MIN >= NUDGE_FOR_MIN || slot === nudgeDismissed || m < toMin(wakeAt()) + MORNING_MIN) return null;
   const callable = (doc?.people || []).filter(p => p.pad || p.code);
   if (!callable.length) return null;
   const heard = (p) => Math.max(0, ...cards.filter(c => c.from === p.name || c.from.includes(p.name)).map(c => c.ts));
@@ -196,7 +199,7 @@ function scene(now) {
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
   if (musicOn()) return "music";
-  const since = hm(now) - toMin(doc.screen?.on || "08:00");
+  const since = hm(now) - toMin(wakeAt());
   if (since >= 0 && since < MORNING_MIN && !routineDone("morning", now)) return "morning";
   if (windingDown(now)) return "winddown";
   if (nudgeFor(now)) return "nudge";
@@ -650,14 +653,14 @@ function hit(x, y) {
 const pick3 = (list) => { const a = [...list].sort(() => Math.random() - 0.5); return a.slice(0, 3); };
 const ago = (t) => (Date.now() - t) / 1000;
 function dayKey(now) { return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`; }
-function todayOn(now) { const d = new Date(now); const m = toMin(doc?.screen?.on || "08:00"); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.getTime(); }
+function todayOn(now) { const d = new Date(now); const m = toMin(wakeAt()); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.getTime(); }
 // Hungry for breakfast each morning, and again four hours after a meal. Dusty ten hours after a bath.
 const hungry = (now) => care.fed < todayOn(now) || now - care.fed > 4 * 3600e3;
 const dusty = (now) => now - care.bathed > 10 * 3600e3;
 const wants = (now) => hungry(now) ? "eat" : dusty(now) ? "bath" : null;
 function windingDown(now) {
   if (!doc || doc.screen?.board === "off") return false;
-  const off = toMin(doc.screen?.off || "20:00"), m = hm(now);
+  const off = toMin(sleepAt()), m = hm(now);
   const left = (off - m + 1440) % 1440;
   return left > 0 && left <= WIND_DOWN_MIN && !asleep(now);
 }
