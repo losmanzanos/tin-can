@@ -145,6 +145,7 @@ async function pollMusic() {
     if (m.state !== music.state || m.name !== music.name) {
       m.since = Date.now();
       if (m.state === "playing") burst(131, 70, 24);
+      if (m.state === "party") { burst(140, 90, 40); burst(360, 90, 40); }
     } else m.since = music.since;
     if (m.art) loadImg(m.art);
     music = m;
@@ -152,7 +153,7 @@ async function pollMusic() {
 }
 // The record player shows on the little Pi screen for now; the tablet joins in once it has been tested.
 const MUSIC_ON_TABLET = true;
-const musicOn = () => (!TABLET || MUSIC_ON_TABLET) && (music.state === "playing" || music.state === "reading" || music.state === "seeing" || (music.state === "miss" && ago(music.since) < 8));
+const musicOn = () => (!TABLET || MUSIC_ON_TABLET) && (music.state === "playing" || music.state === "reading" || music.state === "seeing" || music.state === "party" || music.state === "party-over" || (music.state === "miss" && ago(music.since) < 8));
 
 /* ---------------- what's going on ---------------- */
 const hm = (d) => d.getHours() * 60 + d.getMinutes();
@@ -389,7 +390,16 @@ function drawMusic(now, u, bob, wig) {
   if (music.state !== "playing") {
     sky("#bfe3f5", "#e8f5fb"); ground("#8fcf6a", "#7cbd58");
     const ty = 266 - 27 * u + bob, st = music.state, t = ago(music.since), dots = ".".repeat(1 + tick % 3);
-    if (st === "seeing") {                             // something just came into view: Tinny perks up
+    if (st === "party") {                              // the party card: Tinny puts on a party hat and cheers
+      sky("#d9c8f5", "#fbe3f1"); ground("#8fcf6a", "#7cbd58");
+      const hop = tick % 4 < 2 ? -12 : 0;
+      tinny(40 + wig, ty + hop, u, { hat: "party", eyes: "happy", mouth: "open", arms: "up" });
+      if (tick % 3 === 0) burst(60 + Math.random() * 360, 40, 6);
+      bubble(214, 14, 250, 74, ["Party time! 🎉", "Put on a record!"], 26, 240);
+    } else if (st === "party-over") {
+      tinny(40 + wig, ty, u, { eyes: "closed", mouth: "smile", cap: true });
+      bubble(214, 14, 250, 74, ["Party's over!", "That was fun 🌙"], 24, 240);
+    } else if (st === "seeing") {                             // something just came into view: Tinny perks up
       const hop = tick % 4 < 2 ? -10 : 0;
       tinny(40 + wig, ty + hop, u, { mouth: "open", arms: "up" });
       text("❗", 40 + 13 * u, ty - 2 * u + hop, 36, "#000", "center");
