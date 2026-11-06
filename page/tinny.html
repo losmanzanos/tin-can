@@ -46,6 +46,7 @@ const MORNING_MIN = 20;                          // "good morning" for the first
 const HUG_SECONDS = 20;
 const PLAY_IDLE_S = 25;                          // a game she walks away from ends after this
 const LEARN_IDLE_S = 60;                         // reading takes longer: a learning round waits a minute
+const PUZZLE_IDLE_S = 180;                       // a puzzle takes thinking: it waits three minutes
 const WIND_DOWN_MIN = 20;                        // the bedtime routine, before her big screen turns off
 
 let doc = null, cards = [], seenTs = 0, hug = {}, weather = null, version = null;
@@ -194,7 +195,7 @@ function scene(now) {
   if (calib) return "calibrate";
   if (doc.screen?.board === "off") return "off";
   if (asleep(now) || tuckedIn === dayKey(now)) return "bedtime";
-  if (act && (Date.now() - lastTap) / 1000 > (act.kind === "learn" ? LEARN_IDLE_S : PLAY_IDLE_S) && act.kind !== "done") act = null;
+  if (act && (Date.now() - lastTap) / 1000 > (act.kind === "learn" ? LEARN_IDLE_S : act.kind === "puzzle" ? PUZZLE_IDLE_S : PLAY_IDLE_S) && act.kind !== "done") act = null;
   if (act) return "play";
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
@@ -495,19 +496,21 @@ function startPlay(now) {
   begin("playmenu");
 }
 const GAMES = [["⚽", "Ball", "ball"], ["🎨", "Colors", "color"], ["🙈", "Hide & seek", "peek"],
-               ["🔁", "Patterns", "pattern"], ["🤔", "Odd one out", "odd"], ["🃏", "Memory", "memory"]];
+               ["🔁", "Patterns", "pattern"], ["🤔", "Odd one out", "odd"], ["🃏", "Memory", "memory"], ["🧩", "Puzzles", "puzzle"]];
 function startGame(k) {
   if (k === "ball") return startBall();
   if (k === "memory") return startMemory();
+  if (k === "puzzle") return startPuzzles();
   begin(k, { round: 0, rounds: 5 }); newRound();
 }
 function drawPlayMenu(now) {
   rect(0, 0, W, H, "#16181f");
   homeButton(() => begin("menu"));
   pill(140, 8, 200, 34, "Pick a game!", 18, "#2a2d3a");
-  const fills = ["#fff1a8", "#ffd0c8", "#cdebc0", "#cfeaf7", "#e7d4f5", "#ffe3b8"];
+  const fills = ["#fff1a8", "#ffd0c8", "#cdebc0", "#cfeaf7", "#e7d4f5", "#ffe3b8", "#c8efdc"];
   GAMES.forEach(([e, label, k], i) => {
-    const x = 6 + (i % 3) * 157, y = 50 + Math.floor(i / 3) * 136, w = 151, h = 130;
+    const row = Math.floor(i / 4), inRow = Math.min(4, GAMES.length - row * 4);
+    const x = 6 + (4 - inRow) * 59 + (i % 4) * 118, y = 50 + row * 136, w = 112, h = 130;
     ctx.fillStyle = fills[i]; ctx.beginPath(); ctx.roundRect(x, y, w, h, 20); ctx.fill();
     text(e, x + w / 2, y + 70, 54, "#000", "center");
     text(label, x + w / 2, y + 112, fit(label, 24, w - 16), "#16181f", "center");
@@ -598,6 +601,8 @@ function drawScene(now) {
     if (k === "menu") drawMenu(now);
     else if (k === "playmenu") drawPlayMenu(now);
     else if (k === "memory") drawMemory(now);
+    else if (k === "puzzlepick") drawPuzzlePick(now);
+    else if (k === "puzzle") drawPuzzle(now);
     else if (k === "learn") drawLearn(now);
     else if (k === "hatch") drawHatch(now);
     else if (k === "friends") drawFriends(now);
@@ -615,7 +620,7 @@ function drawScene(now) {
 
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "playmenu" && act?.kind !== "memory" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "playmenu" && act?.kind !== "memory" && act?.kind !== "puzzle" && act?.kind !== "puzzlepick" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
   if (name === "day" || name === "nudge") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   if (lowBattery() && (name === "day" || name === "music")) {
@@ -1651,6 +1656,193 @@ function drawCalibration() {
   text(`${calib.i + 1} of ${CAL_PTS.length}`, 240, ty + 6, 18, "#c9d4ff", "center");
 }
 
+/* ---------------- postcard puzzles ---------------- */
+// The pictures from her postcards, cut into jigsaw pieces. The pieces wait small in a
+// pile at the side and grow to full size when she picks one up. Dropped close enough
+// to its spot, a piece clicks in. Finishing a puzzle makes the next one a size bigger,
+// and she can pick the size herself too.
+const PUZZLE_SIZES = [[2, 3], [3, 3], [3, 4], [4, 4], [4, 5]];   // rows x columns: 6 to 20 pieces
+const PUZZLE_GHOST = [0.28, 0.2, 0.13, 0.08, 0.05];               // how much of the picture shows under the pieces
+const PILE = 0.7;                                                  // pieces in the pile are this size
+let drag = null, dragDraw = false;
+const puzzleCards = () => cards.filter(c => c.photo);
+function startPuzzles() {
+  for (const cd of puzzleCards()) loadImg(`/postcards/${cd.id}.jpg`);
+  begin("puzzlepick", { page: 0, lv: Math.min(store.get("tinny-puzzle-lv", 0), PUZZLE_SIZES.length - 1) });
+}
+// The part of a picture that fills a box of this shape (up: where to cut a tall one).
+function cover(img, ratio, up = 0.5) {
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  if (iw / ih > ratio) { const sw = ih * ratio; return [(iw - sw) / 2, 0, sw, ih]; }
+  const sh = iw / ratio; return [0, (ih - sh) * up, iw, sh];
+}
+function drawPuzzlePick(now) {
+  sky("#d9f2e4", "#f2fbf5");
+  const list = puzzleCards(), pages = Math.ceil(list.length / 6);
+  if (act.page >= pages) act.page = 0;
+  pill(140, 8, 200, 34, list.length ? "Pick a postcard!" : "No pictures yet", 18, "#2a2d3a");
+  if (!list.length) { wrapIn("When a postcard comes with a picture, it turns into a puzzle here.", 240, 150, 360, 120, 26); return; }
+  if (pages > 1) { pill(370, 8, 102, 34, "More ▶", 17, "#2f6fb5"); zone(360, 0, 120, 46, () => (act.page = (act.page + 1) % pages)); }
+  list.slice(act.page * 6, act.page * 6 + 6).forEach((cd, i) => {
+    const x = 30 + (i % 3) * 146, y = 52 + Math.floor(i / 3) * 108, w = 128, h = 96;
+    const img = images[`/postcards/${cd.id}.jpg`], who = cd.from || "";
+    ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(x, y + 4, w, h, 12); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.clip();
+    if (img) { const [sx, sy, sw, sh] = cover(img, w / h, 0.35); ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h); }
+    else rect(x, y, w, h, "#fffdf7");
+    if (who) { ctx.fillStyle = "#16181fb0"; ctx.fillRect(x, y + h - 24, w, 24); }
+    ctx.restore();
+    if (who) text(who, x + w / 2, y + h - 7, fit(who, 15, w - 12), "#fff", "center");
+    ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.stroke();
+    zone(x, y, w, h, () => img && startPuzzle(cd, img, act.lv));
+  });
+  text("Pieces", 104, 300, 18, "#16181f", "center");
+  PUZZLE_SIZES.forEach(([r, q], i) => {
+    const x = 146 + i * 66, on = i === act.lv;
+    pill(x, 276, 60, 36, String(r * q), 19, on ? "#16181f" : "#ffffff", on ? "#fff" : "#16181f");
+    zone(x, 270, 64, 50, () => (act.lv = i));
+  });
+}
+// One piece's outline: four sides, each straight (the edge of the picture), a knob
+// sticking out (+1) or a hole for the neighbor's knob (-1). The knob is the same
+// shape run either way, so neighbors fit exactly.
+function piecePath(g, w, h, tab, e) {
+  const pts = [[0, 0], [w, 0], [w, h], [0, h], [0, 0]];
+  g.beginPath(); g.moveTo(0, 0);
+  for (let i = 0; i < 4; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], L = Math.hypot(x1 - x0, y1 - y0);
+    if (!e[i]) { g.lineTo(x1, y1); continue; }
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, d = e[i] * tab;
+    const P = (t, s) => [x0 + ux * t * L + uy * s * d, y0 + uy * t * L - ux * s * d];
+    g.lineTo(...P(0.36, 0));
+    g.bezierCurveTo(...P(0.42, 0.05), ...P(0.28, 1), ...P(0.5, 1));
+    g.bezierCurveTo(...P(0.72, 1), ...P(0.58, 0.05), ...P(0.64, 0));
+    g.lineTo(x1, y1);
+  }
+  g.closePath();
+}
+function startPuzzle(cd, img, lv) {
+  const tall = img.naturalHeight > img.naturalWidth * 1.1;
+  let [rows, cols] = PUZZLE_SIZES[lv];
+  if (tall) [rows, cols] = [cols, rows];
+  // a wide picture: the board on the left, the pile on the right and underneath. A tall one: the pile on the right.
+  const B = tall ? { x: 10, y: 28, w: 180, h: 240 } : { x: 10, y: 34, w: 288, h: 216 };
+  const pile = tall ? [[204, 8, 160, 82], [204, 96, 272, 222]] : [[306, 92, 170, 226], [64, 256, 236, 64]];
+  const k = SCALE, bc = document.createElement("canvas");
+  bc.width = B.w * k; bc.height = B.h * k;
+  const [sx, sy, sw, sh] = cover(img, B.w / B.h, 0.35);
+  const bg = bc.getContext("2d"); bg.imageSmoothingQuality = "high"; bg.drawImage(img, sx, sy, sw, sh, 0, 0, bc.width, bc.height);
+  const cw = B.w / cols, ch = B.h / rows, tab = Math.min(cw, ch) * 0.22, m = tab + 3;
+  const coin = () => (Math.random() < 0.5 ? 1 : -1);
+  const down = [...Array(rows)].map(() => [...Array(cols)].map(coin)), right = [...Array(rows)].map(() => [...Array(cols)].map(coin));
+  const pieces = [];
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const edges = [r ? -down[r - 1][q] : 0, q < cols - 1 ? right[r][q] : 0, r < rows - 1 ? down[r][q] : 0, q ? -right[r][q - 1] : 0];
+    const make = (outline) => {
+      const pc = document.createElement("canvas");
+      pc.width = Math.ceil((cw + 2 * m) * k); pc.height = Math.ceil((ch + 2 * m) * k);
+      const g = pc.getContext("2d"); g.scale(pc.width / (cw + 2 * m), pc.height / (ch + 2 * m)); g.translate(m, m);
+      piecePath(g, cw, ch, tab, edges);
+      g.save(); g.clip(); g.drawImage(bc, -q * cw, -r * ch, B.w, B.h); g.restore();
+      if (outline) { g.lineJoin = "round"; g.lineWidth = 2.5; g.strokeStyle = "#16181fa0"; g.stroke(); g.lineWidth = 1; g.strokeStyle = "#ffffffa0"; g.stroke(); }
+      return pc;
+    };
+    pieces.push({ tx: B.x + q * cw + cw / 2, ty: B.y + r * ch + ch / 2, x: 0, y: 0, s: PILE, done: false, img: make(true), plain: make(false) });
+  }
+  // into the pile, spread out as much as there's room for
+  const order = shuffle(pieces), areas = pile.map(p => p[2] * p[3]), total = areas.reduce((a, b) => a + b, 0);
+  const hw = cw * PILE / 2, hh = ch * PILE / 2, placed = [];
+  for (const p of order) {
+    let best = null, least = Infinity;
+    for (let t = 0; t < 40 && least > 0; t++) {
+      let a = Math.random() * total, i = 0;
+      while (i < areas.length - 1 && a > areas[i]) a -= areas[i++];
+      const [rx, ry, rw, rh] = pile[i];
+      let x = rw > 2 * hw ? rx + hw + Math.random() * (rw - 2 * hw) : rx + rw / 2;
+      let y = rh > 2 * hh ? ry + hh + Math.random() * (rh - 2 * hh) : ry + rh / 2;
+      x = Math.max(hw + 2, Math.min(W - hw - 2, x)); y = Math.max(hh + 2, Math.min(H - hh - 2, y));
+      const over = placed.reduce((n, o) => n + Math.max(0, 2 * hw - Math.abs(o.x - x)) * Math.max(0, 2 * hh - Math.abs(o.y - y)), 0);
+      if (over < least) { least = over; best = [x, y]; }
+    }
+    [p.x, p.y] = best; placed.push(p);
+  }
+  drag = null;
+  begin("puzzle", { from: cd.from || "", lv, tall, B, bc, pieces: order, cw, ch, m, pile, solved: 0 });
+}
+function drawPiece(p, can) {
+  const w = (act.cw + 2 * act.m) * p.s, h = (act.ch + 2 * act.m) * p.s;
+  ctx.drawImage(can, p.x - w / 2, p.y - h / 2, w, h);
+}
+function drawPuzzle(now) {
+  const a = act, B = a.B;
+  sky("#d9f2e4", "#f2fbf5");
+  zone(0, 0, W, H, () => {});                          // a tap between pieces does nothing (no petting mid-puzzle)
+  const title = a.from ? `A postcard from ${a.from}` : "A postcard";
+  text(title, B.x + 2, B.y - 9, fit(title, 16, a.tall ? 186 : 286), "#2a4a38");
+  // the box lid: the whole picture, to look at
+  const bw = a.tall ? 66 : 100, bh = a.tall ? 88 : 75, bx = 472 - bw;
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(bx - 3, 5, bw + 6, bh + 6, 6); ctx.fill();
+  ctx.drawImage(a.bc, bx, 8, bw, bh);
+  // the board
+  ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(B.x - 4, B.y - 4, B.w + 8, B.h + 8, 8); ctx.fill();
+  rect(B.x, B.y, B.w, B.h, "#fffdf7");
+  if (a.solved) {
+    ctx.drawImage(a.bc, B.x, B.y, B.w, B.h);
+    pill(W - 226, H - 58, 206, 42, "🎉 You did it!", 22, "#e2413b");
+    return;
+  }
+  ctx.globalAlpha = PUZZLE_GHOST[a.lv]; ctx.drawImage(a.bc, B.x, B.y, B.w, B.h); ctx.globalAlpha = 1;
+  for (const p of a.pieces) if (p.done) drawPiece(p, p.plain);
+  for (const p of a.pieces) if (!p.done && p !== drag?.p) drawPiece(p, p.img);
+  if (drag) {
+    ctx.save(); ctx.shadowColor = "#0000006b"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 7;
+    drawPiece(drag.p, drag.p.img); ctx.restore();
+  }
+}
+// A press on a loose piece picks it up (the top one, if they're piled).
+function puzzleGrab(x, y) {
+  if (act?.kind !== "puzzle" || act.solved || drag) return false;
+  if (x < 64 && y > 262) return false;                 // the back button
+  const a = act;
+  for (let i = a.pieces.length - 1; i >= 0; i--) {
+    const p = a.pieces[i];
+    if (p.done) continue;
+    if (Math.abs(x - p.x) <= a.cw * p.s / 2 + 6 && Math.abs(y - p.y) <= a.ch * p.s / 2 + 6) {
+      a.pieces.splice(i, 1); a.pieces.push(p);
+      const grow = 1 / p.s; p.s = 1;                   // full size, with the finger on the same part of it
+      drag = { p, dx: (p.x - x) * grow, dy: (p.y - y) * grow };
+      puzzleMove(x, y);
+      return true;
+    }
+  }
+  return false;
+}
+function puzzleMove(x, y) {
+  if (!drag) return;
+  drag.p.x = Math.max(0, Math.min(W, x + drag.dx)); drag.p.y = Math.max(0, Math.min(H, y + drag.dy));
+}
+function puzzleDrop() {
+  const p = drag?.p, a = act;
+  drag = null;
+  if (!p || a?.kind !== "puzzle") return;
+  if (Math.hypot(p.x - p.tx, p.y - p.ty) <= Math.max(16, Math.min(a.cw, a.ch) * 0.3)) {
+    p.x = p.tx; p.y = p.ty; p.done = true; burst(p.x, p.y, 6);
+    if (a.pieces.every(q => q.done)) solvePuzzle();
+    return;
+  }
+  const B = a.B;
+  if (!(p.x >= B.x && p.x <= B.x + B.w && p.y >= B.y && p.y <= B.y + B.h)) p.s = PILE;   // off the board: small again
+  const hw = a.cw * p.s / 2, hh = a.ch * p.s / 2;
+  if (p.x - hw < 60 && p.y + hh > 270) p.x = 60 + hw;   // not on top of the back button
+}
+function solvePuzzle() {
+  const a = act;
+  a.solved = Date.now(); burst(a.B.x + a.B.w / 2, a.B.y + a.B.h / 2, 30);
+  const lv = store.get("tinny-puzzle-lv", 0);
+  if (a.lv >= lv) store.set("tinny-puzzle-lv", Math.min(a.lv + 1, PUZZLE_SIZES.length - 1));
+  setTimeout(() => { if (act === a) finish(["You did the puzzle!", `${a.pieces.length} pieces`]); }, 3500);
+}
+
 /* ---------------- telling the admin page how she's doing ---------------- */
 let progTimer = null;
 function postProgress() {
@@ -1691,10 +1883,25 @@ addEventListener("pointerdown", (e) => {
   [x, y] = applyCal(x, y);
   rings.push({ x, y, at: Date.now() });
   if (doc?.screen?.tapDots) taps = [...taps.slice(-5), { x, y, at: Date.now() }];
+  if (puzzleGrab(x, y)) { drawScene(new Date()); return; }
   const fn = hit(x, y);
   try { if (fn) fn(x, y); else pet(); } catch (err) { act = null; }
   drawScene(new Date());     // show the answer to the tap now, and with it the new targets
 });
+// Dragging a puzzle piece: drawn as the finger moves, not just 8 times a second.
+function canvasXY(e) {
+  const r = c.getBoundingClientRect();
+  let x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+  if (c.style.transform) { x = W - x; y = H - y; }
+  return applyCal(x, y);
+}
+addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  e.preventDefault(); lastTap = Date.now();
+  puzzleMove(...canvasXY(e));
+  if (!dragDraw) { dragDraw = true; requestAnimationFrame(() => { dragDraw = false; drawScene(new Date()); }); }
+});
+for (const ev of ["pointerup", "pointercancel"]) addEventListener(ev, () => { if (drag) { puzzleDrop(); drawScene(new Date()); } });
 addEventListener("keydown", pet);
 
 /* ---------------- go ---------------- */
