@@ -522,7 +522,7 @@ function drawScene(now) {
       rect(x, y, s * 2, s * 2, (tick + x) % 24 < 3 ? "#7d86b8" : "#fff6c8");
     const mn = moon(now);
     text(mn.e, 80, 118, 64, "#000", "center");
-    text(`Tonight: ${mn.name}`, 80, 160, 14, "#c9d4ff", "center");
+    const moonLine = `Tonight: ${mn.name}`; text(moonLine, 14, 302, fit(moonLine, 16, 220), "#c9d4ff");   // bottom left, across from "Goodnight"
     ctx.globalAlpha = 0.85; tinny(120 + wig, 266 - 27 * u + 4, u, { eyes: "closed", mouth: "flat", cap: true, squish: tick % 16 < 8 }); ctx.globalAlpha = 1;
     const z = tick % 24;
     text("z", 296, 132 - (z % 8), 24, "#c9d4ff"); if (z >= 8) text("z", 318, 100 - (z % 8), 32, "#c9d4ff"); if (z >= 16) text("Z", 346, 62 - (z % 8), 42, "#c9d4ff");
