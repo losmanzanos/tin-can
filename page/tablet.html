@@ -97,7 +97,7 @@ setInterval(() => { wave++; draw(); }, 350);
 // corner with the cover and slides back out. Tapping Tinny goes to the full scene in Tinny.
 (() => {
   if (!window.tinnyPopGo) return;                     // only on the tablet (the page sets where a tap goes)
-  const RECORD = "http://192.168.68.77:8080";
+  const RECORD = "http://192.168.68.21:8080";
   const pop = document.getElementById("tinnyPop"), say = document.getElementById("tpSay"), cover = document.getElementById("tpCover");
   const c = document.getElementById("tpPet").getContext("2d");
   const COL = { k: "#16181f", g: "#b9c0cc", l: "#e4e8ef", d: "#8b93a3", p: "#f2a1a8", m: "#e9ad1c" };
