@@ -32,6 +32,13 @@ canvas { display: block; width: min(100vw, 150vh); height: min(66.667vw, 100vh);
 const PB = window.PhoneBook;
 const W = 480, H = 320, FPS = 8;
 const c = document.getElementById("c"), ctx = c.getContext("2d");
+let SCALE = 1;
+function sharpen() {
+  const r = c.getBoundingClientRect();
+  const k = Math.max(1, Math.min(4, Math.round(r.width * (window.devicePixelRatio || 1) / W)));
+  if (k !== SCALE || c.width !== W * k) { SCALE = k; c.width = W * k; c.height = H * k; }
+}
+sharpen(); addEventListener("resize", sharpen);
 const COL = { k: "#16181f", g: "#b9c0cc", l: "#e4e8ef", d: "#8b93a3", w: "#ffffff", p: "#f2a1a8", m: "#e9ad1c", r: "#e2413b",
               b: "#2f6fb5", y: "#ffd84a", o: "#ef7f2c", t: "#46bfc0", v: "#b768d6", s: "#5fae4a" };
 const NUDGE_EVERY_MIN = 30, NUDGE_FOR_MIN = 1;   // a "call someone?" minute every half hour
@@ -485,6 +492,8 @@ function drawScene(now) {
   const blink = tick % 37 === 0 || tick % 37 === 1;
   const petting = Date.now() < wiggleUntil;
   const wig = petting ? (tick % 2 ? 4 : -4) : 0;
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  ctx.imageSmoothingQuality = "high";
   ctx.save();
   zones = [];
   if (name === "off" || name === "loading") { rect(0, 0, W, H, "#000"); ctx.restore(); return; }
@@ -563,7 +572,7 @@ function drawScene(now) {
     else if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
     else if (k === "done") drawDone(now); else drawGame(now);
     if (act && !["done", "menu", "learn", "hatch", "friends"].includes(act.kind)) {          // home: back to the menu, any time
-      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("🏠", 28, 304, 20, "#000", "center");
+      ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("◀", 28, 303, 20, "#fff", "center");
       zone(0, 266, 60, 54, () => { begin("menu"); });
     }
   }
@@ -1281,7 +1290,7 @@ function drawSpell(q) {
 }
 function homeButton(fn) {
   ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(8, 8, 96, 34, 17); ctx.fill();
-  text("🏠 Back", 56, 31, 17, "#fff", "center");
+  text("◀  Back", 56, 31, 17, "#fff", "center");
   zone(0, 0, 120, 46, fn);
 }
 
