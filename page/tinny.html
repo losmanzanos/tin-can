@@ -144,7 +144,7 @@ async function pollMusic() {
   } catch (e) { music = { state: "idle", since: 0 }; }    // the record player is off: nothing to show
 }
 // The record player shows on the little Pi screen for now; the tablet joins in once it has been tested.
-const MUSIC_ON_TABLET = false;
+const MUSIC_ON_TABLET = true;
 const musicOn = () => (!TABLET || MUSIC_ON_TABLET) && (music.state === "playing" || music.state === "reading" || music.state === "seeing" || (music.state === "miss" && ago(music.since) < 8));
 
 /* ---------------- what's going on ---------------- */
