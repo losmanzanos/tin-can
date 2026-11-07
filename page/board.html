@@ -20,7 +20,7 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .days button[aria-pressed=true] { border-color: var(--ink); transform: translateY(calc(var(--u) * -1)); box-shadow: 0 calc(var(--u) * 1) 0 var(--ink); }
 .days button .star { position: absolute; top: calc(var(--u) * -2.2); right: calc(var(--u) * -1.2); font-size: calc(var(--u) * 5); }
 
-.main { display: grid; grid-template-columns: 1fr 1.05fr; gap: calc(var(--u) * 3); min-height: 0; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: calc(var(--u) * 3); min-height: 0; }
 /* A phone held upright: the day on top, the magnets underneath. */
 @media (orientation: portrait) {
   .main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
@@ -41,20 +41,21 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 /* The tile tray: every magnet she can use. */
 /* Pages of magnets: swipe sideways on the tray, or tap the arrows. */
 .tray { background: #efe6d2; border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 2); display: grid; grid-template-rows: minmax(0, 1fr) auto;
-  gap: calc(var(--u) * 1.6); overflow: hidden; min-height: 0; touch-action: none; transition: background .12s; }
-.trayPage { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: calc(var(--u) * 1.6); align-content: start; min-height: 0; }
-.trayNav { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 2); }
+  gap: calc(var(--u) * 1.6); overflow: hidden; min-height: 0; min-width: 0; touch-action: none; transition: background .12s; }
+.trayPage { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: calc(var(--u) * 1.6); align-content: start; min-height: 0; min-width: 0; overflow: hidden; }
+.trayPage .probe { position: absolute; visibility: hidden; width: calc(var(--u) * var(--tt, 17)); height: 0; }
+.trayNav { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 2); min-width: 0; }
 .trayNav button { width: calc(var(--u) * 11); height: calc(var(--u) * 11); border: 0; border-radius: 50%; background: var(--ink); color: #fff;
-  font-size: calc(var(--u) * 4.6); line-height: 1; cursor: pointer; box-shadow: 0 calc(var(--u) * 0.8) 0 #0006; }
+  font-size: calc(var(--u) * 4.6); line-height: 1; cursor: pointer; flex: none; box-shadow: 0 calc(var(--u) * 0.8) 0 #0006; }
 .trayNav button:disabled { opacity: .2; box-shadow: none; }
-.dots { display: flex; gap: calc(var(--u) * 1.8); }
+.dots { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.8); min-width: 0; }
 .dots i { width: calc(var(--u) * 2.6); height: calc(var(--u) * 2.6); border-radius: 50%; background: #cbbd99; }
 .dots i.on { background: var(--ink); transform: scale(1.25); }
 .tray.over { background: #e4d6b6; outline: calc(var(--u) * 0.6) dashed var(--ink); }
 
 .tile { width: calc(var(--u) * 17); height: calc(var(--u) * 17); display: block; touch-action: none; }
 /* Big enough for a small finger. */
-.tray .tile { width: calc(var(--u) * var(--tt, 17)); height: calc(var(--u) * var(--tt, 17)); justify-self: center; }
+.tray .tile { width: min(calc(var(--u) * var(--tt, 17)), 100%); height: auto; aspect-ratio: 1; justify-self: center; }
 .tile.placed { animation: pop .25s ease-out; }
 @keyframes pop { 0% { transform: scale(.7); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
 .ghost { position: fixed; z-index: 10; pointer-events: none; width: calc(var(--u) * 20); height: calc(var(--u) * 20); transform: translate(-50%, -60%) rotate(-4deg);
@@ -73,6 +74,38 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .tablet .days { margin-left: calc(var(--u) * 19); }
 .tablet .backToTinny.home { left: calc(var(--u) * 3); top: calc(var(--u) * 2.5); bottom: auto; height: calc(var(--u) * 13); width: calc(var(--u) * 17.5);
   padding: 0; border-radius: calc(var(--u) * 3); font-size: calc(var(--u) * 4.2); line-height: 1.1; }
+
+/* Make your own magnet: the first spot in the tray. Draw one, or take a picture and draw on it. */
+.makeTile { width: min(calc(var(--u) * var(--tt, 17)), 100%); aspect-ratio: 1; justify-self: center; border: calc(var(--u) * 0.7) dashed var(--ink);
+  border-radius: calc(var(--u) * 2.6); background: #fff7d6; color: var(--ink); font: 700 calc(var(--u) * 8) "Andika", sans-serif; line-height: 1;
+  display: grid; place-items: center; align-content: center; gap: calc(var(--u) * 0.4); cursor: pointer; padding: 0; }
+.makeTile small { font-size: calc(var(--u) * 3.4); }
+.maker { position: fixed; inset: 0; z-index: 30; background: var(--paper); display: none; gap: calc(var(--u) * 3); padding: calc(var(--u) * 3);
+  grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-content: center; touch-action: none; }
+.maker.on { display: grid; }
+.paper { position: relative; width: calc(var(--u) * 92); height: calc(var(--u) * 92); border-radius: calc(var(--u) * 4); overflow: hidden;
+  background: #fff; box-shadow: 0 0 0 calc(var(--u) * 0.8) var(--ink), 0 calc(var(--u) * 1.4) 0 calc(var(--u) * 0.8) var(--ink); }
+.paper canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.tools { display: grid; gap: calc(var(--u) * 2.2); align-content: center; max-width: calc(var(--u) * 62); }
+.swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: calc(var(--u) * 1.6); }
+.swatches button { aspect-ratio: 1; border-radius: 50%; border: calc(var(--u) * 0.7) solid #fff; background: var(--c); box-shadow: 0 0 0 calc(var(--u) * 0.4) #0003; padding: 0; }
+.swatches button.on { box-shadow: 0 0 0 calc(var(--u) * 0.9) var(--ink); transform: scale(1.12); }
+.sizes, .acts { display: flex; gap: calc(var(--u) * 1.6); }
+.maker .big { flex: 1; border: 0; border-radius: calc(var(--u) * 3); background: #fff; color: var(--ink); font: 700 calc(var(--u) * 4.6) "Andika", sans-serif;
+  padding: calc(var(--u) * 1.8) calc(var(--u) * 1); box-shadow: 0 calc(var(--u) * 0.8) 0 #0003; display: grid; place-items: center; gap: calc(var(--u) * 0.3); }
+.maker .big.on { background: var(--ink); color: #fff; }
+.maker .big small { font-size: calc(var(--u) * 2.8); }
+.sizes .big i { display: block; border-radius: 50%; background: currentColor; }
+.maker .done { background: #4caf50; color: #fff; font-size: calc(var(--u) * 5.4); }
+.maker .cancel { flex: 0 0 auto; padding-left: calc(var(--u) * 3); padding-right: calc(var(--u) * 3); }
+.maker .wait { position: absolute; inset: 0; display: none; place-items: center; background: #fffc; font-size: calc(var(--u) * 6); }
+.maker .wait.on { display: grid; }
+@media (orientation: portrait) {
+  .maker { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: center; }
+  .paper { width: calc(var(--u) * 86); height: calc(var(--u) * 86); justify-self: center; }
+  .tools { max-width: none; }
+  .swatches { grid-template-columns: repeat(10, 1fr); gap: calc(var(--u) * 1.2); }
+}
 </style>
 </head>
 <body>
@@ -92,6 +125,25 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 <div class="night" id="night"></div>
 <div class="msg" id="msg"></div>
 <div class="saving" id="saving"></div>
+<div class="maker" id="maker">
+  <div class="paper"><canvas id="paperBack" width="512" height="512"></canvas><canvas id="paperInk" width="512" height="512"></canvas></div>
+  <div class="tools">
+    <div class="swatches" id="swatches"></div>
+    <div class="sizes" id="sizes"></div>
+    <div class="acts">
+      <button type="button" class="big" id="makerPhoto">📷<small>Picture</small></button>
+      <button type="button" class="big" id="makerEraser">🧽<small>Eraser</small></button>
+      <button type="button" class="big" id="makerUndo">↩️<small>Oops</small></button>
+      <button type="button" class="big" id="makerClear">🗑️<small>New</small></button>
+    </div>
+    <div class="acts">
+      <button type="button" class="big cancel" id="makerCancel">✖️</button>
+      <button type="button" class="big done" id="makerDone">✅ Make it!</button>
+    </div>
+  </div>
+  <input type="file" id="makerFile" accept="image/*" capture="environment" hidden>
+  <div class="wait" id="makerWait">Making your magnet… ✨</div>
+</div>
 
 <script src="/render.js"></script>
 <script>
@@ -185,20 +237,29 @@ function render() {
 }
 
 /* ---------- the tray, a page at a time ---------- */
-let trayPage = 0, perPage = 9;
+let trayPage = 0, perPage = 9, justMade = null;
+const MAKE = { make: true };
 function renderTray() {
   const page = $("trayPage");
   // Upright phones get the biggest magnets; wide screens fit more per page.
   const tt = innerHeight > innerWidth ? 21 : 17;
   page.style.setProperty("--tt", tt);
-  const u = Math.min(innerWidth, innerHeight) / 100, cell = tt * u, gap = 1.6 * u;
-  const cols = Math.max(1, Math.floor((page.clientWidth + gap) / (cell + gap)));
-  const rows = Math.max(1, Math.floor((page.clientHeight + gap) / (cell + gap)));
+  // Measure with the page's own CSS sizes, on an empty page. (The tablet's browser can report a
+  // smaller window to scripts than CSS uses, which made too many columns and pushed the tray
+  // and its arrow off the screen.)
+  const probe = el("div", "probe");
+  page.replaceChildren(probe);
+  const cell = probe.getBoundingClientRect().width, gap = parseFloat(getComputedStyle(page).columnGap) || 0;
+  const box = page.getBoundingClientRect();
+  const cols = Math.max(1, Math.floor((box.width + gap) / (cell + gap)));
+  const rows = Math.max(1, Math.floor((box.height + gap) / (cell + gap)));
   perPage = cols * rows;
-  const pages = Math.max(1, Math.ceil(doc.tiles.length / perPage));
+  const items = [MAKE, ...doc.tiles];   // the make-your-own spot comes first
+  const pages = Math.max(1, Math.ceil(items.length / perPage));
   trayPage = Math.max(0, Math.min(trayPage, pages - 1));
   page.style.setProperty("--cols", cols);
-  page.replaceChildren(...doc.tiles.slice(trayPage * perPage, (trayPage + 1) * perPage).map(tileCanvas));
+  page.replaceChildren(...items.slice(trayPage * perPage, (trayPage + 1) * perPage).map(t => t === MAKE ? makeButton() : tileCanvas(t)));
+  if (justMade) { page.querySelector(`.tile[data-id="${CSS.escape(justMade)}"]`)?.classList.add("placed"); justMade = null; }
   $("prevPage").disabled = trayPage === 0;
   $("nextPage").disabled = trayPage === pages - 1;
   $("dots").replaceChildren(...Array.from({ length: pages }, (_, i) => { const d = el("i", i === trayPage ? "on" : ""); return d; }));
@@ -208,6 +269,12 @@ function turnPage(by) { trayPage += by; touched = Date.now(); renderTray(); }
 $("prevPage").onclick = () => turnPage(-1);
 $("nextPage").onclick = () => turnPage(1);
 addEventListener("resize", () => doc && renderTray());
+// The tablet's browser can settle on its size after the page loads (bars hiding): follow the tray's real size.
+let traySize = "";
+if (window.ResizeObserver) new ResizeObserver(([e]) => {
+  const s = Math.round(e.contentRect.width) + "x" + Math.round(e.contentRect.height);
+  if (s !== traySize) { traySize = s; if (doc && !dragging) renderTray(); }
+}).observe($("tray"));
 // A swipe on the tray (not on a magnet) turns the page.
 let swipe = null;
 $("tray").addEventListener("pointerdown", (e) => { if (!e.target.closest(".tile, button")) swipe = { x: e.clientX, y: e.clientY }; });
@@ -217,6 +284,100 @@ document.addEventListener("pointerup", (e) => {
   swipe = null;
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) turnPage(dx < 0 ? 1 : -1);
 });
+
+/* ---------- make your own magnet ---------- */
+// Tap the + in the tray: draw a magnet, or take a picture (Fully's camera upload) and draw on it.
+// "Make it!" sends a square picture to the Pi, which adds it to the front of the tray.
+const INKS = ["#16181f", "#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2f8fd1", "#8a5ad1", "#f08ab0", "#8b5a2b", "#ffffff"];
+const SIZES = [10, 22, 44];
+const maker = { color: INKS[1], size: SIZES[1], eraser: false, undo: [], drawing: null };
+const back = $("paperBack").getContext("2d"), ink = $("paperInk").getContext("2d");
+function makeButton() {
+  const b = el("button", "makeTile"); b.type = "button";
+  b.innerHTML = "+<small>✏️ 📷</small>"; b.setAttribute("aria-label", "Make a magnet");
+  b.onclick = openMaker;
+  return b;
+}
+function makerTools() {
+  $("swatches").replaceChildren(...INKS.map(c => {
+    const b = el("button", !maker.eraser && c === maker.color ? "on" : ""); b.type = "button"; b.style.setProperty("--c", c);
+    b.onclick = () => { maker.color = c; maker.eraser = false; makerTools(); };
+    return b;
+  }));
+  $("sizes").replaceChildren(...SIZES.map((z, i) => {
+    const b = el("button", "big" + (z === maker.size ? " on" : "")); b.type = "button";
+    const dot = el("i"); dot.style.width = dot.style.height = `calc(var(--u) * ${[1.6, 3.2, 5.6][i]})`; b.append(dot);
+    b.onclick = () => { maker.size = z; makerTools(); };
+    return b;
+  }));
+  $("makerEraser").classList.toggle("on", maker.eraser);
+}
+function openMaker() {
+  touched = Date.now();
+  back.fillStyle = "#fff"; back.fillRect(0, 0, 512, 512);
+  ink.clearRect(0, 0, 512, 512);
+  Object.assign(maker, { eraser: false, undo: [], drawing: null });
+  $("makerWait").classList.remove("on");
+  makerTools();
+  $("maker").classList.add("on");
+}
+function closeMaker() { $("maker").classList.remove("on"); maker.drawing = null; }
+function paperPoint(e) {
+  const r = $("paperInk").getBoundingClientRect();
+  let x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  if (document.body.style.transform) { x = 1 - x; y = 1 - y; }   // the flipped little screen
+  return [x * 512, y * 512];
+}
+$("paperInk").addEventListener("pointerdown", (e) => {
+  e.preventDefault(); touched = Date.now();
+  $("paperInk").setPointerCapture(e.pointerId);
+  maker.undo.push(ink.getImageData(0, 0, 512, 512)); if (maker.undo.length > 25) maker.undo.shift();
+  maker.drawing = { id: e.pointerId, at: paperPoint(e) };
+  stroke(maker.drawing.at, maker.drawing.at);
+});
+$("paperInk").addEventListener("pointermove", (e) => {
+  if (!maker.drawing || e.pointerId !== maker.drawing.id) return;
+  for (const ev of (e.getCoalescedEvents ? e.getCoalescedEvents() : [e])) { const p = paperPoint(ev); stroke(maker.drawing.at, p); maker.drawing.at = p; }
+});
+for (const t of ["pointerup", "pointercancel"]) $("paperInk").addEventListener(t, () => { maker.drawing = null; });
+function stroke([x0, y0], [x1, y1]) {
+  ink.globalCompositeOperation = maker.eraser ? "destination-out" : "source-over";
+  ink.strokeStyle = maker.color; ink.lineWidth = maker.eraser ? maker.size * 1.6 : maker.size; ink.lineCap = ink.lineJoin = "round";
+  ink.beginPath(); ink.moveTo(x0, y0); ink.lineTo(x1 + 0.01, y1); ink.stroke();
+  ink.globalCompositeOperation = "source-over";
+}
+$("makerEraser").onclick = () => { maker.eraser = !maker.eraser; makerTools(); };
+$("makerUndo").onclick = () => { const last = maker.undo.pop(); if (last) ink.putImageData(last, 0, 0); };
+$("makerClear").onclick = () => { maker.undo.push(ink.getImageData(0, 0, 512, 512)); ink.clearRect(0, 0, 512, 512); back.fillStyle = "#fff"; back.fillRect(0, 0, 512, 512); };
+$("makerCancel").onclick = closeMaker;
+$("makerPhoto").onclick = () => { touched = Date.now(); $("makerFile").value = ""; $("makerFile").click(); };
+$("makerFile").onchange = async () => {
+  const f = $("makerFile").files[0]; if (!f) return;
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => {   // the middle square of the picture, behind her drawing
+    const m = Math.min(img.naturalWidth, img.naturalHeight);
+    back.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, 0, 0, 512, 512);
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+};
+$("makerDone").onclick = async () => {
+  const out = document.createElement("canvas"); out.width = out.height = 512;
+  const o = out.getContext("2d"); o.drawImage($("paperBack"), 0, 0); o.drawImage($("paperInk"), 0, 0);
+  $("makerWait").classList.add("on");
+  try {
+    const jpeg = await new Promise(ok => out.toBlob(ok, "image/jpeg", 0.88));
+    const r = await fetch("/api/board/tile", { method: "POST", cache: "no-store", headers: { "X-Board-Key": key, "Content-Type": "image/jpeg" }, body: jpeg });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || "Uh oh, that didn't work. Try again! 🙈");
+    doc = data.doc || doc;
+    justMade = data.tile?.id || null; trayPage = 0; seen = null;
+    closeMaker(); render(); scheduleRedraw();
+  } catch (e) {
+    $("makerWait").textContent = /full/.test(e.message) ? e.message : "Uh oh, that didn't work. Try again! 🙈";
+    setTimeout(() => { $("makerWait").classList.remove("on"); $("makerWait").textContent = "Making your magnet… ✨"; }, 2500);
+  }
+};
 
 /* ---------- dragging ---------- */
 function targetAt(x, y) {

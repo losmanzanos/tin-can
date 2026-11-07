@@ -41,7 +41,7 @@ PAGE = APP / "page"
 DEFAULT_DATA = Path(os.environ.get("ZELDA_DATA", Path.home() / "zelda-phone-data"))
 
 MAX_PEOPLE = 21  # 7 per page; the screen flips through up to 3 pages
-MAX_TILES = 100
+MAX_TILES = 160
 MAX_CARDS = 30   # postcards kept; older ones are let go
 CARDS_LOOK = 3   # bump when postcards.py draws differently, so the Pi redraws them
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
@@ -908,7 +908,7 @@ def make_handler(store, mailroom):
                 return self.send(HTTPStatus.OK, {"ok": True},
                                  headers={"Set-Cookie": f"{COOKIE}=; Path=/; Max-Age=0; SameSite=Strict"})
 
-            board_paths = path == "/api/board/week" or path.startswith("/api/frames/days/")
+            board_paths = path in ("/api/board/week", "/api/board/tile") or path.startswith("/api/frames/days/")
             if not (self.authed() or (board_paths and self.board_ok())):
                 return self.error(HTTPStatus.UNAUTHORIZED, "Please log in")
 
@@ -920,6 +920,24 @@ def make_handler(store, mailroom):
                 if saved is None:
                     return self.send(HTTPStatus.CONFLICT, {"error": "changed elsewhere", "doc": public_doc(store.load())})
                 return self.send(HTTPStatus.OK, public_doc(saved))
+
+            # A magnet Zelda made on the board: a drawing, or a photo she drew on.
+            # It goes straight into the front of the tray; delete it on the admin page.
+            if path == "/api/board/tile" and self.command == "POST":
+                if (self.headers.get("Content-Type") or "") != "image/jpeg":
+                    raise BadRequest("send a JPEG")
+                data = self.body(MAX_PHOTO_BYTES)
+                if not data.startswith(b"\xff\xd8\xff"):
+                    raise BadRequest("that isn't a JPEG")
+                cur = store.load()
+                if len(cur.get("tiles") or []) >= MAX_TILES:
+                    raise BadRequest("The tray is full! Ask Dad to clear some magnets.")
+                name = secrets.token_hex(10) + ".jpg"
+                store.photos.mkdir(parents=True, exist_ok=True)
+                write_atomic(store.photos / name, data)
+                tile = {"id": new_id(), "label": "", "kind": "photo", "photo": name}
+                saved = store.save(clean_doc(dict(cur, tiles=[tile] + (cur.get("tiles") or []))))
+                return self.send(HTTPStatus.OK, {"doc": public_doc(saved), "tile": saved["tiles"][0]})
 
             if path == "/api/remote" and self.command == "POST":
                 action = str((self.json_body() or {}).get("action", ""))
