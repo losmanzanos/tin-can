@@ -305,6 +305,8 @@ def clean_doc(doc):
             if not PHOTO_RE.match(str(t.get("photo", ""))):
                 raise BadRequest(f"{label or 'a tile'}: add a photo")
             c["photo"] = t["photo"]
+            if t.get("made"):
+                c["made"] = True     # Zelda made it on the board, so the board may change or delete it
         elif kind != "blank":
             raise BadRequest("unknown tile type")
         tile_ids.add(tid)
@@ -908,7 +910,7 @@ def make_handler(store, mailroom):
                 return self.send(HTTPStatus.OK, {"ok": True},
                                  headers={"Set-Cookie": f"{COOKIE}=; Path=/; Max-Age=0; SameSite=Strict"})
 
-            board_paths = path in ("/api/board/week", "/api/board/tile") or path.startswith("/api/frames/days/")
+            board_paths = path == "/api/board/week" or path.startswith(("/api/board/tile", "/api/frames/days/"))
             if not (self.authed() or (board_paths and self.board_ok())):
                 return self.error(HTTPStatus.UNAUTHORIZED, "Please log in")
 
@@ -935,9 +937,34 @@ def make_handler(store, mailroom):
                 name = secrets.token_hex(10) + ".jpg"
                 store.photos.mkdir(parents=True, exist_ok=True)
                 write_atomic(store.photos / name, data)
-                tile = {"id": new_id(), "label": "", "kind": "photo", "photo": name}
+                tile = {"id": new_id(), "label": "", "kind": "photo", "photo": name, "made": True}
                 saved = store.save(clean_doc(dict(cur, tiles=[tile] + (cur.get("tiles") or []))))
                 return self.send(HTTPStatus.OK, {"doc": public_doc(saved), "tile": saved["tiles"][0]})
+
+            # Change or throw away a magnet she made. Only hers: the board can't touch the others.
+            m = re.match(r"^/api/board/tile/([0-9a-zA-Z_-]{1,32})(/delete)?$", path)
+            if m and self.command == "POST":
+                tid, delete = m.group(1), bool(m.group(2))
+                if not delete:
+                    if (self.headers.get("Content-Type") or "") != "image/jpeg":
+                        raise BadRequest("send a JPEG")
+                    data = self.body(MAX_PHOTO_BYTES)
+                    if not data.startswith(b"\xff\xd8\xff"):
+                        raise BadRequest("that isn't a JPEG")
+                cur = store.load()
+                tiles = cur.get("tiles") or []
+                mine = next((t for t in tiles if t.get("id") == tid and t.get("made")), None)
+                if mine is None:
+                    return self.error(HTTPStatus.NOT_FOUND, "That magnet can't be changed here.")
+                if delete:
+                    tiles = [t for t in tiles if t is not mine]   # clean_doc takes it off the week too
+                else:
+                    name = secrets.token_hex(10) + ".jpg"
+                    store.photos.mkdir(parents=True, exist_ok=True)
+                    write_atomic(store.photos / name, data)
+                    tiles = [dict(t, photo=name) if t is mine else t for t in tiles]
+                saved = store.save(clean_doc(dict(cur, tiles=tiles)))
+                return self.send(HTTPStatus.OK, {"doc": public_doc(saved), "tile": None if delete else next(t for t in saved["tiles"] if t["id"] == tid)})
 
             if path == "/api/remote" and self.command == "POST":
                 action = str((self.json_body() or {}).get("action", ""))

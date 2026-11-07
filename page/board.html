@@ -100,6 +100,19 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
 .maker .cancel { flex: 0 0 auto; padding-left: calc(var(--u) * 3); padding-right: calc(var(--u) * 3); }
 .maker .wait { position: absolute; inset: 0; display: none; place-items: center; background: #fffc; font-size: calc(var(--u) * 6); }
 .maker .wait.on { display: grid; }
+/* Tap a magnet she made: change it or throw it away. */
+.tileMenu { position: fixed; inset: 0; z-index: 35; background: #16181fb3; display: none; place-items: center; }
+.tileMenu.on { display: grid; }
+.tileMenu [hidden] { display: none !important; }
+.tileMenu .card { background: var(--paper); border-radius: calc(var(--u) * 4); padding: calc(var(--u) * 3.5); display: grid; gap: calc(var(--u) * 2.4);
+  justify-items: center; box-shadow: 0 0 0 calc(var(--u) * 0.8) var(--ink), 0 calc(var(--u) * 1.4) 0 calc(var(--u) * 0.8) var(--ink); }
+.tileMenu .card canvas { width: calc(var(--u) * 40); height: calc(var(--u) * 40); }
+.tileMenu .say { font: 700 calc(var(--u) * 5) "Andika", sans-serif; color: var(--ink); text-align: center; }
+.tileMenu .row2 { display: flex; gap: calc(var(--u) * 2); }
+.tileMenu button { border: 0; border-radius: calc(var(--u) * 3); background: #fff; color: var(--ink); font: 700 calc(var(--u) * 4.4) "Andika", sans-serif;
+  padding: calc(var(--u) * 2) calc(var(--u) * 3); box-shadow: 0 calc(var(--u) * 0.8) 0 #0003; min-width: calc(var(--u) * 22); }
+.tileMenu .go { background: #4caf50; color: #fff; }
+.tileMenu .bin { background: #e2413b; color: #fff; }
 @media (orientation: portrait) {
   .maker { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: center; }
   .paper { width: calc(var(--u) * 86); height: calc(var(--u) * 86); justify-self: center; }
@@ -144,6 +157,19 @@ body { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--u) * 2); pad
   <input type="file" id="makerFile" accept="image/*" capture="environment" hidden>
   <div class="wait" id="makerWait">Making your magnet… ✨</div>
 </div>
+<div class="tileMenu" id="tileMenu"><div class="card">
+  <div id="tmTile"></div>
+  <div class="say" id="tmSay">This is your magnet!</div>
+  <div class="row2" id="tmAsk">
+    <button type="button" class="go" id="tmEdit">✏️ Change it</button>
+    <button type="button" class="bin" id="tmBin">🗑️ Throw away</button>
+  </div>
+  <div class="row2" id="tmSure" hidden>
+    <button type="button" class="bin" id="tmYes">🗑️ Yes, throw it away</button>
+    <button type="button" id="tmNo">No, keep it!</button>
+  </div>
+  <button type="button" id="tmClose">✖️ Close</button>
+</div></div>
 
 <script src="/render.js"></script>
 <script>
@@ -185,11 +211,19 @@ async function api(method, url, body) {
   return { status: r.status, data };
 }
 
-function tileCanvas(t) {
+function tileCanvas(t, badge) {
   const c = el("canvas", "tile");
   c.width = c.height = 220;
   c.dataset.id = t.id;
-  const draw = () => PB.drawTile(c.getContext("2d"), t, 8, 4, 204, photos);
+  const draw = () => {
+    const g = c.getContext("2d");
+    PB.drawTile(g, t, 8, 4, 204, photos);
+    if (badge && t.made) {   // a pencil in the corner: tap me to change me
+      g.fillStyle = "#f2c230"; g.strokeStyle = "#16181f"; g.lineWidth = 5;
+      g.beginPath(); g.arc(184, 36, 28, 0, 7); g.fill(); g.stroke();
+      g.font = `30px "Noto Color Emoji", "Apple Color Emoji", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("✏️", 184, 38);
+    }
+  };
   if (t.kind === "photo" && t.photo && !photos[t.photo]) {
     const img = new Image();
     img.onload = () => { photos[t.photo] = img; c.getContext("2d").clearRect(0, 0, 220, 220); draw(); };
@@ -258,7 +292,7 @@ function renderTray() {
   const pages = Math.max(1, Math.ceil(items.length / perPage));
   trayPage = Math.max(0, Math.min(trayPage, pages - 1));
   page.style.setProperty("--cols", cols);
-  page.replaceChildren(...items.slice(trayPage * perPage, (trayPage + 1) * perPage).map(t => t === MAKE ? makeButton() : tileCanvas(t)));
+  page.replaceChildren(...items.slice(trayPage * perPage, (trayPage + 1) * perPage).map(t => t === MAKE ? makeButton() : tileCanvas(t, true)));
   if (justMade) { page.querySelector(`.tile[data-id="${CSS.escape(justMade)}"]`)?.classList.add("placed"); justMade = null; }
   $("prevPage").disabled = trayPage === 0;
   $("nextPage").disabled = trayPage === pages - 1;
@@ -312,9 +346,12 @@ function makerTools() {
   }));
   $("makerEraser").classList.toggle("on", maker.eraser);
 }
-function openMaker() {
+function openMaker(edit) {
   touched = Date.now();
+  maker.edit = edit && edit.id ? edit : null;
   back.fillStyle = "#fff"; back.fillRect(0, 0, 512, 512);
+  const old = maker.edit && photos[maker.edit.photo];   // changing one: start from the picture she made
+  if (old) back.drawImage(old, 0, 0, 512, 512);
   ink.clearRect(0, 0, 512, 512);
   Object.assign(maker, { eraser: false, undo: [], drawing: null });
   $("makerWait").classList.remove("on");
@@ -367,15 +404,47 @@ $("makerDone").onclick = async () => {
   $("makerWait").classList.add("on");
   try {
     const jpeg = await new Promise(ok => out.toBlob(ok, "image/jpeg", 0.88));
-    const r = await fetch("/api/board/tile", { method: "POST", cache: "no-store", headers: { "X-Board-Key": key, "Content-Type": "image/jpeg" }, body: jpeg });
+    const r = await fetch("/api/board/tile" + (maker.edit ? "/" + encodeURIComponent(maker.edit.id) : ""), { method: "POST", cache: "no-store", headers: { "X-Board-Key": key, "Content-Type": "image/jpeg" }, body: jpeg });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || "Uh oh, that didn't work. Try again! 🙈");
     doc = data.doc || doc;
-    justMade = data.tile?.id || null; trayPage = 0; seen = null;
+    justMade = data.tile?.id || null; seen = null;
+    const at = doc.tiles.findIndex(t => t.id === justMade);
+    trayPage = at < 0 ? 0 : Math.floor((at + 1) / perPage);   // stay on the page the magnet is on
     closeMaker(); render(); scheduleRedraw();
   } catch (e) {
     $("makerWait").textContent = /full/.test(e.message) ? e.message : "Uh oh, that didn't work. Try again! 🙈";
     setTimeout(() => { $("makerWait").classList.remove("on"); $("makerWait").textContent = "Making your magnet… ✨"; }, 2500);
+  }
+};
+
+/* ---------- her own magnets: change or throw away ---------- */
+let menuTile = null;
+function openTileMenu(t) {
+  touched = Date.now(); menuTile = t;
+  const c = tileCanvas(t); c.className = "";
+  $("tmTile").replaceChildren(c);
+  $("tmSay").textContent = "You made this one!";
+  $("tmAsk").hidden = false; $("tmSure").hidden = true;
+  $("tileMenu").classList.add("on");
+}
+function closeTileMenu() { $("tileMenu").classList.remove("on"); menuTile = null; }
+$("tmClose").onclick = closeTileMenu;
+$("tileMenu").addEventListener("click", (e) => { if (e.target.id === "tileMenu") closeTileMenu(); });
+$("tmEdit").onclick = () => { const t = menuTile; closeTileMenu(); openMaker(t); };
+$("tmBin").onclick = () => { $("tmSay").textContent = "Throw it away for good?"; $("tmAsk").hidden = true; $("tmSure").hidden = false; };
+$("tmNo").onclick = () => { $("tmSay").textContent = "You made this one!"; $("tmAsk").hidden = false; $("tmSure").hidden = true; };
+$("tmYes").onclick = async () => {
+  const t = menuTile; if (!t) return;
+  $("tmSay").textContent = "Bye bye, magnet! 👋";
+  try {
+    const r = await fetch(`/api/board/tile/${encodeURIComponent(t.id)}/delete`, { method: "POST", cache: "no-store", headers: { "X-Board-Key": key } });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error);
+    doc = data.doc || doc; seen = null;
+    closeTileMenu(); render(); scheduleRedraw();
+  } catch (e) {
+    $("tmSay").textContent = "Uh oh, that didn't work. Try again! 🙈";
   }
 };
 
@@ -437,6 +506,9 @@ function drop(e) {
   } else if (target?.id === "tray" && d.from != null) {
     slots[d.from].splice(slots[d.from].indexOf(d.id), 1);   // dragged back to the tray: take it off
     changed = true;
+  } else if (target?.id === "tray" && e && d.from == null && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 14) {
+    const t = doc.tiles.find(x => x.id === d.id);   // a tap, not a drag: her own magnets open a menu
+    if (t?.made) { render(); openTileMenu(t); return; }
   } else if (target?.id === "tray" && e && Math.abs(e.clientX - d.startX) > 50) {
     turnPage(e.clientX < d.startX ? 1 : -1);   // a swipe that started on a magnet: turn the page too
     return;
