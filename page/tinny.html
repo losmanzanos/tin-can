@@ -374,9 +374,9 @@ function drawDay(now, o, u, bob) {
   if (tiles[1]) tileCard(tiles[1], 396, 170, 70);
   const pal = friendOfDay(now);
   if (pal) {
-    const fu = pal.kind === "cat" ? 4 : 3, fh = (pal.kind === "cat" ? 14 : 16) * fu, happy = ago(palPet) < 1.5;
+    const fu = sp(pal).small, fh = spH(pal) * fu, happy = ago(palPet) < 1.5;
     drawFriend(pal, 2, 264 - fh + (happy ? -5 : 0), fu, happy);
-    zone(0, 262 - fh, 60, fh + 4, () => { palPet = Date.now(); say([pal.kind === "cat" ? `${pal.name} says` : `${pal.name} says`, pal.kind === "cat" ? "Meow! 🐱" : "Neigh! 🦄"], 1.8); hearts.push({ x: 20, y: 200, u: 4, col: "#e2413b", life: 12 }); });
+    zone(0, 262 - fh, 60, fh + 4, () => { palPet = Date.now(); say([`${pal.name} says`, `${sp(pal).say} ${sp(pal).emoji}`], 1.8); hearts.push({ x: 20, y: 200, u: 4, col: "#e2413b", life: 12 }); });
   }
   drawEgg(250, 238, 46);
   if (eggReady() && tick % 8 < 4) text("!", 276, 214, 24, "#e2413b", "center");
@@ -1504,6 +1504,16 @@ const CATS = [{ b: "#ef8a3a", d: "#c4621c", kind: "orange kitten" }, { b: "#3a3d
 const UNIS = [{ b: "#ffffff", mane: "rainbow", kind: "rainbow unicorn" }, { b: "#ffd0e0", mane: "#e2417b", kind: "pink unicorn" },
   { b: "#e7d4f5", mane: "#8a5ad1", kind: "purple unicorn" }, { b: "#d6efff", mane: "#2f8fd1", kind: "blue unicorn" },
   { b: "#ffe9a8", mane: "#e9ad1c", kind: "golden unicorn", rare: 1 }, { b: "#3b3f74", mane: "#ffd84a", kind: "starry night unicorn", rare: 2 }];
+const DOGS = [{ b: "#e9b25a", d: "#c48a2c", kind: "golden puppy" }, { b: "#7a4a2a", d: "#5a3218", kind: "chocolate puppy" },
+  { b: "#ffffff", d: "#16181f", spot: "#16181f", few: 1, kind: "spotty puppy" }, { b: "#e8cfa0", d: "#3a3326", kind: "little pug" },
+  { b: "#e4e8ef", d: "#6d7480", eye: "#46bfc0", kind: "husky puppy" }, { b: "#ffc9dc", d: "#f08ab0", kind: "fluffy pink poodle", rare: 1 },
+  { b: "rainbow", d: "#b768d6", kind: "RAINBOW puppy", rare: 2 }];
+const BIRDS = [{ b: "#5aa7e6", d: "#2f6fb5", kind: "bluebird" }, { b: "#e2413b", d: "#a8231f", kind: "red cardinal" },
+  { b: "#ffd84a", d: "#e9ad1c", kind: "yellow canary" }, { b: "#7ccf5a", d: "#3f9a3a", kind: "green parakeet" },
+  { b: "#f7a8c8", d: "#e2417b", kind: "pink lovebird" }, { b: "#c9a6e8", d: "#8a5ad1", kind: "purple songbird", rare: 1 },
+  { b: "rainbow", d: "#2f6fb5", kind: "RAINBOW parrot", rare: 2 }];
+const DOG_NAMES = ["Max", "Buddy", "Rosie", "Scout", "Waffles", "Maple", "Teddy", "Ollie", "Bear", "Lucy", "Benny", "Honey", "Taco", "Penny"];
+const BIRD_NAMES = ["Tweety", "Kiwi", "Chirp", "Mango", "Skye", "Pip", "Feather", "Blue", "Piper", "Robin", "Tango", "Lemon", "Peep", "Juniper"];
 const CAT_NAMES = ["Luna", "Mittens", "Pumpkin", "Biscuit", "Pepper", "Coco", "Noodle", "Whiskers", "Muffin", "Pickles", "Bean", "Oreo", "Ziggy", "Peanut"];
 const UNI_NAMES = ["Sparkle", "Twinkle", "Glitter", "Daisy", "Moonbeam", "Sunny", "Clover", "Pixie", "Dream", "Stardust", "Cupcake", "Rainbow"];
 const RAINBOW = ["#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2f6fb5", "#b768d6"];
@@ -1513,24 +1523,50 @@ const CAT_PX = [
 const UNI_PX = [
   "...........y....", "..........yy....", "..........yk....", ".........mkkk...", "........mkbbbk..", ".......mmkbebbk.", "......mm.kbbbbnk",
   ".....mm..kbbkkk.", ".........kbbk...", "..kkkkkkkkbbk...", ".kbbbbbbbbbbk...", "mkbbbbbbbbbbk...", "mmkbbbbbbbbk....", "m.kbk.kbk.kbk...", "..kbk.kbk.kbk...", "..kkk.kkk.kkk..."];
+// a puppy sitting up, ears down, tongue out; a round little bird facing right
+const DOG_PX = [
+  "...kkkkkkk...", "..kbbbbbbbk..", ".kdbbbbbbbdk.", "kddbebbbebddk", "kddbbbbbbbddk", "kddbbbnbbbddk", ".kdkbbbbbkdk.",
+  ".kk.kbpbk.kk.", "..kkbbbbbkk..", ".kbbbbbbbbbk.", "kbbbbbbbbbbbk", "kbbbbbbbbbbbk", "kbbbkbbbkbbbk", ".kkk.kkk.kkk."];
+const BIRD_PX = [
+  "....kkkk.....", "...kbbbbk....", "..kbbbbebk...", "..kbbbbbbyyk.", "..kbbbbbbkk..", ".kbbbbbbbbk..", "kddbbbbbbbbk.",
+  "kdddbbbbbbbk.", "kddddbbbbbk..", ".kkddbbbbbk..", "...kkkkkkk...", ".....y..y....", "....yy.yy...."];
+// Everything that differs by kind of friend: its colors, its picture, its names, what it says, and how
+// big to draw it in each place (the pictures are different sizes).
+const SPECIES = {
+  cat: { coats: CATS, px: CAT_PX, names: CAT_NAMES, say: "Meow!", emoji: "🐱", big: 9, mid: 6, small: 4 },
+  unicorn: { coats: UNIS, px: UNI_PX, names: UNI_NAMES, say: "Neigh!", emoji: "🦄", big: 8, mid: 5, small: 3 },
+  dog: { coats: DOGS, px: DOG_PX, names: DOG_NAMES, say: "Woof!", emoji: "🐶", big: 9, mid: 6, small: 4 },
+  bird: { coats: BIRDS, px: BIRD_PX, names: BIRD_NAMES, say: "Tweet!", emoji: "🐦", big: 9, mid: 6, small: 4 },
+};
+const sp = (f) => SPECIES[f.kind] || SPECIES.cat;
+const coatOf = (f) => sp(f).coats[f.coat] || sp(f).coats[0];
+const spW = (f) => sp(f).px[0].length, spH = (f) => sp(f).px.length;
 function drawFriend(f, x, y, u, happy) {
-  const c = (f.kind === "cat" ? CATS : UNIS)[f.coat] || CATS[0];
-  const rows = f.kind === "cat" ? CAT_PX : UNI_PX;
+  const c = coatOf(f);
+  const rows = sp(f).px;
   rows.forEach((row, j) => [...row].forEach((ch, i) => {
     if (ch === ".") return;
-    let col = { k: "#16181f", y: "#e9ad1c", p: "#f2a1a8", n: "#f2a1a8", e: happy ? "#16181f" : (c.eye || "#16181f") }[ch];
-    if (ch === "b") col = c.b === "rainbow" ? RAINBOW[j % 6] : (c.spot && (i + j * 3) % 7 === 0 ? c.spot : (c.spot && (i * 2 + j) % 5 === 0 ? c.d : c.b));
+    let col = { k: "#16181f", y: f.kind === "bird" ? "#ef7f2c" : "#e9ad1c", p: f.kind === "dog" ? "#e2413b" : "#f2a1a8",
+                n: f.kind === "dog" ? "#16181f" : "#f2a1a8", e: happy ? "#16181f" : (c.eye || "#16181f") }[ch];
+    if (ch === "d") col = c.b === "rainbow" || c.few ? c.d : (c.spot && (i + j) % 4 === 0 ? c.spot : c.d);
+    if (ch === "b") col = c.b === "rainbow" ? RAINBOW[j % 6] : (c.spot && (i + j * 3) % 7 === 0 ? c.spot : (c.spot && !c.few && (i * 2 + j) % 5 === 0 ? c.d : c.b));
     if (ch === "m") col = c.mane === "rainbow" ? RAINBOW[j % 6] : c.mane;
     if (ch === "e" && happy) { rect(x + i * u, y + j * u + u / 2, u, u / 2, col); return; }
     rect(x + i * u, y + j * u, u, u, col);
   }));
+  if (f.kind === "dog") { const wag = tick % 4 < 2 ? 0 : u; rect(x + 12 * u + wag, y + 9 * u - wag, u, 2 * u, c.b === "rainbow" ? RAINBOW[2] : c.d); }
+  if (f.kind === "bird" && happy && tick % 2) { rect(x, y + 6 * u, 2 * u, 2 * u, c.d); }          // a flap
   if (f.kind === "cat") { const tw = tick % 8 < 4 ? 0 : u; rect(x + 13 * u, y + 9 * u - tw, u, 4 * u, "#16181f"); rect(x + 13 * u, y + 8 * u - tw, u, u, c.b === "rainbow" ? RAINBOW[1] : c.b); }
 }
 let friends = store.get("tinny-friends", []);
+const FRIENDS_PER_PAGE = 8;
 function rollFriend() {
-  const kind = Math.random() < 0.5 ? "cat" : "unicorn", list = kind === "cat" ? CATS : UNIS, r = Math.random();
+  const kinds = Object.keys(SPECIES), weight = kinds.map(k => 1 / (1 + friends.filter(f => f.kind === k).length));
+  let pick = Math.random() * weight.reduce((a, b) => a + b, 0), kind = kinds[0];
+  for (let i = 0; i < kinds.length; i++) { if ((pick -= weight[i]) <= 0) { kind = kinds[i]; break; } }
+  const list = SPECIES[kind].coats, r = Math.random();
   const pool = list.map((c, i) => i).filter(i => (list[i].rare || 0) === (r < 0.04 ? 2 : r < 0.18 ? 1 : 0));
-  const names = kind === "cat" ? CAT_NAMES : UNI_NAMES, used = friends.map(f => f.name);
+  const names = SPECIES[kind].names, used = friends.map(f => f.name);
   return { kind, coat: pickOne(pool), name: pickOne(names.filter(n => !used.includes(n)).concat(used.length >= names.length ? names : [])) };
 }
 let egg = store.get("tinny-egg", null);
@@ -1564,9 +1600,9 @@ function drawHatch(now) {
   if (!act.born) {                                                  // out it comes
     act.born = true; friends.push({ ...f, at: Date.now() }); store.set("tinny-friends", friends); newEgg(); burst(240, 150, 40); postProgress();
   }
-  const fu = f.kind === "cat" ? 9 : 8, fw = (f.kind === "cat" ? 13 : 16) * fu;
-  drawFriend(f, 240 - fw / 2, 262 - (f.kind === "cat" ? 14 : 16) * fu + (tick % 4 < 2 ? -6 : 0), fu, true);
-  const c = (f.kind === "cat" ? CATS : UNIS)[f.coat];
+  const fu = sp(f).big, fw = spW(f) * fu;
+  drawFriend(f, 240 - fw / 2, 262 - spH(f) * fu + (tick % 4 < 2 ? -6 : 0), fu, true);
+  const c = coatOf(f);
   bubble(150, 10, 316, 70, [`A ${c.kind}!${c.rare === 2 ? " So rare!" : c.rare ? " Rare!" : ""}`, `Meet ${f.name}!`], 24, 176);
   tinny(14, 266 - 27 * 4, 4, { eyes: "happy", mouth: "open", arms: "up" });
   zone(0, 0, W, H, () => { if (t > 3.5) begin("friends"); });
@@ -1580,19 +1616,38 @@ function drawFriends(now) {
   drawEgg(440, 30, 36);
   text(eggReady() ? "Tap me! 🥚" : `${left} more game${left === 1 ? "" : "s"}`, 410, 34, 16, "#fff", "right");
   if (eggReady()) zone(380, 0, 100, 60, () => begin("hatch"));
-  if (friends.length) text(`My friends: ${friends.length}`, 240, 32, 18, "#ffd84a", "center");
-  const show = friends.slice(-8);
+  if (friends.length) text(`My friends: ${friends.length}`, 200, 32, 18, "#ffd84a", "center");
+  const newest = friends.slice().reverse(), pages = Math.max(1, Math.ceil(newest.length / FRIENDS_PER_PAGE));
+  act.page = Math.min(Math.max(act.page || 0, 0), pages - 1);
+  const show = newest.slice(act.page * FRIENDS_PER_PAGE, act.page * FRIENDS_PER_PAGE + FRIENDS_PER_PAGE);
   show.forEach((f, i) => {
-    const x = 6 + (i % 4) * 118, y = 54 + Math.floor(i / 4) * 132, w = 112, h = 126;
+    const x = 36 + (i % 4) * 104, y = 54 + Math.floor(i / 4) * 132, w = 96, h = 126, key = act.page * FRIENDS_PER_PAGE + i;
     ctx.fillStyle = "#fff7e8"; ctx.beginPath(); ctx.roundRect(x, y, w, h, 16); ctx.fill();
-    const happy = act.pet === i && ago(act.petAt) < 1.5;
-    const fu = f.kind === "cat" ? 6 : 5, fw = (f.kind === "cat" ? 13 : 16) * fu;
-    drawFriend(f, x + w / 2 - fw / 2, y + 12 + (happy ? -6 : 0), fu, happy);
+    const happy = act.pet === key && ago(act.petAt) < 1.5;
+    const fu = sp(f).mid, fw = spW(f) * fu;
+    drawFriend(f, x + w / 2 - fw / 2, y + 12 + (spH(f) < 14 ? 8 : 0) + (happy ? -6 : 0), fu, happy);
     text(f.name, x + w / 2, y + h - 10, fit(f.name, 18, w - 10), "#16181f", "center");
-    if (happy) text(f.kind === "cat" ? "Meow!" : "Neigh!", x + w / 2, y + 20, 18, "#e2413b", "center");
-    zone(x, y, w, h, () => { act.pet = i; act.petAt = Date.now(); hearts.push({ x: x + 40, y: y + 30, u: 4, col: "#e2413b", life: 12 }); });
+    if (happy) text(sp(f).say, x + w / 2, y + 20, 18, "#e2413b", "center");
+    zone(x, y, w, h, () => { act.pet = key; act.petAt = Date.now(); hearts.push({ x: x + 40, y: y + 30, u: 4, col: "#e2413b", life: 12 }); });
   });
+  if (pages > 1) {                                  // arrows in the side gutters, and dots for which page
+    for (const [dir, cx] of [[-1, 18], [1, 462]]) {
+      const on = dir < 0 ? act.page > 0 : act.page < pages - 1;
+      ctx.globalAlpha = on ? 1 : 0.25;
+      ctx.fillStyle = "#ffd84a"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, 186, 16, 0, 7); ctx.fill(); ctx.stroke();
+      text(dir < 0 ? "◀" : "▶", cx + (dir < 0 ? -1 : 1), 192, 16, "#16181f", "center");
+      ctx.globalAlpha = 1;
+      if (on) zone(dir < 0 ? 0 : 444, 54, 36, 266, () => turnFriendsPage(dir));
+    }
+    for (let p = 0; p < pages; p++) { ctx.fillStyle = p === act.page ? "#ffd84a" : "#ffffff55"; ctx.beginPath(); ctx.arc(200 + (p - (pages - 1) / 2) * 14, 45, 4, 0, 7); ctx.fill(); }
+  }
   if (!friends.length) { drawEgg(240, 160, 110); text("Who's inside? 🤔", 240, 262, 26, "#fff", "center"); text("Play games to warm the egg!", 240, 296, 18, "#ffd84a", "center"); }
+}
+function turnFriendsPage(dir) {
+  if (act?.kind !== "friends") return;
+  const pages = Math.max(1, Math.ceil(friends.length / FRIENDS_PER_PAGE));
+  act.page = Math.min(Math.max((act.page || 0) + dir, 0), pages - 1); act.pet = -1;
 }
 // One friend keeps Tinny company on the home screen, a different one each day.
 function friendOfDay(now) { return friends.length ? friends[(new Date(now).getDate() + new Date(now).getMonth() * 31) % friends.length] : null; }
@@ -1849,7 +1904,7 @@ function postProgress() {
   clearTimeout(progTimer);
   progTimer = setTimeout(() => fetch("/api/tinny/progress", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ levels: Object.fromEntries(Object.keys(TRACKS).map(k => [k, learn[k].lv])), days: learn.days, stars, flowers: garden.total, growing: garden.plots.length,
-      moods: store.get("tinny-moods", {}), friends: friends.map(f => `${f.name} the ${((f.kind === "cat" ? CATS : UNIS)[f.coat] || {}).kind}`) }) }).catch(() => {}), 3000);
+      moods: store.get("tinny-moods", {}), friends: friends.map(f => `${f.name} the ${coatOf(f).kind}`) }) }).catch(() => {}), 3000);
 }
 
 /* ---------------- touch ---------------- */
@@ -1882,6 +1937,7 @@ addEventListener("pointerdown", (e) => {
   if (calib) { if (!calib.done) calibTap(x, y); drawScene(new Date()); return; }
   [x, y] = applyCal(x, y);
   rings.push({ x, y, at: Date.now() });
+  downAt = { x, y };
   if (doc?.screen?.tapDots) taps = [...taps.slice(-5), { x, y, at: Date.now() }];
   if (puzzleGrab(x, y)) { drawScene(new Date()); return; }
   const fn = hit(x, y);
@@ -1902,6 +1958,14 @@ addEventListener("pointermove", (e) => {
   if (!dragDraw) { dragDraw = true; requestAnimationFrame(() => { dragDraw = false; drawScene(new Date()); }); }
 });
 for (const ev of ["pointerup", "pointercancel"]) addEventListener(ev, () => { if (drag) { puzzleDrop(); drawScene(new Date()); } });
+// Swiping the friends shelf turns its pages (a tap still pets).
+let downAt = null;
+addEventListener("pointerup", (e) => {
+  if (!downAt || act?.kind !== "friends") return;
+  const [x, y] = canvasXY(e), dx = x - downAt.x, dy = y - downAt.y;
+  downAt = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { turnFriendsPage(dx < 0 ? 1 : -1); lastTap = Date.now(); drawScene(new Date()); }
+});
 addEventListener("keydown", pet);
 
 /* ---------------- go ---------------- */
