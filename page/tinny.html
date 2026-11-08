@@ -83,7 +83,7 @@ async function refresh() {
       applyLevelSet();
     }
     const t = await getJSON("/api/tinny");
-    seenTs = t.seen || 0; hug = t.hug || {};
+    seenTs = t.seen || 0; hug = t.hug || {}; bed = t.bed || {};
     if (t.calibrate && t.calibrate > calTs) { calTs = t.calibrate; store.set("tinny-cal-ts", calTs); startCalibration(); }
   } catch (e) { /* the Pi is busy or restarting: try again soon */ }
 }
@@ -131,12 +131,17 @@ const BOARD_KEY = new URLSearchParams(location.hash.slice(1)).get("board") || ""
 // back to the two big squares instead of straight to the board.
 const TABLET = new URLSearchParams(location.hash.slice(1)).get("tablet") === "1" || typeof window.fully !== "undefined";
 function goTabletHome() { location.href = "/tablet" + (BOARD_KEY ? "#board=" + encodeURIComponent(BOARD_KEY) : ""); }
-let battery = null, batteryNagged = 0;
+let battery = null, batteryNagged = 0, batterySent = 0;
 async function checkBattery() {
   try {
     if (window.fully && fully.getBatteryLevel) battery = { level: fully.getBatteryLevel() / 100, charging: !!fully.isPlugged() };
     else if (navigator.getBattery) { const b = await navigator.getBattery(); battery = { level: b.level, charging: b.charging }; }
   } catch (e) { battery = null; }
+  if (TABLET && battery && Date.now() - batterySent > 5 * 60e3) {   // for the admin page
+    batterySent = Date.now();
+    fetch("/api/tablet", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: "tinny", battery: Math.round(battery.level * 100), charging: battery.charging }) }).catch(() => {});
+  }
 }
 const lowBattery = () => battery && !battery.charging && battery.level <= 0.2;
 let music = { state: "idle", since: 0 };
@@ -162,7 +167,13 @@ const toMin = (s) => { const [h, m] = (s || "0:0").split(":").map(Number); retur
 // Tinny's own hours (set on the admin page), or her big screen's if those are blank
 const wakeAt = () => doc?.tinny?.wake || doc?.screen?.on || "08:00";
 const sleepAt = () => doc?.tinny?.sleep || doc?.screen?.off || "20:00";
+// An early bedtime started on the admin page: the routine now, then asleep until morning.
+let bed = {};
+const bedAt = () => bed.tinnyBedFrom ? bed.tinnyBedFrom * 1000 + WIND_DOWN_MIN * 60e3 : 0;
+const earlyBed = (now) => bed.tinnyBedUntil && +now < bed.tinnyBedUntil * 1000 && +now >= bedAt();
+const earlyWindDown = (now) => bed.tinnyBedUntil && +now >= bed.tinnyBedFrom * 1000 && +now < bedAt();
 function asleep(now) {   // asleep outside Tinny's hours
+  if (earlyBed(now)) return true;
   const on = toMin(wakeAt()), off = toMin(sleepAt()), m = hm(now);
   if (on === off) return false;
   return on < off ? !(m >= on && m < off) : !(m >= on || m < off);
@@ -195,7 +206,7 @@ function scene(now) {
   if (calib) return "calibrate";
   if (doc.screen?.board === "off") return "off";
   if (asleep(now) || tuckedIn === dayKey(now)) return "bedtime";
-  if (act && (Date.now() - lastTap) / 1000 > (act.kind === "learn" ? LEARN_IDLE_S : act.kind === "puzzle" ? PUZZLE_IDLE_S : PLAY_IDLE_S) && act.kind !== "done") act = null;
+  if (act && (Date.now() - lastTap) / 1000 > (act.kind === "learn" || act.kind === "zoo" ? LEARN_IDLE_S : act.kind === "puzzle" ? PUZZLE_IDLE_S : PLAY_IDLE_S) && act.kind !== "done") act = null;
   if (act) return "play";
   if (hug.ts && hug.ts > hugShown && now / 1000 - hug.ts < HUG_SECONDS) return "hug";
   if (newCard()) return "postcard";
@@ -496,18 +507,19 @@ function startPlay(now) {
   begin("playmenu");
 }
 const GAMES = [["⚽", "Ball", "ball"], ["🎨", "Colors", "color"], ["🙈", "Hide & seek", "peek"],
-               ["🔁", "Patterns", "pattern"], ["🤔", "Odd one out", "odd"], ["🃏", "Memory", "memory"], ["🧩", "Puzzles", "puzzle"]];
+               ["🔁", "Patterns", "pattern"], ["🤔", "Odd one out", "odd"], ["🃏", "Memory", "memory"], ["🧩", "Puzzles", "puzzle"], ["🦁", "Zoo", "zoo"]];
 function startGame(k) {
   if (k === "ball") return startBall();
   if (k === "memory") return startMemory();
   if (k === "puzzle") return startPuzzles();
+  if (k === "zoo") return startZoo();
   begin(k, { round: 0, rounds: 5 }); newRound();
 }
 function drawPlayMenu(now) {
   rect(0, 0, W, H, "#16181f");
   homeButton(() => begin("menu"));
   pill(140, 8, 200, 34, "Pick a game!", 18, "#2a2d3a");
-  const fills = ["#fff1a8", "#ffd0c8", "#cdebc0", "#cfeaf7", "#e7d4f5", "#ffe3b8", "#c8efdc"];
+  const fills = ["#fff1a8", "#ffd0c8", "#cdebc0", "#cfeaf7", "#e7d4f5", "#ffe3b8", "#c8efdc", "#f6dcc0"];
   GAMES.forEach(([e, label, k], i) => {
     const row = Math.floor(i / 4), inRow = Math.min(4, GAMES.length - row * 4);
     const x = 6 + (4 - inRow) * 59 + (i % 4) * 118, y = 50 + row * 136, w = 112, h = 130;
@@ -606,9 +618,10 @@ function drawScene(now) {
     else if (k === "learn") drawLearn(now);
     else if (k === "hatch") drawHatch(now);
     else if (k === "friends") drawFriends(now);
+    else if (k === "zoo") drawZoo(now);
     else if (k === "eat") drawEat(now, u); else if (k === "bath") drawBath(now, u); else if (k === "ball") drawBall(now, u);
     else if (k === "done") drawDone(now); else drawGame(now);
-    if (act && !["done", "menu", "playmenu", "learn", "hatch", "friends"].includes(act.kind)) {          // back to the menu, any time
+    if (act && !["done", "menu", "playmenu", "learn", "hatch", "friends", "zoo"].includes(act.kind)) {          // back to the menu, any time
       ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.arc(28, 296, 20, 0, 7); ctx.fill(); text("◀", 28, 303, 20, "#fff", "center");
       zone(0, 266, 60, 54, () => { begin("menu"); });
     }
@@ -620,7 +633,7 @@ function drawScene(now) {
 
   else drawDay(now, { blink, eyes: petting ? "happy" : undefined, mouth: petting ? "open" : undefined }, u, bob + 0);
 
-  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "playmenu" && act?.kind !== "memory" && act?.kind !== "puzzle" && act?.kind !== "puzzlepick" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
+  if (saying() && (name === "day" || name === "music" || name === "morning" || name === "winddown" || (name === "play" && act?.kind !== "learn" && act?.kind !== "menu" && act?.kind !== "playmenu" && act?.kind !== "memory" && act?.kind !== "puzzle" && act?.kind !== "puzzlepick" && act?.kind !== "zoo" && act?.kind !== "done"))) bubble(214, 14, 250, 74, said.lines, 24, 240);
   if (name === "day" || name === "nudge") pill(14, 14, 92, 32, `⭐ ${stars}`, 17);
   if (weather && name === "day") pill(14, 52, 104, 32, `${weather.icon} ${weather.temp}${weather.unit}`, 17, "#ffffffcc", "#16181f");
   if (lowBattery() && (name === "day" || name === "music")) {
@@ -665,6 +678,7 @@ const dusty = (now) => now - care.bathed > 10 * 3600e3;
 const wants = (now) => hungry(now) ? "eat" : dusty(now) ? "bath" : null;
 function windingDown(now) {
   if (!doc || doc.screen?.board === "off") return false;
+  if (earlyWindDown(now)) return true;
   const off = toMin(sleepAt()), m = hm(now);
   const left = (off - m + 1440) % 1440;
   return left > 0 && left <= WIND_DOWN_MIN && !asleep(now);
@@ -1904,7 +1918,253 @@ function postProgress() {
   clearTimeout(progTimer);
   progTimer = setTimeout(() => fetch("/api/tinny/progress", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ levels: Object.fromEntries(Object.keys(TRACKS).map(k => [k, learn[k].lv])), days: learn.days, stars, flowers: garden.total, growing: garden.plots.length,
-      moods: store.get("tinny-moods", {}), friends: friends.map(f => `${f.name} the ${coatOf(f).kind}`) }) }).catch(() => {}), 3000);
+      moods: store.get("tinny-moods", {}), friends: friends.map(f => `${f.name} the ${coatOf(f).kind}`), zoo: zoo.length }) }).catch(() => {}), 3000);
+}
+
+/* ---------------- the zoo ---------------- */
+// Zelda's zoo: six homes with four animals each, all empty at first. A new animal
+// arrives in a crate, and she settles it in by answering one question about it:
+// where it lives, what it eats, what it says, how many there are, or its first
+// letter. Then it walks into its pen and stays. Tapping an animal in a pen makes it
+// hop and say something true about itself. Everything is said out loud too.
+const ZOO_HOMES = [
+  { k: "savanna", name: "Savanna", e: "🌾", sky: "#ffe9a8", ground: "#e4c46e", line: "the savanna", where: "in the savanna" },
+  { k: "jungle", name: "Jungle", e: "🌴", sky: "#c4ecb4", ground: "#5fae4a", line: "the jungle", where: "in the jungle" },
+  { k: "ocean", name: "Ocean", e: "🌊", sky: "#cdeefc", ground: "#3d9be0", line: "the ocean", where: "in the ocean" },
+  { k: "snow", name: "Snow", e: "❄️", sky: "#e6f2ff", ground: "#ffffff", line: "the snow", where: "in the snow" },
+  { k: "farm", name: "Farm", e: "🚜", sky: "#cfeaf7", ground: "#8fcf6a", line: "the farm", where: "on the farm" },
+  { k: "desert", name: "Desert", e: "🌵", sky: "#ffe3b8", ground: "#f0c987", line: "the desert", where: "in the desert" },
+];
+// id, emoji, name, home, food, diet (h plants, c animals, o skip the food question), sound, fact
+const ZOO = [
+  ["lion", "🦁", "lion", "savanna", "🍖", "c", "Roar!", "A lion's roar can be heard five miles away!"],
+  ["elephant", "🐘", "elephant", "savanna", "🍉", "h", "Pawoo!", "Elephants drink with their trunks!"],
+  ["giraffe", "🦒", "giraffe", "savanna", "🍃", "h", null, "Giraffes are the tallest animals in the world!"],
+  ["zebra", "🦓", "zebra", "savanna", "🌾", "h", null, "Every zebra has its very own stripes!"],
+  ["monkey", "🐒", "monkey", "jungle", "🍌", "h", "Ooh ooh, ah ah!", "Monkeys hold on to branches with their tails!"],
+  ["tiger", "🐅", "tiger", "jungle", "🍖", "c", "Grrr!", "Tigers love to swim!"],
+  ["parrot", "🦜", "parrot", "jungle", "🥜", "h", "Squawk!", "Some parrots can learn to talk!"],
+  ["sloth", "🦥", "sloth", "jungle", "🍃", "h", null, "Sloths hang upside down and sleep most of the day!"],
+  ["whale", "🐳", "whale", "ocean", "🦐", "c", "Ooooooo!", "Whales sing songs to each other!"],
+  ["dolphin", "🐬", "dolphin", "ocean", "🐟", "c", "Click, click, squeak!", "Dolphins sleep with one eye open!"],
+  ["octopus", "🐙", "octopus", "ocean", "🦀", "c", null, "An octopus has eight arms and three hearts!"],
+  ["turtle", "🐢", "turtle", "ocean", "🌿", "o", null, "Sea turtles can hold their breath for hours!"],
+  ["penguin", "🐧", "penguin", "snow", "🐟", "c", "Honk honk!", "Penguins can't fly, but they're super swimmers!"],
+  ["polarbear", "🐻‍❄️", "polar bear", "snow", "🐟", "c", "Grrr!", "A polar bear's thick fur keeps it warm in the snow!"],
+  ["seal", "🦭", "seal", "snow", "🐟", "c", "Arf arf!", "Seals can sleep underwater!"],
+  ["owl", "🦉", "owl", "snow", "🐭", "c", "Hoo hoo!", "Snowy owls are white, so they can hide in the snow!"],
+  ["cow", "🐄", "cow", "farm", "🌾", "h", "Moo!", "Cows give us milk!"],
+  ["pig", "🐖", "pig", "farm", "🌽", "o", "Oink oink!", "Pigs roll in mud to stay cool!"],
+  ["sheep", "🐑", "sheep", "farm", "🌾", "h", "Baa!", "A sheep's wool makes warm sweaters!"],
+  ["horse", "🐎", "horse", "farm", "🥕", "h", "Neigh!", "Horses can sleep standing up!"],
+  ["camel", "🐪", "camel", "desert", "🌵", "h", null, "A camel's hump is full of fat, not water!"],
+  ["lizard", "🦎", "lizard", "desert", "🦗", "o", null, "Lizards warm up by lying in the sun!"],
+  ["snake", "🐍", "snake", "desert", "🐭", "c", "Hisss!", "Snakes smell with their tongues!"],
+  ["kangaroo", "🦘", "kangaroo", "desert", "🌾", "h", null, "Baby kangaroos ride in their mom's pouch!"],
+].map(([id, e, name, home, food, diet, sound, fact]) => ({ id, e, name, home, food, diet, sound, fact }));
+const ZOO_BY = Object.fromEntries(ZOO.map(a => [a.id, a]));
+const homeOf = (k) => ZOO_HOMES.find(h => h.k === k);
+const plural = (a) => a.name === "sheep" ? "sheep" : a.name === "octopus" ? "octopuses" : a.name + "s";
+let zoo = store.get("tinny-zoo", []).filter(id => ZOO_BY[id]);
+
+// Out loud: Fully's voice on the tablet, the browser's anywhere else, quiet if neither.
+function speak(s) {
+  const line = String(s).replace(/[^\p{L}\p{N}\s.,!?'-]/gu, "").replace(/\s+/g, " ").trim();
+  if (!line) return;
+  try {
+    if (window.fully && fully.textToSpeech) { try { fully.stopTextToSpeech && fully.stopTextToSpeech(); } catch (e) {} fully.textToSpeech(line); return; }
+    if (window.speechSynthesis) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(line); u.rate = 0.95; u.pitch = 1.15; speechSynthesis.speak(u); }
+  } catch (e) {}
+}
+
+function startZoo() { begin("zoo", { view: "map" }); speak(zoo.length ? "Welcome back to your zoo!" : "Welcome to your zoo! Tap the truck to meet your first animal."); }
+function zooNext() {
+  const left = ZOO.filter(a => !zoo.includes(a.id));
+  if (!left.length) return null;
+  if (!zoo.length) return shuffle(left.filter(a => a.home === "farm"))[0];   // a familiar one first
+  return shuffle(left)[0];
+}
+// One question about the animal that's arriving. Kinds rotate, so it doesn't get old.
+function zooQuestion(a) {
+  const kinds = ["home", "count", "letter"];
+  if (a.diet !== "o") kinds.push("food");
+  if (a.sound) kinds.push("sound");
+  let kind = zoo.length === 0 ? "home" : shuffle(kinds.filter(k => k !== store.get("tinny-zoo-last", "")))[0];
+  store.set("tinny-zoo-last", kind);
+  if (kind === "home") {
+    const opts = shuffle([homeOf(a.home), ...shuffle(ZOO_HOMES.filter(h => h.k !== a.home)).slice(0, 2)]);
+    return { kind, ask: `Where does the ${a.name} live?`, opts: opts.map(h => ({ big: h.e, label: h.name })), ans: opts.findIndex(h => h.k === a.home),
+             yes: `Yes! The ${a.name} lives ${homeOf(a.home).where}!` };
+  }
+  if (kind === "food") {
+    const wrong = a.diet === "h" ? ["🍖", "🐟", "🐭"] : ["🍌", "🥕", "🌽", "🍉"];
+    const opts = shuffle([a.food, ...shuffle(wrong.filter(f => f !== a.food)).slice(0, 2)]);
+    return { kind, ask: `Feeding time! What does the ${a.name} eat?`, opts: opts.map(f => ({ big: f })), ans: opts.indexOf(a.food),
+             yes: `Yum! The ${a.name} loves that!` };
+  }
+  if (kind === "sound") {
+    const others = shuffle(ZOO.filter(b => b.sound && b.sound !== a.sound && b.id !== a.id)).slice(0, 2);
+    const opts = shuffle([a, ...others]);
+    return { kind, ask: `Who says "${a.sound}"?`, say: `Who says ${a.sound}`, opts: opts.map(b => ({ big: b.e })), ans: opts.indexOf(a),
+             yes: `Yes! The ${a.name} says ${a.sound}` };
+  }
+  if (kind === "count") {
+    const n = 2 + Math.floor(Math.random() * 4);
+    const nums = shuffle([n, ...shuffle([1, 2, 3, 4, 5, 6].filter(k => k !== n)).slice(0, 2)]);
+    return { kind, n, ask: `How many ${plural(a)}?`, opts: nums.map(k => ({ big: String(k), num: true })), ans: nums.indexOf(n),
+             yes: `Yes! ${n} ${plural(a)}!` };
+  }
+  const L = a.name[0].toUpperCase();
+  const others = shuffle(ZOO.filter(b => b.name[0].toUpperCase() !== L)).slice(0, 2);
+  const opts = shuffle([a, ...others]);
+  return { kind: "letter", ask: `${L} is for…?`, say: `${L} is for what? Which animal starts with ${L}?`, opts: opts.map(b => ({ big: b.e })), ans: opts.indexOf(a),
+           yes: `Yes! ${L} is for ${a.name}!` };
+}
+function zooArrive() {
+  const a = zooNext();
+  if (!a) return;
+  begin("zoo", { view: "crate", animal: a.id });
+  speak("A new animal is here! Tap the crate to open it.");
+}
+function zooOpen() {
+  const a = ZOO_BY[act.animal];
+  act.q = zooQuestion(a); act.view = "ask"; act.misses = 0; act.wrong = null; act.right = null; act.opened = Date.now();
+  speak(`It's a ${a.name}! ${act.q.say || act.q.ask}`);
+}
+function zooAnswer(i) {
+  if (act.right != null) return;
+  const a = ZOO_BY[act.animal];
+  if (i === act.q.ans) {
+    act.right = i; act.rightAt = Date.now(); burst(240, 200, 30); speak(act.q.yes);
+  } else {
+    act.wrong = { i, at: Date.now() }; act.misses++;
+    speak(act.misses >= 2 ? "Almost! Look at the one that's glowing." : "Hmm, try again!");
+  }
+}
+function zooSettle() {      // into its pen, for good
+  const a = ZOO_BY[act.animal];
+  if (!zoo.includes(a.id)) { zoo.push(a.id); store.set("tinny-zoo", zoo); award(); warmEgg(1); postProgress(); }
+  const done = ZOO.filter(b => b.home === a.home).every(b => zoo.includes(b.id));
+  begin("zoo", { view: "pen", pen: a.home, fresh: a.id, party: done });
+  speak(done ? `You finished ${homeOf(a.home).line}! Every animal has a home!` : `Welcome to the zoo, ${a.name}!`);
+  if (done) burst(240, 120, 50);
+}
+function zooPoke(a) {
+  act.poke = { id: a.id, at: Date.now() };
+  speak(`${a.sound ? a.sound + " " : ""}${a.fact}`);
+}
+
+function drawZoo(now) {
+  if (act.view === "map") return drawZooMap(now);
+  if (act.view === "pen") return drawZooPen(now);
+  return drawZooArrival(now);
+}
+function silhouette(fn) { ctx.save(); ctx.filter = "brightness(0) opacity(0.22)"; fn(); ctx.restore(); }
+function drawZooMap(now) {
+  sky("#d7f0ff", "#f4fbff");
+  homeButton(() => begin("playmenu"));
+  const title = `Zelda's Zoo  ${zoo.length}/${ZOO.length}`;
+  ctx.fillStyle = "#8b5a2b"; ctx.beginPath(); ctx.roundRect(124, 6, 196, 38, 10); ctx.fill();
+  ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.stroke();
+  text(title, 222, 32, fit(title, 19, 184), "#fff", "center");
+  const left = ZOO.length - zoo.length;
+  if (left) {                                   // the truck with the next animal
+    const bob = tick % 8 < 4 ? 0 : -3;
+    ctx.fillStyle = "#16181f"; ctx.beginPath(); ctx.roundRect(330, 5 + bob, 144, 40, 20); ctx.fill();
+    ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(333, 8 + bob, 138, 34, 17); ctx.fill();
+    text("🚚 New animal!", 402, 31 + bob, fit("🚚 New animal!", 17, 128), "#16181f", "center");
+    zone(326, 0, 154, 50, zooArrive);
+  } else pill(334, 8, 138, 34, "🏆 All done!", 17, "#5fae4a");
+  ZOO_HOMES.forEach((h, i) => {
+    const x = 9 + (i % 3) * 156, y = 52 + Math.floor(i / 3) * 132, w = 150, hh = 126;
+    const animals = ZOO.filter(a => a.home === h.k), done = animals.every(a => zoo.includes(a.id));
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, hh, 16); ctx.clip();
+    rect(x, y, w, hh, h.sky); rect(x, y + 62, w, hh - 62, h.ground);
+    if (h.k === "ocean") for (let k = 0; k < 5; k++) rect(x + 8 + k * 30, y + 70 + (k % 2) * 8, 16, 3, "#ffffff80");
+    ctx.restore();
+    ctx.strokeStyle = done ? "#e9ad1c" : "#16181f"; ctx.lineWidth = done ? 5 : 3; ctx.beginPath(); ctx.roundRect(x, y, w, hh, 16); ctx.stroke();
+    // a fence along the bottom
+    for (let k = 0; k < 9; k++) rect(x + 6 + k * 17, y + hh - 18, 4, 14, "#8b5a2b");
+    rect(x + 4, y + hh - 14, w - 8, 3, "#8b5a2b");
+    text(`${h.e} ${h.name}`, x + 10, y + 24, fit(`${h.e} ${h.name}`, 17, w - 40), "#16181f");
+    if (done) text("⭐", x + w - 22, y + 24, 18, "#000", "center");
+    animals.forEach((a, k) => {
+      const ax = x + 22 + k * 35, ay = y + 82 + ((k + tick / 4) % 2 < 1 ? 0 : -2);
+      if (zoo.includes(a.id)) text(a.e, ax, ay, 30, "#000", "center");
+      else silhouette(() => text(a.e, ax, ay, 30, "#000", "center"));
+    });
+    zone(x, y, w, hh, () => { begin("zoo", { view: "pen", pen: h.k }); speak(`${h.name}!`); });
+  });
+}
+function drawZooPen(now) {
+  const h = homeOf(act.pen), animals = ZOO.filter(a => a.home === h.k);
+  sky(h.sky, h.sky); ground(h.ground);
+  if (h.k === "ocean") { rect(0, 150, W, 116, "#7cc8f2"); for (let k = 0; k < 8; k++) rect(20 + k * 60, 170 + (k % 3) * 24, 26, 4, "#ffffff90"); }
+  if (h.k === "snow") for (let k = 0; k < 14; k++) rect((k * 73 + tick * 3) % W, (k * 41 + tick * 4) % 260, 5, 5, "#bcd6f5");
+  if (h.k === "desert") text("☀️", 420, 70, 46, "#000", "center");
+  if (h.k === "jungle") { text("🌴", 30, 262, 70, "#000", "center"); text("🌴", 452, 262, 70, "#000", "center"); }
+  homeButton(() => begin("zoo", { view: "map" }));
+  pill(150, 8, 180, 34, `${h.e} ${h.name}`, 18, "#ffffffdd", "#16181f");
+  const poke = act.poke && ago(act.poke.at) < 6 ? act.poke : null;
+  animals.forEach((a, k) => {
+    const cx = 90 + k * 100, base = h.k === "ocean" ? 230 : 250;
+    const hop = poke?.id === a.id && ago(poke.at) < 1.2 ? -Math.abs(Math.sin(ago(poke.at) * 8)) * 26 : Math.sin(tick / 5 + k * 2) * 3;
+    if (zoo.includes(a.id)) {
+      text(a.e, cx, base + hop, 66, "#000", "center");
+      if (act.fresh === a.id && ago(act.t0) < 6 && tick % 6 < 4) sparkle(cx + 30, base - 70, 4);
+      zone(cx - 48, base - 80, 96, 100, () => zooPoke(a));
+    } else {
+      silhouette(() => text(a.e, cx, base, 66, "#000", "center"));
+      text("?", cx, base - 20, 30, "#ffffffcc", "center");
+      zone(cx - 48, base - 80, 96, 100, () => { act.poke = { id: null, at: Date.now() }; speak("Someone new is coming soon!"); });
+    }
+  });
+  if (poke) {
+    const a = poke.id && ZOO_BY[poke.id];
+    bubble(70, 52, 340, 78, a ? [a.sound ? `${a.sound}` : a.name[0].toUpperCase() + a.name.slice(1), a.fact] : ["Someone new", "is coming soon!"], 19, a ? 90 + animals.indexOf(a) * 100 : 240);
+  } else if (act.party && ago(act.t0) < 8) {
+    bubble(70, 52, 340, 66, [`You finished ${h.line}! 🎉`], 22, 240);
+    if (tick % 6 === 0) burst(80 + Math.random() * 320, 120, 10);
+  } else if (act.fresh && ago(act.t0) < 6) {
+    bubble(110, 52, 260, 60, [`Welcome, ${ZOO_BY[act.fresh].name}!`], 22, 90 + animals.indexOf(ZOO_BY[act.fresh]) * 100);
+  }
+}
+function drawZooArrival(now) {
+  const a = ZOO_BY[act.animal];
+  sky("#fdf0dc", "#fff8ee"); ground("#e9d7b8");
+  homeButton(() => begin("zoo", { view: "map" }));
+  if (act.view === "crate") {
+    const shake = tick % 10 < 3 ? (tick % 2 ? 6 : -6) : 0;
+    text("📦", 240 + shake, 236, 150, "#000", "center");
+    bubble(130, 16, 260, 60, ["Who's in the crate?", "Tap to open it!"], 21, 240);
+    tinny(16, 266 - 27 * 4, 4, { eyes: "happy", mouth: "o", arms: "up" });
+    zone(120, 80, 240, 186, zooOpen);
+    return;
+  }
+  const q = act.q, t = ago(act.opened), right = act.right != null;
+  if (right && ago(act.rightAt) > 2.2) return zooSettle();
+  // the animal, popped out of its crate
+  const pop = Math.min(1, t / 0.4);
+  text("📦", 64, 262, 70, "#000", "center");
+  text(a.e, 64, 196 - pop * 20 + (right && tick % 4 < 2 ? -10 : 0), 30 + pop * 44, "#000", "center");
+  // the question, with a speaker to hear it again
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(126, 12, 344, 62, 20); ctx.fill(); ctx.stroke();
+  text(right ? "🎉" : q.ask, 280, 52, right ? 34 : fit(q.ask, 24, 268), "#16181f", "center");
+  ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.arc(440, 43, 20, 0, 7); ctx.fill(); ctx.stroke();
+  text("🔊", 440, 51, 20, "#000", "center");
+  zone(414, 14, 54, 58, () => speak(q.say || q.ask));
+  if (q.kind === "count") {             // the herd to count
+    for (let k = 0; k < q.n; k++) text(a.e, 150 + k * 54 + (k % 2) * 8, 122 + (k % 2) * 16, 40, "#000", "center");
+  }
+  const top = q.kind === "count" ? 160 : 108, hgt = q.kind === "count" ? 100 : 140;
+  q.opts.forEach((o, i) => {
+    const x = 132 + i * 114, w = 104, dx = act.wrong?.i === i && ago(act.wrong.at) < 0.6 ? (tick % 2 ? 5 : -5) : 0;
+    const glow = act.misses >= 2 && i === q.ans && !right && tick % 6 < 3;
+    card(x + dx, top, w, hgt, right && i === q.ans ? "#c9f0b4" : glow ? "#fff1a8" : "#fffdf7", {});
+    if (o.label) { text(o.big, x + w / 2 + dx, top + hgt / 2 + 8, 52, "#000", "center"); text(o.label, x + w / 2 + dx, top + hgt - 14, fit(o.label, 18, w - 10), "#16181f", "center"); }
+    else text(o.big, x + w / 2 + dx, top + hgt / 2 + (o.num ? 18 : 20), o.num ? 54 : 60, o.num ? "#16181f" : "#000", "center");
+    zone(x - 4, top - 4, w + 8, hgt + 8, () => zooAnswer(i));
+  });
 }
 
 /* ---------------- touch ---------------- */

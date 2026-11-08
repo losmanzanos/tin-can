@@ -151,6 +151,11 @@ def is_daytime(on, off, now):
     return now >= on or now < off  # e.g. on 20:00, off 08:00 (overnight)
 
 
+def off_tonight():
+    """The admin page turned the screen off early: it stays off until its next morning."""
+    return (read_json(f"{DATA}/tonight.json") or {}).get("bigOffUntil", 0) > time.time()
+
+
 def period(now):
     return 0 if now < MORNING_ENDS else 1 if now < MIDDAY_ENDS else 2
 
@@ -480,7 +485,7 @@ def main():
                 screen.press(action)
             settings.refresh()
             now_hm = time.strftime("%H:%M")
-            screen.tick(settings, is_daytime(settings.on, settings.off, now_hm), now_hm)
+            screen.tick(settings, is_daytime(settings.on, settings.off, now_hm) and not off_tonight(), now_hm)
         except Exception as e:
             log("error:", e)
         for code in keys.wait(2):

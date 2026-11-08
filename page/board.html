@@ -577,6 +577,15 @@ setInterval(() => {
   if (!dragging && Date.now() - touched > IDLE_MS && day !== PB.weekdayOf(new Date())) { day = PB.weekdayOf(new Date()); render(); }
 }, 5000);
 setInterval(refresh, 10000);
+// The tablet's battery, for the admin page, every few minutes while she's on her board.
+function tabletCheckIn() {
+  try {
+    if (!window.fully || !fully.getBatteryLevel) return;
+    fetch("/api/tablet", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: "board", battery: fully.getBatteryLevel(), charging: !!fully.isPlugged() }) }).catch(() => {});
+  } catch (e) {}
+}
+tabletCheckIn(); setInterval(tabletCheckIn, 5 * 60e3);
 setInterval(() => { if (!dragging) render(); }, 60000);   // "now" moves through the day
 
 (async () => {

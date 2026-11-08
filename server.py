@@ -365,6 +365,25 @@ def clean_tinny(t):
     return out
 
 
+def next_time(hm, now=None):
+    """The next time the clock reads hm (HH:MM), as a timestamp."""
+    now = now or time.time()
+    h, m = map(int, hm.split(":"))
+    t = time.localtime(now)
+    at = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, h, m, 0, 0, 0, -1))
+    return int(at if at > now + 60 else at + 86400)
+
+
+def tonight_state(store):
+    """Early bedtimes started from the admin page: Tinny's, and her big screen's. Each one
+    lasts until its next morning on its own."""
+    t = read_json(store.dir / "tonight.json", {}) or {}
+    now = time.time()
+    return {"bigOffUntil": t.get("bigOffUntil", 0) if t.get("bigOffUntil", 0) > now else 0,
+            "tinnyBedFrom": t.get("tinnyBedFrom", 0) if t.get("tinnyBedUntil", 0) > now else 0,
+            "tinnyBedUntil": t.get("tinnyBedUntil", 0) if t.get("tinnyBedUntil", 0) > now else 0}
+
+
 def public_doc(doc):
     """What the display and Zelda's view need: no family emails or phone numbers."""
     doc = dict(doc)
@@ -770,6 +789,8 @@ def make_handler(store, mailroom):
                                for k, v in (s.get("family") or {}).items()],
                     "familyUrl": s.get("familyUrl") or public_url(),
                     "tinnyProgress": read_json(store.dir / "tinny-progress.json", {}) or {},
+                    "tonight": tonight_state(store),
+                    "tablet": read_json(store.dir / "tablet.json", {}) or {},
                 },
             }
 
@@ -794,7 +815,8 @@ def make_handler(store, mailroom):
                 # her newest postcard yet, and the last hug sent from the admin page.
                 return self.send(HTTPStatus.OK, {"seen": (read_json(store.dir / "postcards-seen.json", {}) or {}).get("ts", 0),
                                                  "hug": read_json(store.dir / "hug.json", {}) or {},
-                                                 "calibrate": (read_json(store.dir / "calibrate.json", {}) or {}).get("ts", 0)})
+                                                 "calibrate": (read_json(store.dir / "calibrate.json", {}) or {}).get("ts", 0),
+                                                 "bed": {k: v for k, v in tonight_state(store).items() if k.startswith("tinny")}})
             if path == "/api/board":
                 if not (self.board_ok() or self.authed()):
                     return self.error(HTTPStatus.UNAUTHORIZED, "This board's link is out of date. Make a new one on the admin page.")
@@ -878,6 +900,20 @@ def make_handler(store, mailroom):
                 if len(raw) > 16000:
                     raise BadRequest("too big")
                 write_atomic(store.dir / "tinny-progress.json", json.dumps(dict(body, at=int(time.time()))).encode())
+                return self.send(HTTPStatus.OK, {"ok": True})
+
+            # The tablet checks in every few minutes from Tinny or the board: its battery, for the
+            # admin page. Home network only, a few numbers.
+            if path == "/api/tablet" and self.command == "POST":
+                b = self.json_body() or {}
+                out = {"at": int(time.time()), "page": str(b.get("page", ""))[:12]}
+                try:
+                    lv = float(b.get("battery"))
+                    if 0 <= lv <= 100:
+                        out.update(battery=round(lv), charging=bool(b.get("charging")))
+                except (TypeError, ValueError):
+                    pass
+                write_atomic(store.dir / "tablet.json", json.dumps(out).encode())
                 return self.send(HTTPStatus.OK, {"ok": True})
 
             # Tapping Tinny's postcard opens postcards on her big screen, like her
@@ -1007,6 +1043,26 @@ def make_handler(store, mailroom):
             if path == "/api/tinny/calibrate" and self.command == "POST":
                 write_atomic(store.dir / "calibrate.json", json.dumps({"ts": int(time.time())}).encode())
                 return self.send(HTTPStatus.OK, {"ok": True})
+
+            # Bedtime early: Tinny starts its bedtime routine now, or her big screen goes off now.
+            # Each lasts until its own next morning, or until it's undone here.
+            if path == "/api/tonight" and self.command == "POST":
+                b = self.json_body() or {}
+                t = tonight_state(store)
+                doc = store.load()
+                scr, tin = doc.get("screen") or {}, doc.get("tinny") or {}
+                big_on = scr.get("on") if TIME_RE.match(str(scr.get("on"))) else "08:00"
+                tinny_wake = tin.get("wake") if TIME_RE.match(str(tin.get("wake") or "")) else big_on
+                if b.get("big") == "off":
+                    t["bigOffUntil"] = next_time(big_on)
+                elif b.get("big") == "on":
+                    t["bigOffUntil"] = 0
+                if b.get("tinny") == "bed":
+                    t["tinnyBedFrom"], t["tinnyBedUntil"] = int(time.time()), next_time(tinny_wake)
+                elif b.get("tinny") == "wake":
+                    t["tinnyBedFrom"] = t["tinnyBedUntil"] = 0
+                write_atomic(store.dir / "tonight.json", json.dumps(t).encode())
+                return self.send(HTTPStatus.OK, {"tonight": tonight_state(store)})
 
             if path == "/api/tinny/hug" and self.command == "POST":
                 sender = str((self.json_body() or {}).get("from", "")).strip()[:40] or "someone"
