@@ -1011,7 +1011,7 @@ function renderPostcards() {
   if (!state) return;
   const from = $("cardFrom");
   const keep = from.value;
-  from.replaceChildren(...["Mom & Dad", "Mom", "Dad", ...doc.people.map(p => p.name)]
+  from.replaceChildren(...["Mom & Dad", ...doc.people.map(p => p.name)]   // the same names as on her screen
     .filter((v, i, a) => a.indexOf(v) === i).map(n => { const o = el("option", null, n); o.value = n; return o; }));
   if (keep) from.value = keep;
 
