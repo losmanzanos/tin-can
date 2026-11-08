@@ -1529,6 +1529,15 @@ const BIRDS = [{ b: "#5aa7e6", d: "#2f6fb5", kind: "bluebird" }, { b: "#e2413b",
 const DOG_NAMES = ["Max", "Buddy", "Rosie", "Scout", "Waffles", "Maple", "Teddy", "Ollie", "Bear", "Lucy", "Benny", "Honey", "Taco", "Penny"];
 const BIRD_NAMES = ["Tweety", "Kiwi", "Chirp", "Mango", "Skye", "Pip", "Feather", "Blue", "Piper", "Robin", "Tango", "Lemon", "Peep", "Juniper"];
 const CAT_NAMES = ["Luna", "Mittens", "Pumpkin", "Biscuit", "Pepper", "Coco", "Noodle", "Whiskers", "Muffin", "Pickles", "Bean", "Oreo", "Ziggy", "Peanut"];
+const GIRAFFE_NAMES = ["Stretch", "Topper", "Gigi", "Twiga", "Zara", "Lofty", "Spots", "Marigold", "Tallulah", "Ginger", "Sprout", "Hazel"];
+const GIRAFFES = [{ b: "#f2c96b", d: "#a8662c", mane: "#7a4a2a", kind: "giraffe" }, { b: "#f6dca0", d: "#c48a2c", mane: "#8b5a2b", kind: "baby giraffe" },
+  { b: "#f0b860", d: "#6b3d1e", mane: "#4a2a14", kind: "spotty giraffe" }, { b: "#fff8ec", d: "#e9c27a", mane: "#c48a2c", kind: "white giraffe", rare: 1 },
+  { b: "#ffd6e7", d: "#f08ab0", mane: "#b768d6", kind: "pink giraffe", rare: 1 }, { b: "rainbow", d: "#b768d6", mane: "rainbow", kind: "RAINBOW giraffe", rare: 2 }];
+// a giraffe facing right: horns, a long neck with its mane, patches, four legs
+const GIRAFFE_PX = [
+  "........k.k....", "........d.d....", ".......kbbbbk..", "......kbbbbebk.", "......kbbbbbbbk", "......kmbbbnnnk", ".......kbbbkkk.",
+  "......kmbbk....", "......kmbdk....", "......kmbbk....", "......kmdbk....", "......kmbbk....", ".kkkkkkbbbk....", "kbbdbbbbdbk....",
+  "kbdbbdbbbbk....", "kbbbbbdbbdk....", ".kbkkkkkbk.....", ".kbk...kbk.....", ".kkk...kkk....."];
 const UNI_NAMES = ["Sparkle", "Twinkle", "Glitter", "Daisy", "Moonbeam", "Sunny", "Clover", "Pixie", "Dream", "Stardust", "Cupcake", "Rainbow"];
 const RAINBOW = ["#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2f6fb5", "#b768d6"];
 const CAT_PX = [
@@ -1551,6 +1560,7 @@ const SPECIES = {
   unicorn: { coats: UNIS, px: UNI_PX, names: UNI_NAMES, say: "Neigh!", emoji: "🦄", big: 8, mid: 5, small: 3 },
   dog: { coats: DOGS, px: DOG_PX, names: DOG_NAMES, say: "Woof!", emoji: "🐶", big: 9, mid: 6, small: 4 },
   bird: { coats: BIRDS, px: BIRD_PX, names: BIRD_NAMES, say: "Tweet!", emoji: "🐦", big: 9, mid: 6, small: 4 },
+  giraffe: { coats: GIRAFFES, px: GIRAFFE_PX, names: GIRAFFE_NAMES, say: "Hmmmm!", emoji: "🦒", big: 8, mid: 4, small: 3 },
 };
 const sp = (f) => SPECIES[f.kind] || SPECIES.cat;
 const coatOf = (f) => sp(f).coats[f.coat] || sp(f).coats[0];
@@ -1570,14 +1580,16 @@ function drawFriend(f, x, y, u, happy) {
   }));
   if (f.kind === "dog") { const wag = tick % 4 < 2 ? 0 : u; rect(x + 12 * u + wag, y + 9 * u - wag, u, 2 * u, c.b === "rainbow" ? RAINBOW[2] : c.d); }
   if (f.kind === "bird" && happy && tick % 2) { rect(x, y + 6 * u, 2 * u, 2 * u, c.d); }          // a flap
+  if (f.kind === "giraffe") { const sw = tick % 8 < 4 ? 0 : u; rect(x - u, y + 13 * u + sw, u, 2 * u, c.mane === "rainbow" ? RAINBOW[3] : c.mane); }   // a swishing tail
   if (f.kind === "cat") { const tw = tick % 8 < 4 ? 0 : u; rect(x + 13 * u, y + 9 * u - tw, u, 4 * u, "#16181f"); rect(x + 13 * u, y + 8 * u - tw, u, u, c.b === "rainbow" ? RAINBOW[1] : c.b); }
 }
 let friends = store.get("tinny-friends", []);
 const FRIENDS_PER_PAGE = 8;
-function rollFriend() {
+function rollFriend(want) {
   const kinds = Object.keys(SPECIES), weight = kinds.map(k => 1 / (1 + friends.filter(f => f.kind === k).length));
   let pick = Math.random() * weight.reduce((a, b) => a + b, 0), kind = kinds[0];
   for (let i = 0; i < kinds.length; i++) { if ((pick -= weight[i]) <= 0) { kind = kinds[i]; break; } }
+  if (want && SPECIES[want]) kind = want;
   const list = SPECIES[kind].coats, r = Math.random();
   const pool = list.map((c, i) => i).filter(i => (list[i].rare || 0) === (r < 0.04 ? 2 : r < 0.18 ? 1 : 0));
   const names = SPECIES[kind].names, used = friends.map(f => f.name);
@@ -1586,6 +1598,11 @@ function rollFriend() {
 let egg = store.get("tinny-egg", null);
 function newEgg() { egg = { warm: 0, inside: rollFriend(), spots: pickOne(["#f2a1a8", "#b768d6", "#46bfc0", "#ffd84a", "#6cbf4a"]) }; store.set("tinny-egg", egg); }
 if (!egg) newEgg();
+// November 8, 2026: Zelda asked for giraffes, so the egg she has now holds her first one.
+if (!store.get("tinny-giraffe-egg", 0)) {
+  if (!friends.some(f => f.kind === "giraffe")) { egg.inside = rollFriend("giraffe"); store.set("tinny-egg", egg); }
+  store.set("tinny-giraffe-egg", 1);
+}
 const eggNeed = () => (friends.length === 0 ? 3 : 6);      // the first one hatches quickly
 const eggReady = () => egg.warm >= eggNeed();
 function warmEgg(n) { egg.warm = Math.min(eggNeed(), egg.warm + n); store.set("tinny-egg", egg); }
@@ -1604,7 +1621,7 @@ function tapEgg() { if (eggReady()) begin("hatch"); else begin("friends"); }
 function drawHatch(now) {
   const t = ago(act.t0);
   sky("#fff3c4", "#fffaf0"); ground("#8fcf6a", "#7cbd58");
-  const f = egg.inside;
+  const f = act.f || egg.inside;      // once it's out, the egg already holds the next friend
   if (t < 2.2) {
     drawEgg(240, 160, 150 + Math.sin(t * 20) * 4, 1 + Math.floor(t));
     bubble(270, 14, 200, 64, [t < 1 ? "It's hatching!" : "Crack… crack…"], 24, 290);
@@ -1612,7 +1629,7 @@ function drawHatch(now) {
     return;
   }
   if (!act.born) {                                                  // out it comes
-    act.born = true; friends.push({ ...f, at: Date.now() }); store.set("tinny-friends", friends); newEgg(); burst(240, 150, 40); postProgress();
+    act.born = true; act.f = f; friends.push({ ...f, at: Date.now() }); store.set("tinny-friends", friends); newEgg(); burst(240, 150, 40); postProgress();
   }
   const fu = sp(f).big, fw = spW(f) * fu;
   drawFriend(f, 240 - fw / 2, 262 - spH(f) * fu + (tick % 4 < 2 ? -6 : 0), fu, true);
