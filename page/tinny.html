@@ -1592,12 +1592,15 @@ function rollFriend(want) {
   if (want && SPECIES[want]) kind = want;
   const list = SPECIES[kind].coats, r = Math.random();
   const pool = list.map((c, i) => i).filter(i => (list[i].rare || 0) === (r < 0.04 ? 2 : r < 0.18 ? 1 : 0));
-  const names = SPECIES[kind].names, used = friends.map(f => f.name);
-  return { kind, coat: pickOne(pool), name: pickOne(names.filter(n => !used.includes(n)).concat(used.length >= names.length ? names : [])) };
+  const names = SPECIES[kind].names, used = friends.map(f => f.name), coat = pickOne(pool);
+  // Zelda picked this one: her first rare bird is called Buffalo.
+  if (kind === "bird" && list[coat].rare && !used.includes("Buffalo")) return { kind, coat, name: "Buffalo" };
+  return { kind, coat, name: pickOne(names.filter(n => !used.includes(n)).concat(used.length >= names.length ? names : [])) };
 }
 let egg = store.get("tinny-egg", null);
 function newEgg() { egg = { warm: 0, inside: rollFriend(), spots: pickOne(["#f2a1a8", "#b768d6", "#46bfc0", "#ffd84a", "#6cbf4a"]) }; store.set("tinny-egg", egg); }
 if (!egg) newEgg();
+if (egg.inside?.kind === "bird" && BIRDS[egg.inside.coat]?.rare && !friends.some(f => f.name === "Buffalo")) { egg.inside.name = "Buffalo"; store.set("tinny-egg", egg); }
 // November 8, 2026: Zelda asked for giraffes, so the egg she has now holds her first one.
 if (!store.get("tinny-giraffe-egg", 0)) {
   if (!friends.some(f => f.kind === "giraffe")) { egg.inside = rollFriend("giraffe"); store.set("tinny-egg", egg); }
