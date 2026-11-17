@@ -38,7 +38,8 @@ apt-get update
 BROWSER_PKG=chromium; apt-cache show chromium >/dev/null 2>&1 || BROWSER_PKG=chromium-browser
 for try in 1 2 3; do apt-get install -y --no-install-recommends \
   xserver-xorg-core xserver-xorg-video-fbdev xserver-xorg-input-evdev xserver-xorg-input-libinput \
-  x11-xserver-utils xinit xinput unclutter "$BROWSER_PKG" fonts-noto-color-emoji curl && break
+  x11-xserver-utils xinit xinput unclutter "$BROWSER_PKG" fonts-noto-color-emoji curl \
+  espeak-ng speech-dispatcher speech-dispatcher-espeak-ng alsa-utils && break
   [ "$try" = 3 ] && { echo "Couldn't download packages. Check the board's Wi-Fi and run this again."; exit 1; }
   echo "Download failed; trying again in 10 seconds (downloaded parts are kept)"; sleep 10
 done
@@ -138,6 +139,7 @@ while true; do
   "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --password-store=basic \\
     --disable-features=Translate,TouchpadOverscrollHistoryNavigation --check-for-update-interval=31536000 \\
     --disable-pinch --overscroll-history-navigation=0 --disable-session-crashed-bubble --touch-events=enabled \\
+    --enable-speech-dispatcher --autoplay-policy=no-user-gesture-required \\
     --window-position=0,0 --window-size=480,320 --force-device-scale-factor=1 \\
     --disable-gpu --disk-cache-size=10000000 '$OPEN'
   sleep 5   # if Chromium ever closes, open it again
@@ -153,7 +155,9 @@ echo '[ -z "$DISPLAY" ] && [ "$(tty)" = /dev/tty1 ] && exec startx -- -nocursor 
 chown "$U:$U" "$H/.xinitrc" "$PROFILE"
 if command -v raspi-config >/dev/null; then
   raspi-config nonint do_boot_behaviour B2   # console, logged in automatically
+  raspi-config nonint do_audio 1 2>/dev/null || true   # sound out of the headphone jack (Tinny reads questions aloud)
 fi
+amixer -q sset Master 90% 2>/dev/null || amixer -q sset PCM 90% 2>/dev/null || true
 
 echo "== On at 08:00, off at 20:00 (or whatever the admin page says)"
 cat > /etc/cron.d/zelda-board <<CRON

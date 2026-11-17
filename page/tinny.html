@@ -946,6 +946,36 @@ function numOpts(ans, lo = 0, hi = 10) {
   return threeOf(ans, near);
 }
 function rime(w) { return w.slice(1); }
+/* ---------------- reading aloud ---------------- */
+// She can't read the questions yet, so Tinny reads them to her: out loud through
+// a speaker on the little Pi (Chromium's speech, set up by board/setup.sh), and
+// always on screen too, lighting up each word as it goes. 🔊 on a question
+// reads it again. Reading questions never say the word she's meant to read.
+let voice = null, canSpeak = false, spokenAt = 0;
+function pickVoice() {
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices();
+  canSpeak = vs.length > 0;
+  voice = vs.find(v => /en.US/i.test(v.lang) && /female|zira|samantha|karen/i.test(v.name)) || vs.find(v => /^en/i.test(v.lang)) || vs[0] || null;
+}
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(textToSay) {
+  if (!canSpeak || !textToSay) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(textToSay.replace(/−/g, " minus ").replace(/\+/g, " plus ").replace(/=/g, " equals ").replace(/!/g, "."));
+    if (voice) u.voice = voice;
+    u.rate = 0.85; u.pitch = 1.15; u.volume = 1;
+    speechSynthesis.speak(u); spokenAt = Date.now();
+  } catch (e) { canSpeak = false; }
+}
+function readQuestion(q, again) {
+  if (!q) return;
+  q.readAt = Date.now();
+  speak((again ? "" : "") + (q.spoken || q.ask));
+}
+// Words with their letters spelled out, for sound questions: "c, a, t"
+const spellOut = (w) => [...w].join(", ");
 const VOWELS = "aeiou";
 function makeQuestion(track) {
   // Now and then a question from the level below, so what she learned stays
@@ -983,7 +1013,7 @@ function makeQuestion(track) {
       const i = Math.random() < 0.5 && VOWELS.includes(w[1]) ? 1 : Math.random() < 0.5 ? 0 : w.length - 1;
       const pool = i === 1 ? [...VOWELS] : [...LOWER];
       [q.opts, q.ans] = threeOf(w[i], pool);
-      Object.assign(q, { kind: "letter", word: w, ask: "Which letter is missing?", show: { pic: e, blank: w.slice(0, i) + "_" + w.slice(i + 1) } });
+      Object.assign(q, { kind: "letter", word: w, ask: "Which letter is missing?", show: { pic: e, blank: w.slice(0, i) + "_" + w.slice(i + 1) }, spoken: `Which letter is missing from ${w}?`, readAt: Date.now() });
       return q;
     }
     const extra = lv >= 4 ? shuffle([...LOWER].filter(ch => !w.includes(ch))).slice(0, 2) : [];
@@ -1003,9 +1033,14 @@ function makeQuestion(track) {
     else if (lv === 8) { const t = 3 + rnd(8), a = 1 + rnd(t - 1); [q.opts, q.ans] = numOpts(t - a, 0, 10); Object.assign(q, { ask: "What's the missing number?", show: { expr: `${a} + ? = ${t}`, count: t, ghostFrom: a } }); }
     else { const plus = Math.random() < 0.55, a = plus ? rnd(9) + 1 : 2 + rnd(9), b = plus ? 1 + rnd(10 - a) : 1 + rnd(a - 1); const v = plus ? a + b : a - b; [q.opts, q.ans] = numOpts(v, 0, 12); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` }, hint: plus ? { add: [a, b] } : { take: [a, b] } }); }
   }
+  if (track === "P") q.spoken = lv === 1 ? `Find the letter ${q.show.big}.` : lv === 2 ? `Find the big ${q.show.big.toUpperCase()}.` : lv === 3 ? `What sound does ${q.word} start with?` : lv === 4 ? `What sound does ${q.word} end with?` : `What sound is in the middle of ${q.word}?`;
+  if (track === "R") q.spoken = lv === 1 ? "Sound out the word, then find its picture." : lv === 6 ? "Read the sentence. Which picture is it about?" : lv === 4 ? "Read the word. Look at the middle letter. Which picture?" : "Read the word. Which picture?";
+  if (track === "S") q.spoken = q.kind === "letter" ? `Which letter is missing from ${q.word}?` : q.traced ? `Copy the word ${q.word}. Tap the letters in order.` : `Spell ${q.word}.`;
+  if (track === "M") q.spoken = q.show.expr && !q.show.count ? `What is ${q.show.expr.replace("= ?", "")}?` : q.show.expr ? `${q.show.expr.replace("?", "what").replace("=", "makes")}` : q.ask;
+  q.readAt = Date.now();
   return q;
 }
-function startLearn(track) { begin("learn", { track, n: 0, right: 0 }); act.q = makeQuestion(track); }
+function startLearn(track) { begin("learn", { track, n: 0, right: 0 }); act.q = makeQuestion(track); readQuestion(act.q); }
 function scoreQuestion(q) {
   const t = learn[q.track], first = q.tries === 0, day = dayKey(new Date());
   const d = learn.days[day] = learn.days[day] || {};
@@ -1026,11 +1061,12 @@ function rightAnswer(q, x, y) {
   const up = scoreQuestion(q);
   act.right += q.tries === 0 ? 1 : 0;
   const back = q.track === "R" && q.word ? [`${q.word}!`, "You read it!"] : q.track === "P" && q.word ? [`${[...q.word].join("-")}`, `${q.word}!`] : q.track === "M" && q.show?.expr ? [q.show.expr.replace("?", String(q.opts[q.ans])).replace(" = ?", ""), "Yes!"] : null;
-  say(up ? ["New level!", "You're so smart!"] : back || pickOne(PRAISE), 1.5);
+  const praise = up ? ["New level!", "You're so smart!"] : back || pickOne(PRAISE);
+  say(praise, 1.5); speak(praise.join(" "));
   setTimeout(() => {
     if (!act || act.kind !== "learn" || act.q !== q) return;
     act.n++;
-    if (act.n >= ROUND) finishLearn(); else act.q = makeQuestion(act.track);
+    if (act.n >= ROUND) finishLearn(); else { act.q = makeQuestion(act.track); readQuestion(act.q); }
   }, 1400);
 }
 function wrongAnswer(q, i) {
@@ -1040,7 +1076,8 @@ function wrongAnswer(q, i) {
   if (q.tries >= 2) q.glow = q.ans;
   if ((q.show?.count || q.show?.add || q.show?.take || q.hint) && q.tries === 1) q.demo = Date.now();     // count them together
   if (q.hint && q.tries === 1) q.show = { ...q.show, ...q.hint, expr: q.show.expr };                     // a number sentence: show the things
-  say(q.tries >= 2 ? ["This one!"] : pickOne([["Almost!"], ["Try again!"], ["Hmm, not that one."]]), 1.4);
+  const nudge = q.tries >= 2 ? ["This one!"] : pickOne([["Almost!"], ["Try again!"], ["Hmm, not that one."]]);
+  say(nudge, 1.4); speak(q.tries >= 2 ? "This one." : q.demo ? "Let's count them together." : nudge.join(" "));
 }
 function chooseOpt(i, x, y) {
   const q = act?.q;
@@ -1133,6 +1170,7 @@ function tenFrame(n, cx, cy, cell, thing) {
     const x = cx - 2.5 * cell + (i % 5) * cell, y = cy - cell + Math.floor(i / 5) * cell;
     ctx.fillStyle = i < n ? "#fff" : "#f3eee0"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(x, y, cell, cell); ctx.fill(); ctx.stroke();
     if (i < n) text(thing, x + cell / 2, y + cell * 0.78, cell * 0.72, "#000", "center");
+    else text("?", x + cell / 2, y + cell * 0.76, cell * 0.6, "#e2413b", "center");
   }
 }
 function drawLearn(now) {
@@ -1147,7 +1185,20 @@ function drawLearn(now) {
   // the question card
   ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(92, 48, 380, 110, 20); ctx.fill(); ctx.stroke();
   const ask = saying() ? said.lines.join(" ") : q.ask;
-  text(ask, 282, 76, fit(ask, 22, 350), saying() ? "#e2413b" : "#6f6752", "center");
+  const size = fit(ask, 22, 320);
+  if (!saying() && q.readAt && ago(q.readAt) < ask.split(" ").length * 0.45 + 0.6) {   // being read: one word at a time
+    const words = ask.split(" "), at = Math.floor(ago(q.readAt) / 0.45);
+    ctx.font = `700 ${size}px Andika`; let x = 268 - ctx.measureText(ask).width / 2;
+    words.forEach((w, i) => {
+      const ww = ctx.measureText(w + " ").width;
+      if (i === at) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 3, 60, ctx.measureText(w).width + 6, size + 6, 6); ctx.fill(); }
+      text(w, x, 76, size, i <= at ? "#16181f" : "#6f6752", "left"); ctx.font = `700 ${size}px Andika`; x += ww;
+    });
+  } else text(ask, 268, 76, size, saying() ? "#e2413b" : "#6f6752", "center");
+  // 🔊 reads the question again (and lights the words up even with no speaker)
+  ctx.fillStyle = q.readAt && ago(q.readAt) < 1 ? "#ffd84a" : "#fff3c4"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(448, 72, 18, 0, 7); ctx.fill(); ctx.stroke();
+  text("🔊", 448, 80, 20, "#000", "center");
+  zone(420, 48, 56, 52, () => readQuestion(q, true));
   const s = q.show || {}, cx = 282, cy = 120, withThings = s.expr && (s.count || s.add || s.take);
   if (s.big) text(s.big, cx, cy + 24, 64, "#16181f", "center");
   if (s.pic && !s.blank) text(s.pic, cx, cy + 22, 56, "#000", "center");
@@ -1315,8 +1366,9 @@ const SPECIES = {
       { b: "#b768d6", d: "#8a5ad1", s: "#8a5ad1", kind: "purple dinosaur" }, { b: "#ef7f2c", d: "#c85f14", s: "#c85f14", kind: "orange dinosaur" },
       { b: "#ffd84a", d: "#e9ad1c", s: "#e9ad1c", kind: "golden dinosaur", rare: 1 }, { b: "rainbow", d: "#16181f", s: "#fff", kind: "RAINBOW dinosaur", rare: 2 }] },
   horse: { says: "Neigh!", names: ["Buttercup", "Star", "Maple", "Blaze", "Penny", "Cocoa", "Willow", "Dusty", "Ginger"], px: [
-    "...........kk...", "..........kbbk..", ".........kbbbbk.", ".......kkdbbebk.", "......kddbbbbnk.", ".....kdbbbbbkk..", "kk...kdbbbbk....",
-    "kdkkkkdbbbbk....", "kdbbbbbbbbbk....", ".kbbbbbbbbbk....", "..kbbkkkkbbk....", "..kbk...kbk.....", "..kbk...kbk.....", "..kkk...kkk....."],
+    "............kk.kk...", "............kbkbk...", "...........kbbbbbk..", "..........dkbwebbbk.", ".........ddkbbbbbbbk", "........ddkbbbbbbnnk",
+    "kk.....ddkbbbbbkkkk.", "kdk...ddkbbbbbk.....", "kddk..dkbbbbbbk.....", ".kddkkkbbbbbbbbkkk..", "..kdkbbbbbbbbbbbbbk.", "...kbbbbbbbbbbbbbbk.",
+    "...kbbbbbbbbbbbbbbk.", "...kbk.kbk..kbk.kbk.", "...kbk.kbk..kbk.kbk.", "...kkk.kkk..kkk.kkk."],
     coats: [{ b: "#8a5a2b", d: "#4a2e14", kind: "brown horse" }, { b: "#f3f6fb", d: "#9aa1ad", kind: "white horse" }, { b: "#3a3d4c", d: "#16181f", eye: "#ffd84a", kind: "black horse" },
       { b: "#c98a4b", d: "#fff", kind: "golden palomino", rare: 1 }, { b: "#f3f6fb", d: "rainbow", kind: "rainbow-mane pony", rare: 2 }] },
   panda: { says: "Munch munch!", names: ["Bamboo", "Mochi", "Pudding", "Boba", "Dumpling", "Momo", "Pebble"], px: [
@@ -1325,8 +1377,9 @@ const SPECIES = {
     coats: [{ b: "#ffffff", d: "#16181f", eye: "#fff", kind: "giant panda" }, { b: "#fff4e2", d: "#6e4520", eye: "#fff", kind: "brown panda", rare: 1 },
       { b: "#ffd6e0", d: "#e2417b", eye: "#fff", kind: "pink panda", rare: 2 }] },
   cheetah: { says: "Zoom!", names: ["Dash", "Flash", "Speedy", "Zippy", "Comet", "Rocket", "Sprint"], px: [
-    "..........kk.kk.", ".........kbbkbbk", ".........kbbebbk", ".........kbbbbnk", "..........kbbkk.", "kkk.......kbbk..", "kbbkkkkkkkkbbk..",
-    "kbsbbsbbsbbbbk..", ".kbbsbbsbbsbbk..", "..kbbbbbbbbbbk..", "...kbbkkkbbkk...", "...kbk...kbk....", "...kkk...kkk...."],
+    "..........kk..kk....", ".........kbbkkbbk...", ".........kbbbbbbbk..", ".........kbwebbwebk.", ".........kbbkbbbkbk.", ".........kbbbnnbbbk.",
+    "..........kbbbbbbk..", "kkk.......kkbbbbkk..", "kbbkkkkkkkkkbbbbbbk.", ".kkbbsbbbsbbbsbbbbk.", "....kbbbsbbsbbbbsbk.", ".....kbsbbbbbsbbbbk.",
+    ".....kbk.kbk.kbk.kbk", ".....kbk.kbk.kbk.kbk", ".....kkk.kkk.kkk.kkk"],
     coats: [{ b: "#e9b85a", s: "#3a2a14", kind: "cheetah" }, { b: "#c98a4b", s: "#16181f", kind: "king cheetah", rare: 1 }, { b: "#f3f6fb", s: "#9aa1ad", kind: "snow cheetah", rare: 2 }] },
   flamingo: { says: "Honk!", names: ["Flo", "Coral", "Fifi", "Peaches", "Blossom", "Mango", "Rosa"], px: [
     "..kkk.......", ".kbbbk......", ".kbebbkk....", ".kbbbkyyk...", "..kbk.kkk...", "..kbk.......", "..kbk.......", "..kbkkkkk...",

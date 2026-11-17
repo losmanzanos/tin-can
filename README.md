@@ -174,6 +174,11 @@ Tinny: it only gets a bit hungry or dusty and asks.
 - **Morning and evening routines:** one giant button at a time; a tap anywhere does it and Tinny acts it out. Mornings (her first 20 minutes): wake up, breakfast, get dressed, what's on today. Evenings (the last 20 minutes before her big screen turns off): teeth, pajamas, "How was today?" 😊😐😢, lights out, with tonight's real moon. They grow with her: every couple of weeks a step joins (brushing teeth and making the bed in the morning, then a look outside that picks a coat or umbrella from the real weather; a one-line story at her reading level and a bath at night).
 - **Stars:** every finished round or activity earns one.
 
+**Sound:** plug a small speaker (3.5 mm) into the little Pi's headphone jack and
+Tinny reads every question aloud, in Chromium's voice (`espeak-ng` via
+`speech-dispatcher`, set up by `board/setup.sh`). 🔊 on a question reads it
+again. With no speaker, the words still light up one by one as it "reads".
+
 **Touch:** if taps don't land where she touches, tap **Calibrate the touch** on
 the admin page (**Settings → Tinny**), then tap the middle of each of the five
 stars on the little screen.
