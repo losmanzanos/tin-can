@@ -116,6 +116,11 @@ code { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padd
 
 /* Postcards */
 .cards { list-style: none; display: grid; gap: 12px; }
+.goals { list-style: none; display: grid; gap: 10px; }
+.goals li { display: grid; gap: 4px; padding: 10px 12px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
+.goals small { color: var(--muted); }
+.goalbar { height: 12px; border-radius: 6px; background: #efe6d2; overflow: hidden; }
+.goalbar i { display: block; height: 100%; background: var(--mustard); border-radius: 6px; transition: width .4s; }
 .learnlist { list-style: none; display: grid; gap: 8px; }
 .learnlist li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 10px 12px; border: 2px solid var(--rule); border-radius: 14px; background: #fff; }
 .learnlist li > span:first-child { font-size: 28px; grid-row: span 3; align-self: start; }
@@ -350,6 +355,8 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
     <div class="panel">
       <p class="hint">The tin-can pet on her tablet. It holds up new postcards, dresses for her calendar, the weather and holidays, suggests calling someone now and then, and keeps its own bedtime. Zelda plays learning games with it that find her level by themselves, and her right answers grow a garden and fill her zoo.</p>
       <div class="label">What Zelda's practicing <span class="hint" id="learnAt"></span></div>
+      <div class="label">Kindergarten goals</div>
+      <ul class="goals" id="learnGoals"></ul>
       <ul class="learnlist" id="learnList"></ul>
       <p class="hint" id="learnMoods"></p>
       <p class="hint" id="learnFriends"></p>
@@ -383,6 +390,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
         </label>
       </div>
       <div class="row-btns"><button type="button" class="btn plain small" id="saveTinnyKid">Save</button></div>
+      <p class="hint">🔊 Tinny reads every question aloud with the tablet's voice, and the words light up as it reads. If it stays quiet, turn on <b>Enable JavaScript Interface</b> in Fully's Advanced Web Settings.</p>
       <div class="label">Send Zelda a hug <span class="hint">Tinny gives her a big squeeze, with your name</span></div>
       <div class="row2">
         <select id="hugFrom" aria-label="Hug from"></select>
@@ -1280,10 +1288,13 @@ $("famUrlSave").onclick = async () => {
 };
 
 /* ---------- Tinny ---------- */
-const LEARN = { P: ["🔤", "Letters", ["Find the letter", "Big & little letters", "First sounds", "Last sounds"]],
-  R: ["📖", "Reading", ["Read a word", "Rhyming words", "Longer words", "Little sentences"]],
-  S: ["✏️", "Spelling", ["Copy the word", "Spell 3 letters", "3 letters + extras", "4-letter words"]],
-  M: ["🔢", "Numbers", ["Count to 5", "Count to 10", "Which is more?", "Add to 5", "Take away", "Add to 10", "Number sentences"]] };
+const LEARN = { P: ["🔤", "Letters", ["Find the letter", "Big & little letters", "First sounds", "Last sounds", "Middle sounds"]],
+  R: ["📖", "Reading", ["Sound it out", "Read a word", "Word families", "Vowel detective", "Longer words", "Little sentences"]],
+  S: ["✏️", "Spelling", ["Copy the word", "Missing letter", "Spell 3 letters", "3 letters + extras", "4-letter words"]],
+  M: ["➕", "Math", ["Add to 10", "Take away from 10", "+ and − to 10", "Missing number", "Make 10", "+ and − to 20"]] };
+// The two kindergarten goals, and which level means she's there: reading words by their middle
+// vowel (Vowel detective), and the last of the within-10 math (Make 10).
+const GOALS = [["📖 Reading short words (c-a-t)", "R", 4], ["➕ Adding & taking away within 10", "M", 5]];
 function renderLearning() {
   const pr = state.settings.tinnyProgress || {}, lv = pr.levels || {}, days = pr.days || {};
   const week = Object.keys(days).sort().slice(-7);
@@ -1299,6 +1310,13 @@ function renderLearning() {
       `${name} set to level ${sel.value}. Tinny picks it up in a few seconds.`);
     li.append(el("span", null, e), el("b", null, name),
       el("small", null, tried ? `This week: ${tried} tried, ${first} right the first time` : "Not played this week"), sel);
+    return li;
+  }));
+  $("learnGoals").replaceChildren(...GOALS.map(([label, k, goal]) => {
+    const l = Math.min(lv[k] || 1, goal), pct = Math.round((l - 1) / (goal - 1) * 100);
+    const li = el("li");
+    li.append(el("b", null, label), el("small", null, pct >= 100 ? "There! 🎉 (keeps practicing)" : `${pct}% of the way: ${LEARN[k][2][(lv[k] || 1) - 1]}`));
+    const bar = el("div", "goalbar"); const fill = el("i"); fill.style.width = pct + "%"; bar.append(fill); li.append(bar);
     return li;
   }));
   const moods = pr.moods || {}, mk = Object.keys(moods).sort().slice(-7);

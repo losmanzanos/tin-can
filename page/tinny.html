@@ -998,8 +998,8 @@ function weatherWear() {
 const STORIES = [   // by her reading level: short words first, then longer ones
   ["The cat sat.", "A pig in a hat.", "The dog can run.", "Sun on the bus.", "The cat naps.", "A bug on a rug.", "Mom and the cat.", "The fox hid."],
   ["The cat sat on the mat.", "A big pig had a nap.", "The dog got a red hat.", "Ten bugs in a box.", "The hen sat in the sun."],
-  ["The frog sat on a log.", "A duck can swim fast.", "The kite went up and up.", "My cat likes milk.", "The fish can swim."],
-  ["The little unicorn can fly.", "The cat and the duck are best friends.", "We went to the zoo and saw a lion.", "The moon is big and bright tonight."],
+  ["The frog sat on a log.", "A duck can swim fast.", "The kite went up and up.", "My cat likes milk.", "The fish can swim.", "The owl can hoot.", "A big red ladybug."],
+  ["The little unicorn can fly.", "The cat and the duck are best friends.", "We went to the zoo and saw a lion.", "The moon is big and bright tonight.", "The panda eats bamboo all day.", "A pink flamingo stands on one leg.", "The dolphin jumps out of the sea.", "The cheetah is the fastest of all."],
 ];
 function routineSteps(kind, now) {
   const wk = weeksOld(now), s = [];
@@ -1161,21 +1161,25 @@ function holiday(now) {
 const W3 = [["cat", "🐱"], ["dog", "🐶"], ["pig", "🐷"], ["hen", "🐔"], ["bus", "🚌"], ["sun", "☀️"], ["bed", "🛏️"], ["hat", "🎩"], ["bat", "🦇"],
   ["fox", "🦊"], ["box", "📦"], ["bug", "🐛"], ["map", "🗺️"], ["pen", "🖊️"], ["net", "🥅"], ["web", "🕸️"], ["ant", "🐜"], ["rat", "🐀"],
   ["log", "🪵"], ["cap", "🧢"], ["van", "🚐"], ["cab", "🚕"], ["tub", "🛁"], ["nut", "🥜"], ["leg", "🦵"], ["pin", "📌"], ["mug", "☕"],
-  ["bag", "👜"], ["hut", "🛖"], ["ten", "🔟"], ["six", "6️⃣"], ["pot", "🍲"], ["cup", "🥤"], ["jam", "🍯"], ["fan", "🪭"], ["mop", "🧹"]];
+  ["bag", "👜"], ["hut", "🛖"], ["ten", "🔟"], ["six", "6️⃣"], ["pot", "🍲"], ["cup", "🥤"], ["jam", "🍯"], ["fan", "🪭"], ["mop", "🧹"],
+  ["egg", "🥚"], ["jet", "✈️"], ["kid", "🧒"], ["mom", "👩"], ["dad", "👨"], ["can", "🥫"], ["pan", "🍳"], ["gem", "💎"], ["key", "🔑"], ["owl", "🦉"]].filter(w => w[0] !== "key" && w[0] !== "owl");
+// Words that differ only in the vowel, for the vowel-detective level: she has to
+// read the middle sound, not guess from the first letter.
+const VOWEL_SETS = [["hat", "hut"], ["pin", "pan", "pen"], ["bug", "bag"], ["net", "nut"], ["map", "mop"], ["cap", "cup"], ["log", "leg"], ["pot", "pet"]].map(set => set.filter(w => W3.some(x => x[0] === w))).filter(set => set.length >= 2);
 const W4 = [["fish", "🐟"], ["frog", "🐸"], ["duck", "🦆"], ["ship", "🚢"], ["star", "⭐"], ["moon", "🌙"], ["tree", "🌳"], ["cake", "🍰"],
   ["bike", "🚲"], ["kite", "🪁"], ["boat", "⛵"], ["goat", "🐐"], ["sock", "🧦"], ["milk", "🥛"], ["bell", "🔔"], ["drum", "🥁"],
   ["crab", "🦀"], ["nest", "🪺"], ["hand", "✋"], ["lamp", "💡"], ["ring", "💍"], ["lion", "🦁"], ["corn", "🌽"], ["frog", "🐸"]].filter((w, i, a) => a.findIndex(x => x[0] === w[0]) === i);
 // Pictures a 4-year-old names one way only (🐔 is a "chicken", 👜 a "purse", 🧹 a
 // "broom"), for the games where she sees only the picture: sounds and spelling.
-const CLEAR = new Set(["cat", "dog", "pig", "bus", "sun", "bed", "hat", "bat", "fox", "box", "bug", "map", "pen", "web", "ant", "leg", "ten", "six",
+const CLEAR = new Set(["cat", "dog", "pig", "bus", "sun", "bed", "hat", "bat", "fox", "box", "bug", "map", "pen", "web", "ant", "leg", "ten", "six", "egg", "jet", "mom", "dad", "gem",
   "fish", "frog", "duck", "star", "moon", "tree", "cake", "bike", "kite", "boat", "goat", "sock", "milk", "bell", "drum", "crab", "nest", "hand", "lamp", "ring", "lion", "corn"]);
 const clear = (bank) => bank.filter(w => CLEAR.has(w[0]));
-const SENTENCES = ["I see a %.", "Here is a %.", "Look at the %!", "I like the %.", "Can you see a %?", "The % is big."];
+const SENTENCES = ["I see a %.", "Here is a %.", "Look at the %!", "I like the %.", "Can you see a %?", "The % is big.", "The % is red.", "A % and a cat.", "My % is little.", "Zelda has a %."];
 const ITEMS = ["🍎", "⭐", "🐟", "🌸", "🚗", "🐞", "🎈", "🐶", "🍪", "🦆"];
 const TRACKS = {
-  P: { name: "Letters", emoji: "🔤", bg: ["#ffe3b8", "#fff4e2"], levels: ["Find the letter", "Big & little letters", "First sounds", "Last sounds"] },
-  R: { name: "Read", emoji: "📖", bg: ["#cfeaf7", "#eef8fc"], levels: ["Read a word", "Rhyming words", "Longer words", "Little sentences"] },
-  S: { name: "Spell", emoji: "✏️", bg: ["#e7d4f5", "#f6effc"], levels: ["Copy the word", "Spell 3 letters", "3 letters + extras", "4-letter words"] },
+  P: { name: "Letters", emoji: "🔤", bg: ["#ffe3b8", "#fff4e2"], levels: ["Find the letter", "Big & little letters", "First sounds", "Last sounds", "Middle sounds"] },
+  R: { name: "Read", emoji: "📖", bg: ["#cfeaf7", "#eef8fc"], levels: ["Sound it out", "Read a word", "Word families", "Vowel detective", "Longer words", "Little sentences"] },
+  S: { name: "Spell", emoji: "✏️", bg: ["#e7d4f5", "#f6effc"], levels: ["Copy the word", "Missing letter", "Spell 3 letters", "3 letters + extras", "4-letter words"] },
   M: { name: "Math", emoji: "➕", bg: ["#c9ecb4", "#eef8e8"], levels: ["Add to 10", "Take away from 10", "+ and − to 10", "Missing number", "Make 10", "+ and − to 20"] },
 };
 const ROUND = 5;
@@ -1183,11 +1187,18 @@ const learn = store.get("tinny-learn", {});
 for (const k of Object.keys(TRACKS)) learn[k] = Object.assign({ lv: k === "P" ? 3 : 1, streak: 0, miss: 0 }, learn[k]);
 // Count became Math (adding and taking away within 10): everyone starts it at its first level
 if (learn.M.v !== 2) { learn.M = { lv: 1, streak: 0, miss: 0, v: 2 }; store.set("tinny-learn", learn); }
+// November 17, 2026: Read and Spell got new first steps (sounding out, a missing letter), so her
+// level moves up to stay on the same step she was on.
+if (learn.ver !== 2) {
+  const R = [0, 2, 3, 5, 6], S = [0, 1, 3, 4, 5];
+  learn.R.lv = R[learn.R.lv] || learn.R.lv; learn.S.lv = S[learn.S.lv] || learn.S.lv;
+  learn.ver = 2; store.set("tinny-learn", learn);
+}
 // Levels set on the admin page win, once each time they're set.
 function applyLevelSet() {
   const set = doc?.tinny?.levels;
   if (!set || !set.ts || set.ts <= (learn.setTs || 0)) return;
-  for (const k of Object.keys(TRACKS)) if (set[k]) learn[k] = { lv: Math.max(1, Math.min(TRACKS[k].levels.length, set[k])), streak: 0, miss: 0 };
+  for (const k of Object.keys(TRACKS)) if (set[k]) learn[k] = { lv: Math.max(1, Math.min(TRACKS[k].levels.length, set[k])), streak: 0, miss: 0, v: 2 };
   learn.setTs = set.ts; store.set("tinny-learn", learn); postProgress();
 }
 learn.days = learn.days || {};
@@ -1205,29 +1216,85 @@ function numOpts(ans, lo = 0, hi = 10) {
   return threeOf(ans, near);
 }
 function rime(w) { return w.slice(1); }
+/* ---------------- reading aloud ---------------- */
+// She can't read the questions yet, so Tinny reads them to her: out loud with the
+// tablet's voice, and always on screen too, lighting up each word as it goes. 🔊 on a question
+// reads it again. Reading questions never say the word she's meant to read.
+let voice = null, canSpeak = false, spokenAt = 0;
+function pickVoice() {
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices();
+  canSpeak = vs.length > 0;
+  voice = vs.find(v => /en.US/i.test(v.lang) && /female|zira|samantha|karen/i.test(v.name)) || vs.find(v => /^en/i.test(v.lang)) || vs[0] || null;
+}
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(textToSay) {
+  // Fully's own voice on the tablet (it needs "Enable JavaScript Interface" in Fully's Advanced Web
+  // Settings), the browser's voice anywhere else, quiet if neither. Symbols are read as words.
+  const line = String(textToSay || "").replace(/−/g, " minus ").replace(/\+/g, " plus ").replace(/=/g, " equals ")
+    .replace(/[^\p{L}\p{N}\s.,!?'-]/gu, "").replace(/\s+/g, " ").trim();
+  if (!line) return;
+  try {
+    if (window.fully && fully.textToSpeech) {
+      try { fully.stopTextToSpeech && fully.stopTextToSpeech(); } catch (e) {}
+      fully.textToSpeech(line); spokenAt = Date.now(); return;
+    }
+    if (!canSpeak) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(line);
+    if (voice) u.voice = voice;
+    u.rate = 0.85; u.pitch = 1.15; u.volume = 1;
+    speechSynthesis.speak(u); spokenAt = Date.now();
+  } catch (e) {}
+}
+function readQuestion(q, again) {
+  if (!q) return;
+  q.readAt = Date.now();
+  speak((again ? "" : "") + (q.spoken || q.ask));
+}
+// Words with their letters spelled out, for sound questions: "c, a, t"
+const spellOut = (w) => [...w].join(", ");
+const VOWELS = "aeiou";
 function makeQuestion(track) {
-  const lv = learn[track].lv;
-  const q = { track, lv, tries: 0, faded: [], glow: null, okAt: 0 };
+  // Now and then a question from the level below, so what she learned stays
+  // fresh. Review questions don't move the level either way.
+  const cur = learn[track].lv, review = cur > 1 && Math.random() < 0.2, lv = review ? cur - 1 : cur;
+  const q = { track, lv, tries: 0, faded: [], glow: null, okAt: 0, review };
   if (track === "P") {
     if (lv === 1) { const L = pickOne(UPPER); const pool = (LOOKALIKE[L] || "") + UPPER; [q.opts, q.ans] = threeOf(L, [...pool]); Object.assign(q, { ask: `Find ${L}!`, show: { big: L }, kind: "letter" }); }
     else if (lv === 2) { const l = pickOne(LOWER); const pool = [...(LOOKALIKE[l] || ""), ...LOWER].map(x => x.toUpperCase()); [q.opts, q.ans] = threeOf(l.toUpperCase(), pool); Object.assign(q, { ask: "Find the big one!", show: { big: l }, kind: "letter" }); }
-    else { const [w, e] = pickOne(clear(lv === 3 ? [...W3, ...W4] : W3)); const ch = lv === 3 ? w[0] : w[w.length - 1]; [q.opts, q.ans] = threeOf(ch, [...LOWER]); Object.assign(q, { ask: lv === 3 ? "What does it start with?" : "What does it end with?", show: { pic: e }, kind: "letter", word: w }); }
+    else if (lv <= 4) { const [w, e] = pickOne(clear(lv === 3 ? [...W3, ...W4] : W3)); const ch = lv === 3 ? w[0] : w[w.length - 1]; [q.opts, q.ans] = threeOf(ch, [...LOWER]); Object.assign(q, { ask: lv === 3 ? "What does it start with?" : "What does it end with?", show: { pic: e }, kind: "letter", word: w }); }
+    else {   // the vowel in the middle: the heart of reading a CVC word
+      const [w, e] = pickOne(clear(W3).filter(x => VOWELS.includes(x[0][1])));
+      [q.opts, q.ans] = threeOf(w[1], [...VOWELS]);
+      Object.assign(q, { ask: "What sound is in the middle?", show: { pic: e, blank: w[0] + "_" + w[2] }, kind: "letter", word: w });
+    }
   }
   if (track === "R") {
-    const bank = lv >= 3 ? W4 : W3;
-    const [w, e] = pickOne(lv === 4 ? [...W3, ...W4] : bank);
-    let pool = bank.filter(x => x[0] !== w);
-    if (lv === 2) { const rhymes = W3.filter(x => x[0] !== w && rime(x[0]) === rime(w)); pool = rhymes.length >= 2 ? rhymes : W3.filter(x => x[0] !== w && x[0][0] === w[0]).concat(rhymes).length >= 2 ? W3.filter(x => x[0] !== w && (x[0][0] === w[0] || rime(x[0]) === rime(w))) : pool; }
-    if (lv === 1) pool = pool.filter(x => x[0][0] !== w[0]);
+    let w, e, pool;
+    if (lv <= 2) { [w, e] = pickOne(W3); pool = W3.filter(x => x[0] !== w && x[0][0] !== w[0]); }
+    else if (lv === 3) { [w, e] = pickOne(W3.filter(x => W3.some(y => y[0] !== x[0] && rime(y[0]) === rime(x[0])))); const rh = W3.filter(x => x[0] !== w && rime(x[0]) === rime(w)); pool = rh.length >= 2 ? rh : [...rh, ...W3.filter(x => x[0] !== w && x[0][0] === w[0])]; }
+    else if (lv === 4) { const set = pickOne(VOWEL_SETS); w = pickOne(set); e = W3.find(x => x[0] === w)[1]; const same = set.filter(x => x !== w).map(x => W3.find(y => y[0] === x)); pool = same.length >= 2 ? same : [...same, ...W3.filter(x => x[0] !== w && x[0][0] === w[0] && !same.includes(x))]; }
+    else if (lv === 5) { [w, e] = pickOne(W4); pool = W4.filter(x => x[0] !== w); }
+    else { [w, e] = pickOne([...W3, ...W4]); pool = [...W3, ...W4].filter(x => x[0] !== w); }
+    if (pool.length < 2) pool = [...pool, ...W3.filter(x => x[0] !== w)];
     const [opts, ans] = threeOf(e, shuffle(pool).map(x => x[1]));
-    Object.assign(q, { opts, ans, kind: "pic", ask: lv === 4 ? "Read it! Which one?" : "Read it!", show: lv === 4 ? { line: pickOne(SENTENCES).replace("%", w) } : { word: w } });
+    Object.assign(q, { opts, ans, kind: "pic", word: w, ask: lv === 1 ? "Sound it out, then find it!" : lv === 6 ? "Read it! Which one?" : lv === 4 ? "Read it! Look at the middle letter." : "Read it!",
+      show: lv === 6 ? { line: pickOne(SENTENCES).replace("%", w) } : { word: w, sweep: lv === 1 } });
   }
   if (track === "S") {
     const mine = (doc?.tinny?.words || []).filter(w => w.length <= 6);
     let w, e = null;
-    if (lv >= 2 && mine.length && Math.random() < 0.3) w = pickOne(mine);
-    else [w, e] = pickOne(lv === 1 ? W3 : clear(lv >= 4 ? W4 : W3));
-    const extra = lv >= 3 ? shuffle([...LOWER].filter(ch => !w.includes(ch))).slice(0, 2) : [];
+    if (lv >= 3 && mine.length && Math.random() < 0.3) w = pickOne(mine);
+    else [w, e] = pickOne(lv === 1 ? W3 : clear(lv >= 5 ? W4 : W3));
+    if (lv === 2) {   // one letter missing: the vowel half the time, else the first or last
+      const i = Math.random() < 0.5 && VOWELS.includes(w[1]) ? 1 : Math.random() < 0.5 ? 0 : w.length - 1;
+      const pool = i === 1 ? [...VOWELS] : [...LOWER];
+      [q.opts, q.ans] = threeOf(w[i], pool);
+      Object.assign(q, { kind: "letter", word: w, ask: "Which letter is missing?", show: { pic: e, blank: w.slice(0, i) + "_" + w.slice(i + 1) }, spoken: `Which letter is missing from ${w}?`, readAt: Date.now() });
+      return q;
+    }
+    const extra = lv >= 4 ? shuffle([...LOWER].filter(ch => !w.includes(ch))).slice(0, 2) : [];
     Object.assign(q, { kind: "spell", word: w, pic: e, ask: e ? "Spell it!" : "Spell this word!", traced: lv === 1, peekUntil: e ? 0 : Date.now() + 4000,
       tiles: shuffle([...w, ...extra]).map(ch => ({ ch, used: false, shakeAt: 0 })), pos: 0, wrongHere: 0 });
   }
@@ -1239,54 +1306,62 @@ function makeQuestion(track) {
       else { let a = 3 + rnd(8), b = 3 + rnd(8); while (a === b) b = 3 + rnd(8); Object.assign(q, { kind: "groups", ask: "Which has more?", opts: [a, b], ans: a > b ? 0 : 1, show: {} }); }
       return q;
     }
-    // within 10: a + b with both sides drawn, a − b with some crossed off, then numbers only
+    // within 10: a + b with both sides drawn, a − b with some crossed off, then numbers only.
+    // A missed number sentence brings the pictures in to count together.
     const sum10 = () => { const a = 1 + rnd(8), b = 1 + rnd(9 - a); return [a, b]; };
-    if (lv === 1) { const [a, b] = sum10(); [q.opts, q.ans] = numOpts(a + b, 0, 10); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] } }); }
-    else if (lv === 2) { const a = 4 + rnd(7), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(a - b, 0, 10); Object.assign(q, { ask: `Tinny ate ${b}. How many left?`, show: { take: [a, b] } }); }
+    if (lv === 1) { const [a, b] = sum10(); [q.opts, q.ans] = numOpts(a + b, 0, 10); Object.assign(q, { ask: "How many in all?", show: { add: [a, b] }, spoken: `${a} and ${b}. How many in all?` }); }
+    else if (lv === 2) { const a = 4 + rnd(7), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(a - b, 0, 10); Object.assign(q, { ask: `Tinny ate ${b}. How many left?`, show: { take: [a, b] }, spoken: `There were ${a}. Tinny ate ${b}. How many are left?` }); }
     else if (lv === 3) {
       const plus = Math.random() < 0.5; let a, b, v;
       if (plus) { [a, b] = sum10(); v = a + b; } else { a = 3 + rnd(8); b = 1 + rnd(a - 1); v = a - b; }
-      [q.opts, q.ans] = numOpts(v, 0, 10); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` } });
+      [q.opts, q.ans] = numOpts(v, 0, 10);
+      Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` }, hint: plus ? { add: [a, b] } : { take: [a, b] }, spoken: `What is ${a} ${plus ? "plus" : "minus"} ${b}?` });
     }
-    else if (lv === 4) {     // the missing number: 3 + ? = 8, or 9 − ? = 4
-      const plus = Math.random() < 0.6;
-      if (plus) { const [a, b] = sum10(); [q.opts, q.ans] = numOpts(b, 0, 10); Object.assign(q, { ask: "What's missing?", show: { expr: `${a} + ? = ${a + b}` } }); }
-      else { const a = 4 + rnd(7), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(b, 0, 10); Object.assign(q, { ask: "What's missing?", show: { expr: `${a} − ? = ${a - b}` } }); }
+    else if (lv === 4) {     // the missing number: 3 + ? = 8 (the ones still to come are faded), or 9 − ? = 4
+      if (Math.random() < 0.6) { const t = 3 + rnd(8), a = 1 + rnd(t - 1); [q.opts, q.ans] = numOpts(t - a, 0, 10); Object.assign(q, { ask: "What's the missing number?", show: { expr: `${a} + ? = ${t}`, count: t, ghostFrom: a }, spoken: `${a} plus what makes ${t}?` }); }
+      else { const a = 4 + rnd(7), b = 1 + rnd(a - 1); [q.opts, q.ans] = numOpts(b, 0, 10); Object.assign(q, { ask: "What's missing?", show: { expr: `${a} − ? = ${a - b}` }, hint: { take: [a, b] }, spoken: `${a} minus what leaves ${a - b}?` }); }
     }
-    else if (lv === 5) { const a = 1 + rnd(9); [q.opts, q.ans] = numOpts(10 - a, 0, 10); Object.assign(q, { ask: "What makes 10?", show: { expr: `${a} + ? = 10` } }); }
+    else if (lv === 5) { const n = 1 + rnd(9); [q.opts, q.ans] = numOpts(10 - n, 0, 10); Object.assign(q, { ask: "How many more to make 10?", show: { tenframe: n }, spoken: `There are ${n}. How many more to make 10? Count the empty boxes.` }); }
     else {                   // up to 20
       const plus = Math.random() < 0.55; let a, b, v;
       if (plus) { a = 3 + rnd(12); b = 1 + rnd(20 - a); v = a + b; } else { a = 8 + rnd(13); b = 1 + rnd(Math.min(10, a - 1)); v = a - b; }
-      [q.opts, q.ans] = numOpts(v, 0, 20); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` } });
+      [q.opts, q.ans] = numOpts(v, 0, 20); Object.assign(q, { ask: "What's the answer?", show: { expr: `${a} ${plus ? "+" : "−"} ${b} = ?` }, spoken: `What is ${a} ${plus ? "plus" : "minus"} ${b}?` });
     }
   }
+  if (track === "P") q.spoken = lv === 1 ? `Find the letter ${q.show.big}.` : lv === 2 ? `Find the big ${q.show.big.toUpperCase()}.` : lv === 3 ? `What sound does ${q.word} start with?` : lv === 4 ? `What sound does ${q.word} end with?` : `What sound is in the middle of ${q.word}?`;
+  if (track === "R") q.spoken = lv === 1 ? "Sound out the word, then find its picture." : lv === 6 ? "Read the sentence. Which picture is it about?" : lv === 4 ? "Read the word. Look at the middle letter. Which picture?" : "Read the word. Which picture?";
+  if (track === "S") q.spoken = q.kind === "letter" ? `Which letter is missing from ${q.word}?` : q.traced ? `Copy the word ${q.word}. Tap the letters in order.` : `Spell ${q.word}.`;
+  if (track === "M" && !q.spoken) q.spoken = q.show.expr && !q.show.count ? `What is ${q.show.expr.replace("= ?", "")}?` : q.show.expr ? `${q.show.expr.replace("?", "what").replace("=", "makes")}` : q.ask;
+  q.readAt = Date.now();
   return q;
 }
-function startLearn(track) { begin("learn", { track, n: 0, right: 0 }); act.q = makeQuestion(track); }
+function startLearn(track) { begin("learn", { track, n: 0, right: 0 }); act.q = makeQuestion(track); readQuestion(act.q); }
 function scoreQuestion(q) {
   const t = learn[q.track], first = q.tries === 0, day = dayKey(new Date());
   const d = learn.days[day] = learn.days[day] || {};
   const rec = d[q.track] = d[q.track] || [0, 0]; rec[0]++; if (first) rec[1]++;
   for (const k of Object.keys(learn.days).sort().slice(0, -21)) delete learn.days[k];
   let up = false;
-  if (first) { t.streak++; if (t.streak >= 4 && t.lv < TRACKS[q.track].levels.length) { t.lv++; t.streak = 0; t.miss = 0; up = true; } }
+  if (first && !q.review) { t.streak++; if (t.streak >= 4 && t.lv < TRACKS[q.track].levels.length) { t.lv++; t.streak = 0; t.miss = 0; up = true; } }
   store.set("tinny-learn", learn); postProgress();
   return up;
 }
 function missed(q) {
   const t = learn[q.track];
-  if (q.tries === 1) { t.streak = 0; t.miss++; if (t.miss >= 3 && t.lv > 1) { t.lv--; t.miss = 0; } store.set("tinny-learn", learn); }
+  if (q.tries === 1 && !q.review) { t.streak = 0; t.miss++; if (t.miss >= 3 && t.lv > 1) { t.lv--; t.miss = 0; } store.set("tinny-learn", learn); }
 }
 const PRAISE = [["Yes!"], ["You got it!"], ["Great job!"], ["Wow!"], ["Super!"], ["That's right!"]];
 function rightAnswer(q, x, y) {
   q.okAt = Date.now(); burst(x, y, 18);
   const up = scoreQuestion(q);
   act.right += q.tries === 0 ? 1 : 0;
-  say(up ? ["New level!", "You're so smart!"] : pickOne(PRAISE), 1.3);
+  const back = q.track === "R" && q.word ? [`${q.word}!`, "You read it!"] : q.track === "P" && q.word ? [`${[...q.word].join("-")}`, `${q.word}!`] : q.track === "M" && q.show?.expr ? [q.show.expr.replace("?", String(q.opts[q.ans])).replace(" = ?", ""), "Yes!"] : null;
+  const praise = up ? ["New level!", "You're so smart!"] : back || pickOne(PRAISE);
+  say(praise, 1.5); speak(praise.join(" "));
   setTimeout(() => {
     if (!act || act.kind !== "learn" || act.q !== q) return;
     act.n++;
-    if (act.n >= ROUND) finishLearn(); else act.q = makeQuestion(act.track);
+    if (act.n >= ROUND) finishLearn(); else { act.q = makeQuestion(act.track); readQuestion(act.q); }
   }, 1400);
 }
 function wrongAnswer(q, i) {
@@ -1294,8 +1369,10 @@ function wrongAnswer(q, i) {
   if (i != null && !q.faded.includes(i)) q.faded.push(i);
   q.shake = { i, at: Date.now() };
   if (q.tries >= 2) q.glow = q.ans;
-  if (q.show?.count && q.tries === 1) q.demo = Date.now();     // count them together
-  say(q.tries >= 2 ? ["This one!"] : pickOne([["Almost!"], ["Try again!"], ["Hmm, not that one."]]), 1.4);
+  if ((q.show?.count || q.show?.add || q.show?.take || q.hint) && q.tries === 1) q.demo = Date.now();     // count them together
+  if (q.hint && q.tries === 1) q.show = { ...q.show, ...q.hint, expr: q.show.expr };                     // a number sentence: show the things
+  const nudge = q.tries >= 2 ? ["This one!"] : pickOne([["Almost!"], ["Try again!"], ["Hmm, not that one."]]);
+  say(nudge, 1.4); speak(q.tries >= 2 ? "This one." : q.demo ? "Let's count them together." : nudge.join(" "));
 }
 function chooseOpt(i, x, y) {
   const q = act?.q;
@@ -1369,15 +1446,26 @@ function card(x, y, w, h, fill, opts = {}) {
   return dx;
 }
 function itemsRow(n, cx, cy, size, thing, opt = {}) {
-  const per = opt.frame ? 5 : n, rows = Math.ceil(n / per), gap = Math.min(size + 4, opt.maxW / per);
+  const per = opt.frame ? 5 : n, rows = Math.ceil(n / per), gap = Math.min(size + 4, opt.maxW / per), from = opt.numberFrom || 0;
   for (let k = 0; k < n; k++) {
     const r = Math.floor(k / per), col = k % per;
     const x = cx + (col - (Math.min(per, n - r * per) - 1) / 2) * gap, y = cy + (r - (rows - 1) / 2) * (size + 2);
-    ctx.globalAlpha = opt.crossFrom != null && k >= opt.crossFrom ? 0.35 : 1;
+    const ghost = opt.ghostFrom != null && k >= opt.ghostFrom;
+    ctx.globalAlpha = opt.crossFrom != null && k >= opt.crossFrom ? 0.35 : ghost ? 0.22 : 1;
     text(thing, x, y + size * 0.35, size, "#000", "center");
     ctx.globalAlpha = 1;
+    if (ghost) text("?", x, y + size * 0.3, size * 0.7, "#e2413b", "center");
     if (opt.crossFrom != null && k >= opt.crossFrom) { ctx.strokeStyle = "#e2413b"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x - size / 2.4, y - size / 2.4); ctx.lineTo(x + size / 2.4, y + size / 2.4); ctx.stroke(); }
-    if (opt.demoN != null && k < opt.demoN) text(String(k + 1), x, y - size * 0.55, 16, "#e2413b", "center");
+    if (opt.demoN != null && k < opt.demoN - from && (opt.crossFrom == null || k < opt.crossFrom)) text(String(from + k + 1), x, y - size * 0.55, 16, "#e2413b", "center");
+  }
+}
+// A ten-frame: two rows of five, n of them filled. The blank ones say how many to go.
+function tenFrame(n, cx, cy, cell, thing) {
+  for (let i = 0; i < 10; i++) {
+    const x = cx - 2.5 * cell + (i % 5) * cell, y = cy - cell + Math.floor(i / 5) * cell;
+    ctx.fillStyle = i < n ? "#fff" : "#f3eee0"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(x, y, cell, cell); ctx.fill(); ctx.stroke();
+    if (i < n) text(thing, x + cell / 2, y + cell * 0.78, cell * 0.72, "#000", "center");
+    else text("?", x + cell / 2, y + cell * 0.76, cell * 0.6, "#e2413b", "center");
   }
 }
 function drawLearn(now) {
@@ -1392,17 +1480,48 @@ function drawLearn(now) {
   // the question card
   ctx.fillStyle = "#fff"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(92, 48, 380, 110, 20); ctx.fill(); ctx.stroke();
   const ask = saying() ? said.lines.join(" ") : q.ask;
-  text(ask, 282, 76, fit(ask, 22, 350), saying() ? "#e2413b" : "#6f6752", "center");
-  const s = q.show || {}, cx = 282, cy = 120;
+  const size = fit(ask, 22, 320);
+  if (!saying() && q.readAt && ago(q.readAt) < ask.split(" ").length * 0.45 + 0.6) {   // being read: one word at a time
+    const words = ask.split(" "), at = Math.floor(ago(q.readAt) / 0.45);
+    ctx.font = `700 ${size}px Andika`; let x = 268 - ctx.measureText(ask).width / 2;
+    words.forEach((w, i) => {
+      const ww = ctx.measureText(w + " ").width;
+      if (i === at) { ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x - 3, 60, ctx.measureText(w).width + 6, size + 6, 6); ctx.fill(); }
+      text(w, x, 76, size, i <= at ? "#16181f" : "#6f6752", "left"); ctx.font = `700 ${size}px Andika`; x += ww;
+    });
+  } else text(ask, 268, 76, size, saying() ? "#e2413b" : "#6f6752", "center");
+  // 🔊 reads the question again (and lights the words up even with no speaker)
+  ctx.fillStyle = q.readAt && ago(q.readAt) < 1 ? "#ffd84a" : "#fff3c4"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(448, 72, 18, 0, 7); ctx.fill(); ctx.stroke();
+  text("🔊", 448, 80, 20, "#000", "center");
+  zone(420, 48, 56, 52, () => readQuestion(q, true));
+  const s = q.show || {}, cx = 282, cy = 120, withThings = s.expr && (s.count || s.add || s.take);
   if (s.big) text(s.big, cx, cy + 24, 64, "#16181f", "center");
-  if (s.pic) text(s.pic, cx, cy + 22, 56, "#000", "center");
-  if (s.word) text(s.word, cx, cy + 22, 56, "#16181f", "center");
+  if (s.pic && !s.blank) text(s.pic, cx, cy + 22, 56, "#000", "center");
+  if (s.blank) {   // the picture, and the word with a gap in it: c _ t
+    text(s.pic, 170, cy + 22, 56, "#000", "center");
+    [...s.blank].forEach((ch, i) => {
+      const x = 240 + i * 50;
+      if (ch === "_") { ctx.fillStyle = tick % 6 < 4 ? "#ffd84a" : "#fff3c4"; ctx.strokeStyle = "#16181f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x, cy - 24, 44, 52, 10); ctx.fill(); ctx.stroke(); text("?", x + 22, cy + 16, 34, "#e2413b", "center"); }
+      else text(ch, x + 22, cy + 18, 48, "#16181f", "center");
+    });
+  }
+  if (s.word) {
+    text(s.word, cx, cy + 22, 56, "#16181f", "center");
+    if (s.sweep && !q.okAt) {   // a finger moves under each letter, then the whole word: sound it out, then say it
+      ctx.font = "700 56px Andika"; const tw = ctx.measureText(s.word).width, L = s.word.length, step = Math.floor(ago(act.t0) / 0.9) % (L + 2);
+      if (step < L) { const lw = tw / L, x0 = cx - tw / 2 + step * lw; ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.roundRect(x0, cy + 28, lw, 8, 4); ctx.fill(); text("👆", x0 + lw / 2, cy + 56, 20, "#000", "center"); }
+      else if (step === L) { ctx.fillStyle = "#6cbf4a"; ctx.beginPath(); ctx.roundRect(cx - tw / 2, cy + 28, tw, 8, 4); ctx.fill(); }
+    }
+  }
   if (s.line) text(s.line, cx, cy + 14, fit(s.line, 32, 350), "#16181f", "center");
-  if (s.expr) text(s.expr, cx, cy + 20, 52, "#16181f", "center");
-  const demoN = q.demo ? Math.min(s.count || 0, Math.floor(ago(q.demo) / 0.6)) : null;
-  if (s.count) itemsRow(s.count, cx, cy + 2, s.frame ? 26 : 34, q.thing, { frame: s.frame, maxW: 340, demoN });
-  if (s.add) { itemsRow(s.add[0], cx - 90, cy + 4, 28, q.thing, { maxW: 150, frame: s.add[0] > 5 }); text("+", cx, cy + 16, 40, "#16181f", "center"); itemsRow(s.add[1], cx + 90, cy + 4, 28, q.thing, { maxW: 150, frame: s.add[1] > 5 }); }
-  if (s.take) itemsRow(s.take[0], cx, cy + 4, 32, q.thing, { maxW: 340, crossFrom: s.take[0] - s.take[1] });
+  if (s.expr) text(s.expr, cx, withThings ? cy - 10 : cy + 20, withThings ? 28 : 52, "#16181f", "center");
+  if (s.tenframe != null) tenFrame(s.tenframe, cx, cy + 10, 30, q.thing);
+  const ty = withThings ? cy + 30 : cy + 4;
+  const total = s.count || (s.add ? s.add[0] + s.add[1] : s.take ? s.take[0] : 0);
+  const demoN = q.demo ? Math.min(total, Math.floor(ago(q.demo) / 0.6)) : null;
+  if (s.count) itemsRow(s.count, cx, withThings ? ty : cy + 2, withThings ? 28 : s.frame ? 26 : 34, q.thing, { frame: s.frame, maxW: 350, demoN, ghostFrom: s.ghostFrom });
+  if (s.add) { itemsRow(s.add[0], cx - 90, ty, withThings ? 22 : 28, q.thing, { maxW: 150, frame: s.add[0] > 5, demoN }); text("+", cx, ty + 12, 40, "#16181f", "center"); itemsRow(s.add[1], cx + 90, ty, withThings ? 22 : 28, q.thing, { maxW: 150, frame: s.add[1] > 5, demoN, numberFrom: s.add[0] }); }
+  if (s.take) itemsRow(s.take[0], cx, ty, withThings ? 24 : 32, q.thing, { maxW: 340, crossFrom: s.take[0] - s.take[1], demoN });
   if (q.kind === "spell") return drawSpell(q);
   // the answers: three big cards across the bottom (two for "which has more")
   const n = q.opts.length, gap = 10, w = n === 2 ? 229 : 148, h = 146, y = 168;
@@ -1508,9 +1627,13 @@ function dayEvent(now, u, ty) {
 
 /* ---------------- the mystery egg, and her friends ---------------- */
 // Every round, game and routine warms the egg. When it's ready it wobbles; a
-// tap hatches a new friend with a name: mostly kittens and unicorns in many
-// colors, a few of them rare. One friend sits beside Tinny each day; tapping
-// the egg shows them all.
+// tap hatches a new friend with a name: kittens, unicorns, puppies, birds, giraffes, ladybugs, dinosaurs,
+// horses, pandas, cheetahs, flamingos, jellyfish, squirrels, owls and dolphins,
+// in many colors, a few of them rare. One friend sits beside Tinny each day;
+// tapping the egg shows them all.
+const RAINBOW = ["#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2f6fb5", "#b768d6"];
+// Sprites: k outline, b body (coat.b), d second color (coat.d), s spots (coat.s or coat.d),
+// e eye, w white, y yellow, p pink, n nose, o orange.
 const CATS = [{ b: "#ef8a3a", d: "#c4621c", kind: "orange kitten" }, { b: "#3a3d4c", d: "#22242e", eye: "#ffd84a", kind: "black kitten" },
   { b: "#ffffff", d: "#d8dce4", kind: "white kitten" }, { b: "#9aa1ad", d: "#6d7480", kind: "gray kitten" },
   { b: "#ffffff", d: "#ef8a3a", spot: "#3a3d4c", kind: "calico kitten" }, { b: "#c9a6e8", d: "#9f78c9", kind: "purple kitty", rare: 1 },
@@ -1539,7 +1662,6 @@ const GIRAFFE_PX = [
   "......kmbbk....", "......kmbdk....", "......kmbbk....", "......kmdbk....", "......kmbbk....", ".kkkkkkbbbk....", "kbbdbbbbdbk....",
   "kbdbbdbbbbk....", "kbbbbbdbbdk....", ".kbkkkkkbk.....", ".kbk...kbk.....", ".kkk...kkk....."];
 const UNI_NAMES = ["Sparkle", "Twinkle", "Glitter", "Daisy", "Moonbeam", "Sunny", "Clover", "Pixie", "Dream", "Stardust", "Cupcake", "Rainbow"];
-const RAINBOW = ["#e2413b", "#ef7f2c", "#f2c230", "#6cbf4a", "#2f6fb5", "#b768d6"];
 const CAT_PX = [
   ".k.........k.", "kpk.......kpk", "kbbk.....kbbk", "kbbbkkkkkbbbk", "kbbbbbbbbbbbk", "kbbebbbbbebbk", "kbbbbbnbbbbbk",
   ".kbbbbbbbbbk.", "..kkbbbbbkk..", ".kbbbbbbbbbk.", "kbbbbbbbbbbbk", "kbbbbbbbbbbbk", "kbbbkbbbkbbbk", ".kkk.kkk.kkk."];
@@ -1562,6 +1684,68 @@ const SPECIES = {
   bird: { coats: BIRDS, px: BIRD_PX, names: BIRD_NAMES, say: "Tweet!", emoji: "🐦", big: 9, mid: 6, small: 4 },
   giraffe: { coats: GIRAFFES, px: GIRAFFE_PX, names: GIRAFFE_NAMES, say: "Hmmmm!", emoji: "🦒", big: 8, mid: 4, small: 3 },
 };
+// November 17, 2026: ten more that Zelda asked for. Extra sprite letters: s spots (coat.s),
+// w white, o orange. Each is sized to fit the same boxes as the others.
+const MORE = {
+  ladybug: { says: "Hi there!", names: ["Dot", "Lulu", "Poppy", "Ruby", "Spot", "Bitsy", "Rosie", "Polka"], px: [
+    "....k...k....", "...k.....k...", "..kkkkkkkkk..", ".kkkkkkkkkkk.", ".kkekkkkkekk.", "kkbbbbkbbbbkk", "kbbsbbkbbsbbk", "kbbbbbkbbbbbk",
+    "kbsbbbkbbbsbk", "kbbbbbkbbbbbk", ".kbbsbkbsbbk.", "..kbbbkbbbk..", "...kkkkkkk..."],
+    coats: [{ b: "#e2413b", s: "#16181f", eye: "#fff", kind: "red ladybug" }, { b: "#f2c230", s: "#16181f", eye: "#fff", kind: "yellow ladybug" },
+      { b: "#ef7f2c", s: "#16181f", eye: "#fff", kind: "orange ladybug" }, { b: "#f2a1a8", s: "#e2413b", eye: "#fff", kind: "pink ladybug", rare: 1 },
+      { b: "#2f6fb5", s: "#ffd84a", eye: "#fff", kind: "blue ladybug", rare: 2 }] },
+  dino: { says: "Rawr!", names: ["Rex", "Dottie", "Spike", "Stompy", "Fern", "Bronto", "Roary", "Peaches"], px: [
+    "..........kkkk..", ".........kbbbbk.", ".........kbebbbk", ".........kbbbkkk", "..........kbbk..", ".........dkbbk..", "kk......ddkbbk..",
+    "kbkkkkkkddkbbk..", "kbbbbbbbbbbbbk..", ".kbbsbbbsbbbbk..", "..kbbbbbbbbbk...", "...kbbkkkbbk....", "...kbk...kbk....", "...kkk...kkk...."],
+    coats: [{ b: "#6cbf4a", d: "#2e8b3a", s: "#2e8b3a", kind: "green dinosaur" }, { b: "#5aa7e6", d: "#2f6fb5", s: "#2f6fb5", kind: "blue dinosaur" },
+      { b: "#b768d6", d: "#8a5ad1", s: "#8a5ad1", kind: "purple dinosaur" }, { b: "#ef7f2c", d: "#c85f14", s: "#c85f14", kind: "orange dinosaur" },
+      { b: "#ffd84a", d: "#e9ad1c", s: "#e9ad1c", kind: "golden dinosaur", rare: 1 }, { b: "rainbow", d: "#16181f", s: "#fff", kind: "RAINBOW dinosaur", rare: 2 }] },
+  horse: { says: "Neigh!", names: ["Buttercup", "Star", "Maple", "Blaze", "Penny", "Cocoa", "Willow", "Dusty", "Ginger"], px: [
+    "............kk.kk...", "............kbkbk...", "...........kbbbbbk..", "..........dkbwebbbk.", ".........ddkbbbbbbbk", "........ddkbbbbbbnnk",
+    "kk.....ddkbbbbbkkkk.", "kdk...ddkbbbbbk.....", "kddk..dkbbbbbbk.....", ".kddkkkbbbbbbbbkkk..", "..kdkbbbbbbbbbbbbbk.", "...kbbbbbbbbbbbbbbk.",
+    "...kbbbbbbbbbbbbbbk.", "...kbk.kbk..kbk.kbk.", "...kbk.kbk..kbk.kbk.", "...kkk.kkk..kkk.kkk."],
+    coats: [{ b: "#8a5a2b", d: "#4a2e14", kind: "brown horse" }, { b: "#f3f6fb", d: "#9aa1ad", kind: "white horse" }, { b: "#3a3d4c", d: "#16181f", eye: "#ffd84a", kind: "black horse" },
+      { b: "#c98a4b", d: "#fff", kind: "golden palomino", rare: 1 }, { b: "#f3f6fb", d: "rainbow", kind: "rainbow-mane pony", rare: 2 }] },
+  panda: { says: "Munch munch!", names: ["Bamboo", "Mochi", "Pudding", "Boba", "Dumpling", "Momo", "Pebble"], px: [
+    ".kk.......kk.", "kddk.....kddk", "kbbbkkkkkbbbk", "kbbbbbbbbbbbk", "kbddbbbbbddbk", "kbdebbbbbedbk", "kbbbbbkbbbbbk", ".kbbbbbbbbbk.",
+    "..kkbbbbbkk..", ".kddbbbbbddk.", "kdddbbbbbdddk", "kddkdddddkddk", ".kkkkkkkkkkk."],
+    coats: [{ b: "#ffffff", d: "#16181f", eye: "#fff", kind: "giant panda" }, { b: "#fff4e2", d: "#6e4520", eye: "#fff", kind: "brown panda", rare: 1 },
+      { b: "#ffd6e0", d: "#e2417b", eye: "#fff", kind: "pink panda", rare: 2 }] },
+  cheetah: { says: "Zoom!", names: ["Dash", "Flash", "Speedy", "Zippy", "Comet", "Rocket", "Sprint"], px: [
+    "..........kk..kk....", ".........kbbkkbbk...", ".........kbbbbbbbk..", ".........kbwebbwebk.", ".........kbbkbbbkbk.", ".........kbbbnnbbbk.",
+    "..........kbbbbbbk..", "kkk.......kkbbbbkk..", "kbbkkkkkkkkkbbbbbbk.", ".kkbbsbbbsbbbsbbbbk.", "....kbbbsbbsbbbbsbk.", ".....kbsbbbbbsbbbbk.",
+    ".....kbk.kbk.kbk.kbk", ".....kbk.kbk.kbk.kbk", ".....kkk.kkk.kkk.kkk"],
+    coats: [{ b: "#e9b85a", s: "#3a2a14", kind: "cheetah" }, { b: "#c98a4b", s: "#16181f", kind: "king cheetah", rare: 1 }, { b: "#f3f6fb", s: "#9aa1ad", kind: "snow cheetah", rare: 2 }] },
+  flamingo: { says: "Honk!", names: ["Flo", "Coral", "Fifi", "Peaches", "Blossom", "Mango", "Rosa"], px: [
+    "..kkk.......", ".kbbbk......", ".kbebbkk....", ".kbbbkyyk...", "..kbk.kkk...", "..kbk.......", "..kbk.......", "..kbkkkkk...",
+    "..kbbbbbbk..", "...kbbbbbbk.", "...kbdbbbbk.", "....kbbbbk..", ".....kkbkk..", ".......k....", ".......k....", "......kkk..."],
+    coats: [{ b: "#f28fb0", d: "#e2417b", kind: "pink flamingo" }, { b: "#ff7f7f", d: "#e2413b", kind: "coral flamingo" }, { b: "#ef7f2c", d: "#c85f14", kind: "orange flamingo", rare: 1 },
+      { b: "#c9a6e8", d: "#8a5ad1", kind: "purple flamingo", rare: 2 }] },
+  jellyfish: { says: "Wibble wobble!", names: ["Jelly", "Bubbles", "Wobbly", "Glow", "Squishy", "Pearl", "Ripple"], px: [
+    "....kkkkk....", "..kkbbbbbkk..", ".kbbbbbbbbbk.", "kbbbbbbbbbbbk", "kbbebbbbbebbk", "kbbbbbbbbbbbk", "kkbbbbbbbbbkk", ".kkkkkkkkkkk.",
+    ".d..d..d..d..", ".d.d...d..d..", "..d.d.d..d...", ".d..d..d..d..", "..d.d...d.d.."],
+    coats: [{ b: "#f2a1a8", d: "#e2417b", kind: "pink jellyfish" }, { b: "#9fd2e6", d: "#2f8fd1", kind: "blue jellyfish" }, { b: "#c9a6e8", d: "#8a5ad1", kind: "purple jellyfish" },
+      { b: "#f3f6fb", d: "#c9d4ff", kind: "moon jelly", rare: 1 }, { b: "rainbow", d: "#b768d6", kind: "RAINBOW jellyfish", rare: 2 }] },
+  squirrel: { says: "Chip chip!", names: ["Nutmeg", "Acorn", "Hazel", "Scamper", "Chip", "Pecan", "Twiggy"], px: [
+    "..kkk.....kk..", ".kbbbk...kbbk.", ".kbbbbk..kbebk", "kbbbbbk..kbbnk", "kbbbbbkkkkbbk.", "kbbbbbbbbbbk..", "kbbbbkbddbbk..", ".kbbbkbddbbk..",
+    ".kbbbkbbbbbk..", "..kbbbbbbbbk..", "...kkkbbbbk...", "....kbkkkbk...", "....kbk.kbk...", "....kkk.kkk..."],
+    coats: [{ b: "#9aa1ad", d: "#f3f6fb", kind: "gray squirrel" }, { b: "#c4621c", d: "#fff4e2", kind: "red squirrel" }, { b: "#8a5a2b", d: "#fff4e2", kind: "brown squirrel" },
+      { b: "#f3f6fb", d: "#ffd6e0", eye: "#e2413b", kind: "white squirrel", rare: 1 }, { b: "#ffd84a", d: "#fff", kind: "golden squirrel", rare: 2 }] },
+  owl: { says: "Hoot hoot!", names: ["Olive", "Hootie", "Winnie", "Pip", "Sage", "Luna", "Archie"], px: [
+    "kk.........kk", "kbk.......kbk", "kbbkkkkkkkbbk", "kbbbbbbbbbbbk", "kbwwwbbbwwwbk", "kbwewbbbwewbk", "kbwwwbybwwwbk", "kbbbbbybbbbbk",
+    "kdbbbbbbbbbdk", "kdbbdbdbdbbdk", "kdbbbdbdbbbdk", ".kdbbbbbbbdk.", "..kkbbbbbkk..", "...kykkkyk..."],
+    coats: [{ b: "#a87650", d: "#6e4520", kind: "brown owl" }, { b: "#f3f6fb", d: "#c9d4ff", kind: "snowy owl" }, { b: "#9aa1ad", d: "#6d7480", kind: "gray owl" },
+      { b: "#c9a6e8", d: "#8a5ad1", kind: "purple owl", rare: 1 }, { b: "rainbow", d: "#16181f", kind: "RAINBOW owl", rare: 2 }] },
+  dolphin: { says: "Eee-ee-ee!", names: ["Splash", "Finn", "Marina", "Echo", "Skipper", "Coral", "Wave"], px: [
+    "..........kk....", ".........kbbk...", ".....kkkkkbbkkk.", "...kkbbbbbbbbbbk", "..kbbbbbbbbbbbbk", ".kbbbbbbbbbbebbk", "kbbkkbbbbbbbbbbk",
+    "kbk.kbwwwwwwwkkk", ".k...kkwwwwwkk..", ".......kkkkk...."],
+    coats: [{ b: "#6b8fb0", kind: "dolphin" }, { b: "#5aa7e6", kind: "blue dolphin" }, { b: "#9aa1ad", kind: "gray dolphin" },
+      { b: "#f2a1a8", kind: "pink river dolphin", rare: 1 }, { b: "rainbow", kind: "RAINBOW dolphin", rare: 2 }] },
+};
+const MORE_EMOJI = { ladybug: "🐞", dino: "🦕", horse: "🐴", panda: "🐼", cheetah: "🐆", flamingo: "🦩", jellyfish: "🌊", squirrel: "🐿️", owl: "🦉", dolphin: "🐬" };
+for (const [k, v] of Object.entries(MORE)) {
+  const w = v.px[0].length, h = v.px.length, fit = (bw, bh) => Math.max(2, Math.floor(Math.min(bw / w, bh / h)));
+  SPECIES[k] = { coats: v.coats, px: v.px, names: v.names, say: v.says, emoji: MORE_EMOJI[k], big: fit(130, 152), mid: fit(80, 86), small: fit(54, 58) };
+}
 const sp = (f) => SPECIES[f.kind] || SPECIES.cat;
 const coatOf = (f) => sp(f).coats[f.coat] || sp(f).coats[0];
 const spW = (f) => sp(f).px[0].length, spH = (f) => sp(f).px.length;
@@ -1571,8 +1755,10 @@ function drawFriend(f, x, y, u, happy) {
   rows.forEach((row, j) => [...row].forEach((ch, i) => {
     if (ch === ".") return;
     let col = { k: "#16181f", y: f.kind === "bird" ? "#ef7f2c" : "#e9ad1c", p: f.kind === "dog" ? "#e2413b" : "#f2a1a8",
-                n: f.kind === "dog" ? "#16181f" : "#f2a1a8", e: happy ? "#16181f" : (c.eye || "#16181f") }[ch];
-    if (ch === "d") col = c.b === "rainbow" || c.few ? c.d : (c.spot && (i + j) % 4 === 0 ? c.spot : c.d);
+                n: f.kind === "dog" ? "#16181f" : "#f2a1a8", w: "#ffffff", o: "#ef7f2c", e: happy ? "#16181f" : (c.eye || "#16181f") }[ch];
+    const dd = c.d === "rainbow" ? RAINBOW[j % 6] : (c.d || c.b);
+    if (ch === "d") col = c.b === "rainbow" || c.few ? dd : (c.spot && (i + j) % 4 === 0 ? c.spot : dd);
+    if (ch === "s") col = c.s === "rainbow" ? RAINBOW[j % 6] : (c.s || c.d || "#16181f");
     if (ch === "b") col = c.b === "rainbow" ? RAINBOW[j % 6] : (c.spot && (i + j * 3) % 7 === 0 ? c.spot : (c.spot && !c.few && (i * 2 + j) % 5 === 0 ? c.d : c.b));
     if (ch === "m") col = c.mane === "rainbow" ? RAINBOW[j % 6] : c.mane;
     if (ch === "e" && happy) { rect(x + i * u, y + j * u + u / 2, u, u / 2, col); return; }
@@ -1591,7 +1777,8 @@ function rollFriend(want) {
   for (let i = 0; i < kinds.length; i++) { if ((pick -= weight[i]) <= 0) { kind = kinds[i]; break; } }
   if (want && SPECIES[want]) kind = want;
   const list = SPECIES[kind].coats, r = Math.random();
-  const pool = list.map((c, i) => i).filter(i => (list[i].rare || 0) === (r < 0.04 ? 2 : r < 0.18 ? 1 : 0));
+  let pool = list.map((c, i) => i).filter(i => (list[i].rare || 0) === (r < 0.04 ? 2 : r < 0.18 ? 1 : 0));
+  if (!pool.length) pool = list.map((c, i) => i).filter(i => !list[i].rare);
   const names = SPECIES[kind].names, used = friends.map(f => f.name), coat = pickOne(pool);
   // Zelda picked this one: her first rare bird is called Buffalo.
   if (kind === "bird" && list[coat].rare && !used.includes("Buffalo")) return { kind, coat, name: "Buffalo" };
@@ -1606,6 +1793,13 @@ if (!store.get("tinny-giraffe-egg", 0)) {
   if (!friends.some(f => f.kind === "giraffe")) { egg.inside = rollFriend("giraffe"); store.set("tinny-egg", egg); }
   store.set("tinny-giraffe-egg", 1);
 }
+// November 17, 2026: Zelda asked for ten more kinds, so the egg she has now holds one of them.
+if (!store.get("tinny-more-egg", 0)) {
+  const fresh = Object.keys(MORE).filter(k => !friends.some(f => f.kind === k));
+  if (fresh.length) { egg.inside = rollFriend(pickOne(fresh)); store.set("tinny-egg", egg); }
+  store.set("tinny-more-egg", 1);
+}
+if (!SPECIES[egg.inside?.kind]) newEgg();
 const eggNeed = () => (friends.length === 0 ? 3 : 6);      // the first one hatches quickly
 const eggReady = () => egg.warm >= eggNeed();
 function warmEgg(n) { egg.warm = Math.min(eggNeed(), egg.warm + n); store.set("tinny-egg", egg); }
@@ -1646,9 +1840,8 @@ function drawFriends(now) {
   rect(0, 0, W, H, "#2a2d3a");
   homeButton(() => { act = null; });
   const left = eggNeed() - egg.warm;
-  // the egg, and how warm it is
   drawEgg(440, 30, 36);
-  text(eggReady() ? "Tap me! 🥚" : `${left} more game${left === 1 ? "" : "s"}`, 410, 34, 16, "#fff", "right");
+  text(eggReady() ? "Tap me!" : `${left} to go`, 412, 34, 15, "#fff", "right");
   if (eggReady()) zone(380, 0, 100, 60, () => begin("hatch"));
   if (friends.length) text(`My friends: ${friends.length}`, 200, 32, 18, "#ffd84a", "center");
   const newest = friends.slice().reverse(), pages = Math.max(1, Math.ceil(newest.length / FRIENDS_PER_PAGE));
@@ -1986,16 +2179,6 @@ const ZOO_BY = Object.fromEntries(ZOO.map(a => [a.id, a]));
 const homeOf = (k) => ZOO_HOMES.find(h => h.k === k);
 const plural = (a) => a.name === "sheep" ? "sheep" : a.name === "octopus" ? "octopuses" : a.name + "s";
 let zoo = store.get("tinny-zoo", []).filter(id => ZOO_BY[id]);
-
-// Out loud: Fully's voice on the tablet, the browser's anywhere else, quiet if neither.
-function speak(s) {
-  const line = String(s).replace(/[^\p{L}\p{N}\s.,!?'-]/gu, "").replace(/\s+/g, " ").trim();
-  if (!line) return;
-  try {
-    if (window.fully && fully.textToSpeech) { try { fully.stopTextToSpeech && fully.stopTextToSpeech(); } catch (e) {} fully.textToSpeech(line); return; }
-    if (window.speechSynthesis) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(line); u.rate = 0.95; u.pitch = 1.15; speechSynthesis.speak(u); }
-  } catch (e) {}
-}
 
 function startZoo() { begin("zoo", { view: "map" }); speak(zoo.length ? "Welcome back to your zoo!" : "Welcome to your zoo! Tap the truck to meet your first animal."); }
 function zooNext() {

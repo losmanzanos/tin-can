@@ -154,15 +154,18 @@ tiles. Every tap shows a ring where it landed, and nothing ever goes wrong for
 Tinny: it only gets a bit hungry or dusty and asks.
 
 - **🔤 Letters, 📖 Read, ✏️ Spell, 🔢 Count:** learning games that find her
-  level by themselves. Four right in a row moves a game up a level; a few misses
-  move it back. A wrong answer is never a dead end: that choice fades, a second
-  miss lights up the right one. Five questions make a round.
-  - Letters: find the letter, big & little letters, first sounds, last sounds.
-  - Read: read a word and pick its picture, then rhyming words, longer words, little sentences.
-  - Spell: tap the letters in order (copying first, then from the picture, then with extra letters, then 4-letter words). Her own words (her name, this week's words) go in on the admin page.
-  - Count: count to 5, to 10, which is more, adding, taking away, number sentences.
+  level by themselves, aimed at two kindergarten goals: reading short (c-a-t)
+  words, and adding and taking away within 10. Four right in a row moves a game
+  up a level; a few misses move it back; one question in five is a review from
+  the level below. A wrong answer is never a dead end: that choice fades, a
+  second miss lights up the right one, and on a counting question Tinny counts
+  the things out with her. Five questions make a round.
+  - Letters: find the letter, big & little letters, first sounds, last sounds, middle (vowel) sounds.
+  - Read: sound it out (a finger slides under each letter), read a word, word families (cat/hat/bat), vowel detective (bug/bag), longer words, little sentences.
+  - Spell: copy the word, the missing letter, spell 3 letters, with extra letters, 4-letter words. Her own words (her name, this week's words) go in on the admin page.
+  - Math: add within 10, take away within 10, + and − sentences within 10, the missing number (3 + ? = 7, with the ones still to come faded), make 10 (a ten-frame with ? in the empty boxes), then + and − to 20. About one question in five is counting, and a missed number sentence brings in the pictures to count together.
 - **Her garden:** every round waters it. Plants bloom after a few rounds; eight fill a garden, then a new one starts.
-- **The mystery egg:** every game and routine warms it. When it wobbles, a tap hatches a new friend with a name: kittens and unicorns in lots of colors, a few of them rare (a rainbow kitty, a starry night unicorn). One friend sits beside Tinny each day; tap the egg to see them all.
+- **The mystery egg:** every game and routine warms it. When it wobbles, a tap hatches a new friend with a name: kittens, unicorns, puppies, birds, giraffes, ladybugs, dinosaurs, horses, pandas, cheetahs, flamingos, jellyfish, squirrels, owls and dolphins, in lots of colors, a few of them rare (a rainbow kitty, a starry night unicorn, a pink river dolphin). It leans toward kinds she doesn't have yet. One friend sits beside Tinny each day; tap the egg to see them all.
 - **🍎 Feed** (snacks with their words) and **🎈 Play** (ball to ten, colors, peekaboo; a bath when it's dusty).
 - **Surprises** every couple of minutes on the home screen: a letter balloon ("B is for bus"), a word of the day, a joke, a fun fact (lots of cats and unicorns), a butterfly, juggling. The jokes and facts are written into Tinny, not fetched, so nothing unexpected shows up.
 - **Holidays:** costumes and decorations for Halloween, Thanksgiving, Christmas, New Year, Valentine's, St. Patrick's, Easter, the Fourth of July, her birthday (set on the admin page) and Tinny's.
@@ -171,13 +174,14 @@ Tinny: it only gets a bit hungry or dusty and asks.
 - **Morning and evening routines:** one giant button at a time; a tap anywhere does it and Tinny acts it out. Mornings (her first 20 minutes): wake up, breakfast, get dressed, what's on today. Evenings (the last 20 minutes before her big screen turns off): teeth, pajamas, "How was today?" 😊😐😢, lights out, with tonight's real moon. They grow with her: every couple of weeks a step joins (brushing teeth and making the bed in the morning, then a look outside that picks a coat or umbrella from the real weather; a one-line story at her reading level and a bath at night).
 - **Stars:** every finished round or activity earns one.
 
-**Touch:** if taps don't land where she touches, tap **Calibrate the touch** on
-the admin page (**Settings → Tinny**), then tap the middle of each of the five
-stars on the little screen.
+**Sound:** Tinny reads every question aloud with the tablet's voice (Fully
+Kiosk's text to speech; turn on **Enable JavaScript Interface** in Fully's
+Advanced Web Settings). 🔊 on a question reads it again, and the words light up
+one by one as it reads.
 
-The admin page shows what she's practicing (each game's level, how this week
-went, and you can set any level), how her days went, and her friends. Letters
-start at first sounds.
+The admin page shows the two kindergarten goals as progress bars, what she's
+practicing (each game's level, how this week went, and you can set any level),
+how her days went, and her friends. Letters start at first sounds.
 
 What Tinny remembers (levels, garden, meals, stars, its hat, the touch calibration) is kept in the little screen's browser.
 
